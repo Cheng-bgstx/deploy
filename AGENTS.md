@@ -55,3 +55,17 @@
   GitHub.
 - Use normal `git` commands for local version control and pushes. Configure Git
   authentication through `gh auth setup-git`.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues on `dixiatielu/sim2real_scalecar` (the fork, not upstream). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one root `GLOSSARY.md` plus `docs/adr/`, both created lazily. See `docs/agents/domain.md`.

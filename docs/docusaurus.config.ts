@@ -36,6 +36,8 @@ const config: Config = {
             'getting-started/README.md',
             'tutorials/README.md',
             'i18n/**',
+            'agents/**',
+            'adr/**',
             'package.json',
             'package-lock.json',
             'tsconfig.json',
