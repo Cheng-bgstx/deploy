@@ -49,6 +49,7 @@ def exported(request, tmp_path_factory):
     source_dir = TRACKERS_DIR / variant
     return SimpleNamespace(
         variant=variant,
+        output_dir=output_dir,
         onnx_path=output_dir / "policy.onnx",
         policy_config=yaml.safe_load((output_dir / "policy.yaml").read_text()),
         comparison=json.loads((output_dir / "comparison.json").read_text()),
@@ -118,6 +119,27 @@ def test_policy_yaml_carries_tracker_contract(exported):
     assert future_steps[0] == 0
     assert set(dep["reference_offsets"]) <= set(future_steps)
     assert "pelvis" in cfg["motion"]["body_names"]
+
+
+def test_policy_yaml_carries_tracker_action_post_processing(exported):
+    """#3's runtime keys, filled from deployment.json by name (Tracker order)."""
+    cfg = exported.policy_config
+    dep = exported.deployment
+
+    limits = cfg["soft_joint_pos_limits"]
+    assert list(limits) == dep["joint_names"]
+    assert limits["left_knee_joint"] == [-0.013090252876281738, 2.8056230545043945]
+    for name, bounds in zip(dep["joint_names"], dep["soft_joint_pos_limits"], strict=True):
+        assert limits[name] == bounds, name
+    assert cfg["max_target_velocity_rad_s"] == 15.0
+    assert cfg["shaping_target"] == "motion_first_frame"
+
+
+def test_deployment_contract_ships_next_to_the_policy(exported):
+    """The vehicle sim2sim takes its physics (kp/kd, armature, effort limits) from the contract."""
+    shipped = exported.output_dir / "deployment.json"
+
+    assert shipped.read_bytes() == (TRACKERS_DIR / exported.variant / "deployment.json").read_bytes()
 
 
 def test_refuses_source_files_that_do_not_match_pinned_sha256(tmp_path):

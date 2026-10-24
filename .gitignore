@@ -21,6 +21,7 @@ stubs
 !/tests/test_tracker_action_postprocess.py
 !/tests/test_scalecar_tracker_export.py
 !/tests/test_scalecar_motion_convert.py
+!/tests/test_vehicle_sim2sim.py
 /third_party/*
 !/third_party/dh116s_sdk/
 /third_party/dh116s_sdk/*

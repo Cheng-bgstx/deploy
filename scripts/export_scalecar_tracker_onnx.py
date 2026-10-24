@@ -10,9 +10,14 @@ through a wrapper that follows sim2real's conventions:
 - Reference Tokens computed inside the graph from the raw Reference;
 - a single ``action[29]`` output in Tracker joint order (``policy_joint_names``).
 
+``policy.yaml`` also carries the Tracker's action post-processing (soft joint
+limits, target rate limit) and the Shaping target, filled from
+``deployment.json`` by joint name.
+
 Each export is compared with the original ONNX on random inputs in sim2real
 layout, mapped to Scalecar layout for the original. Output directory:
-``policy.onnx``, ``policy.yaml`` and ``comparison.json``.
+``policy.onnx``, ``policy.yaml``, ``comparison.json`` and a verbatim copy of the
+pinned ``deployment.json`` (the vehicle sim2sim reads its physics from it).
 
 Run in the root project with torch pinned to the version that produced the
 original ONNX (CPU wheel is enough)::
@@ -63,6 +68,7 @@ REQUIRED_TORCH = "2.7.0"  # producer_version of the original actor.onnx
 OPSET = 17  # same as the original; torch 2.7 writes IR 8, loadable by onnxruntime 1.16
 TOLERANCE = 5e-6
 NUM_SAMPLES = 256
+CONTROL_DT = 0.02  # sim2real runs the Tracker at rl_rate 50 Hz
 
 # HumanoidTransformerAdapt(64, 29, 29, 128, 4, 128, 4) + TaskEmbedder(69, 128)
 PROP_DIM = 64
@@ -449,6 +455,14 @@ def policy_yaml(deployment: dict[str, Any]) -> dict[str, Any]:
         "joint_kp": per_joint(deployment["stiffness"]),
         "joint_kd": per_joint(deployment["damping"]),
         "action_scale": per_joint(deployment["action_scale"]),
+        # Action post-processing, as Scalecar's PositionController: soft clip, then
+        # at most max_target_velocity_rad_s · (1 / rl_rate) per tick.
+        "soft_joint_pos_limits": {
+            name: [float(lo), float(hi)]
+            for name, (lo, hi) in zip(names, deployment["soft_joint_pos_limits"], strict=True)
+        },
+        "max_target_velocity_rad_s": float(deployment["max_target_velocity_rad_s"]),
+        "shaping_target": "motion_first_frame",
         "motion": {
             "motion_backend": "npz",
             "future_steps": offsets,
@@ -601,9 +615,13 @@ def export_tracker(
     sources = verify_sources(source_dir, variant)
     output_dir = Path(output_dir) if output_dir is not None else DEFAULT_OUTPUT_ROOT / variant
 
-    deployment = json.loads((source_dir / "deployment.json").read_text(encoding="utf-8"))
+    contract_bytes = (source_dir / "deployment.json").read_bytes()
+    deployment = json.loads(contract_bytes.decode("utf-8"))
     if deployment.get("input_interface") != "reference_only_v1":
         raise ValueError(f"Unsupported Tracker input interface {deployment.get('input_interface')!r}")
+    if deployment["control_dt"] != CONTROL_DT:
+        # The runtime rate-limits per tick of 1 / rl_rate (50 Hz by default).
+        raise ValueError(f"Tracker control_dt {deployment['control_dt']} != {CONTROL_DT}")
     original_path = source_dir / "actor.onnx"
     actor = rebuild_actor(onnx.load(str(original_path)))
     cfg = policy_yaml(deployment)
@@ -637,6 +655,7 @@ def export_tracker(
         header + yaml.dump(cfg, Dumper=_PolicyYamlDumper, sort_keys=False, width=100),
         encoding="utf-8",
     )
+    (output_dir / "deployment.json").write_bytes(contract_bytes)
 
     max_err = compare_with_original(onnx_path, original_path, layout, num_samples, seed)
     comparison = {
