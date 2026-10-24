@@ -20,6 +20,7 @@ stubs
 !/tests/test_bfm_zero_observations.py
 !/tests/test_tracker_action_postprocess.py
 !/tests/test_scalecar_tracker_export.py
+!/tests/test_scalecar_motion_convert.py
 /third_party/*
 !/third_party/dh116s_sdk/
 /third_party/dh116s_sdk/*
