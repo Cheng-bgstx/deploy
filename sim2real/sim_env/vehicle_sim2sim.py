@@ -163,7 +163,7 @@ class EnvelopeGuard:
         geom = int(self.geoms[index])
         body = int(self.model.geom_bodyid[geom])
         return {
-            "time_s": float(time_s),
+            "time_s": round(float(time_s), 6),
             "margin_m": margin,
             "geom": mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_GEOM, geom) or f"geom{geom}",
             "body": mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_BODY, body),
