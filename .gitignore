@@ -9,6 +9,7 @@ stubs
 /sync-robot.sh
 !/tests/
 /tests/*
+!/tests/test_scalecar_vehicle_scene.py
 !/tests/test_robot_io.py
 !/tests/test_command_sender.py
 !/tests/test_motion_buffer.py
