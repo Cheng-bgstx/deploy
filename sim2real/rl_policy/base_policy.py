@@ -16,7 +16,7 @@ from sim2real.rl_policy.controllers.pico import PicoController
 from sim2real.rl_policy.controllers.unitree_joystick import UnitreeJoystickController
 from sim2real.rl_policy.inference import Timer, build_inference_module
 from sim2real.rl_policy.observations import Observation, ObsGroup, normalize_observation_array
-from sim2real.rl_policy.robot_io import create_robot_io
+from sim2real.rl_policy.robot_io import RobotIO, create_robot_io
 from sim2real.rl_policy.utils.command_sender import ActionManager
 from sim2real.rl_policy.utils.joint_targets import JointTargetPostprocessor
 from sim2real.rl_policy.utils.state_processor import StateProcessor
@@ -74,12 +74,7 @@ class BasePolicy:
         self.body_names_simulation = list(policy_config["body_names_simulation"])
 
         self.robot_io_mode = args.robot_io
-        self.robot_io = create_robot_io(
-            mode=args.robot_io,
-            robot_name=args.robot,
-            robot_cfg=self.robot_cfg,
-            interface=args.robot_interface,
-        )
+        self.robot_io = self._create_robot_io()
 
         self.state_processor = StateProcessor(
             self.robot_cfg,
@@ -194,6 +189,15 @@ class BasePolicy:
 
     def prepare_policy_config(self, policy_config):
         return policy_config
+
+    def _create_robot_io(self) -> RobotIO:
+        """Robot transport. A runner that hosts the robot in-process overrides this."""
+        return create_robot_io(
+            mode=self.args.robot_io,
+            robot_name=self.args.robot,
+            robot_cfg=self.robot_cfg,
+            interface=self.args.robot_interface,
+        )
 
     def _build_controller(self) -> ControllerBase:
         self.keyboard_controller = None
