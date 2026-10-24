@@ -6,7 +6,10 @@ the artifact with the original Scalecar ONNX. The exporter needs torch 2.7.0:
 
     UV_FROZEN=1 uv run --with pytest --with torch==2.7.0 \
         --index https://download.pytorch.org/whl/cpu \
-        pytest tests/test_scalecar_tracker_export.py
+        python -m pytest tests/test_scalecar_tracker_export.py
+
+(``python -m`` puts the repo root first on sys.path; a dependency installs a
+top-level ``scripts`` package that would otherwise shadow this repo's.)
 """
 
 from __future__ import annotations
