@@ -209,6 +209,38 @@ class Tracking(BasePolicy):
 
         raise ValueError(f"Unsupported motion_backend: {self.motion_backend}")
 
+    def motion_first_frame_joint_pos(self) -> np.ndarray:
+        """Frame 0 of the Motion, in robot joint order (Shaping target).
+
+        File Playback uses the Motion it plays. A streamed Reference (zmq
+        backends, the Planner) still needs a Motion file for its first frame:
+        ``--motion-path`` or ``motion.motion_path``.
+        """
+        if self.motion_backend == "npz":
+            dataset = self.motion_dataset
+        else:
+            motion_path = self.args.motion_path or self.motion_config.get("motion_path")
+            if motion_path is None:
+                raise ValueError(
+                    "shaping_target: motion_first_frame with "
+                    f"motion_backend={self.motion_backend} needs a Motion for its "
+                    "first frame: pass --motion-path or set motion.motion_path"
+                )
+            dataset = motion_dataset_first_motion(
+                MotionDataset.create_from_path(
+                    motion_path,
+                    robot_cfg=self.robot_cfg,
+                    mjcf_path=self.motion_config.get("mjcf_path"),
+                )
+            )
+        first = np.zeros(1, dtype=int)
+        joint_pos = dataset.get_slice(first, first, first).joint_pos[0, 0]
+        q = self.default_dof_angles.copy()
+        for index, name in enumerate(self.action_manager.joint_names):
+            if name in dataset.joint_names:
+                q[index] = joint_pos[dataset.joint_names.index(name)]
+        return q
+
     def _update_motion_data(self, *, paused: bool = False) -> None:
         if self.motion_backend == "npz":
             motion_steps = self.motion_future_steps
