@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [{ name = "HDMI Contributors" }]
 requires-python = "==3.10.*"
 dependencies = [
-    "mujoco",
+    "mujoco==3.11.0",
     "mjviser",
     "mjhub @ git+https://github.com/EGalahad/mjhub.git@main",
     "loguru",

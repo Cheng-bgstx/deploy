@@ -1,0 +1,8 @@
+# Verbatim copies from Scalecar_v2 @ 7b8f370, source/scalecar_deploy/scalecar_deploy/.
+# Verified by scripts/scalecar/build_vehicle_scene.py before every build; never edit these files.
+be81cf381ea861df60f87e8a281ae2a9131d4dcc7c4eb3a8010377e84f474de3  __init__.py
+d96df3fd40914f5542fb20c7feec7ee94a60acf739a7d4e9e274d874b6ddea21  scene.py
+fc9556504071ff19d284656e60fe90fecae53ac11a941c51ecfaf93058c774cf  vehicle_collision.py
+3adeb83b8ac925e9b3cc82b549640b43e1b76db338102bce3d441ae6532c8535  surface_validation.py
+14f4a1dbde9056b0e1f279b4b06abeae19270377c270493dce562790462c0bba  simulation/__init__.py
+38c23863b772f98455fce87cebf7567b4e507c14502689b81eb382b631f78a79  simulation/physics.py
