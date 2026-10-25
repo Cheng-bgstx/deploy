@@ -463,7 +463,8 @@ Planner: first Chunk applied 0.060 s after Go
 或者 `Planner: Go refused, staying in Hold: <reason>`，原因可能是骨盆高度检查未
 通过、Planner 预热未完成、深度过旧（`depth is 0.350 s old (limit 0.2 s)`），或者
 深度 / worker 出错。在车辆 sim2sim 中，Go 时的站立骨盆高度约 0.79 m。E-stop、
-Shaping 或再次按 R1 时会打印 `Planner: Go dropped (...)`。
+Shaping 或再次按 R1 时会打印 `Planner: Go dropped (...)`；随后 Planner 会重新执行一次
+预热规划，下一次 Go 要等它完成。如果 worker 崩溃过，要等它重启后这次预热才会完成。
 
 Go 之后每 5 s 打印一行统计：规划次数、延迟 p50/p95、迟到的 Chunk、覆盖耗尽、深度
 帧龄和 Planner 的阶段。

@@ -445,10 +445,39 @@ def test_e_stop_drops_the_go_and_its_chunks_until_a_new_go():
     assert rig.step(5) is rig.hold
     assert rig.reference.phase == "standing"
 
+    rig.go()  # the worker is warmed up again first
+    assert rig.reference.go_time is None and "warmup" in rig.reference.provider.start_rejection
+    rig.worker.respond()
+    rig.step()
     rig.go()
     rig.worker.respond(rows=constant_rows(0.7), latency=0.037)
     motion = rig.step(2)
     np.testing.assert_allclose(motion.joint_pos[0], 0.7)
+
+
+def test_after_a_worker_crash_and_an_e_stop_the_next_go_waits_for_the_restarted_worker():
+    rig = Rig()
+    rig.go()
+    rig.worker.respond(rows=constant_rows(0.5), latency=0.037)
+    rig.step(2)
+    assert rig.reference.phase == "running"
+    rig.worker.last = dict(status="error", error="GPU planner exited; restarting on CUDA")  # the worker crashed
+    rig.step(3)
+
+    rig.reference.abort()  # E-stop
+    rig.step(3)
+    rig.go()  # the worker is still down
+    assert rig.reference.go_time is None and "worker" in rig.reference.provider.start_rejection
+
+    rig.worker.last = dict(status="loaded")  # restarted
+    rig.step()
+    assert rig.worker.submitted[-1]["warmup"]  # the newest request is a fresh warmup plan
+    rig.worker.respond()
+    rig.step()
+    rig.go()
+    assert rig.reference.go_time is not None
+    rig.worker.respond(rows=constant_rows(0.7), latency=0.037)
+    np.testing.assert_allclose(rig.step(2).joint_pos[0], 0.7)
 
 
 # ---------------------------------------------------------------------------

@@ -57,7 +57,7 @@ class PlannerProvider:
     - the joint order is checked against ``JOINT_NAMES`` instead of ``scalecar_dp.spec``;
     - ``sample`` also returns the resampled rows (``ReferenceDecision.rows``);
     - ``start`` records why it refused a Go (``start_rejection``);
-    - ``abort`` (E-stop) drops the current Go;
+    - ``abort`` (E-stop) drops the current Go and re-warms the worker before the next Go;
     - every Planner result is kept in ``plans`` for latency statistics (no TraceWriter).
     """
 
@@ -263,8 +263,16 @@ class PlannerProvider:
 
     def abort(self) -> None:
         """E-stop: drop the current Go. Results still in flight belong to a dead generation,
-        and only a new Go (after the Tracker takes over again) restarts planning."""
+        and only a new Go (after the Tracker takes over again) restarts planning.
+
+        The worker is warmed up again before the next Go: without a Go nothing else is
+        planned, so a worker error (a crash, then a restart) would otherwise never be
+        cleared, and a restarted worker would take its first plan cold. As at startup, the
+        warmup is resubmitted while the worker reports an error, and Go waits for it."""
         self.generation += 1
+        self.warmed = False
+        self.warm_submitted = False
+        self.worker_error = None
         self.go = None
         self.next_plan = None
         self.active = False
@@ -330,6 +338,8 @@ def _rejection(provider: PlannerProvider, readiness: dict) -> str:
         return "the Planner is already running"
     if provider.fault:
         return f"Planner fault: {provider.fault}"
+    if readiness["worker_error"]:
+        return f"Planner worker error: {readiness['worker_error']}"
     if not readiness["warmed"]:
         return "the Planner has not finished its warmup plan"
     if readiness["depth_age_s"] is None:
@@ -338,6 +348,4 @@ def _rejection(provider: PlannerProvider, readiness: dict) -> str:
         return f"depth is {readiness['depth_age_s']:.3f} s old (limit 0.2 s)"
     if readiness["depth_error"]:
         return f"depth error: {readiness['depth_error']}"
-    if readiness["worker_error"]:
-        return f"Planner worker error: {readiness['worker_error']}"
     return "not ready"

@@ -500,7 +500,9 @@ or `Planner: Go refused, staying in Hold: <reason>`, where the reason is the
 pelvis height check, an unfinished Planner warmup, stale depth (`depth is
 0.350 s old (limit 0.2 s)`), or a depth or worker error. Standing pelvis height
 at Go is about 0.79 m in the vehicle sim2sim. An E-stop, Shaping or a new R1
-prints `Planner: Go dropped (...)`.
+prints `Planner: Go dropped (...)`; the Planner then runs a fresh warmup plan,
+which the next Go waits for. If the worker crashed, that warmup is answered once
+it has restarted.
 
 Every 5 s after Go, a stats line reports the plan count, latency p50/p95, late
 Chunks, coverage exhaustion, depth age and the Planner phase.
