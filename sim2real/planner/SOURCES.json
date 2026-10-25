@@ -92,6 +92,10 @@
     "sim.py": {
       "source": "source/scalecar_deploy/scalecar_deploy/simulation/depth.py",
       "source_sha256": "407acefa5db3d94b6cde09b2f97d2b062a22cd5ad096f08776a7c16c9a570d4e"
+    },
+    "depth.py": {
+      "source": "source/scalecar_deploy/scalecar_deploy/hardware/depth.py",
+      "source_sha256": "6ff1c18355b03885a558beca76edd904eef4b1799263800cf3d7e419561c0b09"
     }
   }
 }

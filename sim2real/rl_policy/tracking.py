@@ -81,6 +81,9 @@ def _apply_runtime_motion_config(
     motion_dt_s: float,
     motion_tolerance_s: float,
     planner_checkpoint: Optional[str] = None,
+    depth_ssh_host: Optional[str] = None,
+    depth_remote_executable: Optional[str] = None,
+    depth_log_dir: Optional[str] = None,
 ):
     policy_config = deepcopy(policy_config)
     motion_cfg = policy_config.setdefault("motion", {})
@@ -108,6 +111,13 @@ def _apply_runtime_motion_config(
             motion_cfg["motion_path"] = motion_path
         if planner_checkpoint is not None:
             motion_cfg.setdefault("planner", {})["checkpoint"] = planner_checkpoint
+        for key, value in (
+            ("ssh_host", depth_ssh_host),
+            ("remote_executable", depth_remote_executable),
+            ("log_dir", depth_log_dir),
+        ):
+            if value is not None:
+                motion_cfg.setdefault("depth", {})[key] = value
     if resolved_backend in {"zmq", "smpl_zmq"}:
         motion_cfg["motion_zmq_connect"] = _resolve_motion_zmq_connect(
             motion_backend=resolved_backend,
@@ -135,6 +145,9 @@ class Tracking(BasePolicy):
             motion_dt_s=1 / self.args.rl_rate,
             motion_tolerance_s=self.args.motion_tolerance_s,
             planner_checkpoint=self.args.planner_checkpoint,
+            depth_ssh_host=self.args.depth_ssh_host,
+            depth_remote_executable=self.args.depth_remote_executable,
+            depth_log_dir=self.args.depth_log_dir,
         )
         motion_cfg = policy_config.get("motion", {})
         resolved_backend = str(motion_cfg.get("motion_backend", ""))
@@ -272,12 +285,34 @@ class Tracking(BasePolicy):
     def _planner_io(self, options: dict):
         """Depth source, Planner worker and clock for ``motion_backend=planner``.
 
-        On the robot this is the Host depth receiver, ``GpuPlannerWorker(options)``
-        and ``time.monotonic`` (dixiatielu/sim2real_scalecar#8); the vehicle sim2sim
-        overrides it with rendered depth on simulation time.
+        On the robot: the Host depth receiver (``sim2real.planner.depth``), which starts
+        the Onboard Computer's capture program over SSH; ``GpuPlannerWorker(options)``;
+        and the Host's ``time.monotonic``. ``motion.depth`` (and ``--depth-*``) set the
+        transport: ``ssh_host``, ``remote_executable``, ``port``, ``local_port``, ``cpu``,
+        and ``log_dir`` (default ``outputs/planner_depth/<time>``). The vehicle sim2sim
+        overrides this with rendered depth on simulation time.
         """
-        raise NotImplementedError(
-            "motion_backend=planner on the robot needs the Host depth receiver (dixiatielu/sim2real_scalecar#8)"
+        import time
+        from pathlib import Path
+
+        from sim2real.planner import depth, worker
+        from sim2real.planner.reference import PlannerIO
+
+        depth_cfg = dict(self.motion_config.get("depth") or {})
+        log_dir = Path(
+            depth_cfg.pop("log_dir", None)
+            or Path("outputs") / "planner_depth" / time.strftime("%Y%m%d_%H%M%S")
+        )
+        depth_cfg = depth.depth_options(depth_cfg)
+        log_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(
+            "Planner depth: starting {} on {} through SSH (local port {}); logs in {}",
+            depth_cfg["remote_executable"], depth_cfg["ssh_host"], depth_cfg["local_port"], log_dir,
+        )
+        return PlannerIO(
+            source=depth.DepthSource(depth_cfg, log_dir),
+            worker=worker.GpuPlannerWorker(options),
+            clock=time.monotonic,
         )
 
     def close_reference_source(self) -> None:
@@ -358,7 +393,9 @@ class Tracking(BasePolicy):
 
     def _reset_motion(self) -> None:
         if self.motion_backend == "planner":
-            # Entering the Tracker does not run a Planner cycle; the next tick does.
+            # R1 always starts a Hold at the Motion's frame 0. Entering the Tracker
+            # does not run a Planner cycle; the next tick does.
+            self._drop_planner_go("the Tracker took over again")
             self.motion_data = self.motion_buffer.motion_data
             return
         if self.motion_backend == "npz":
@@ -374,6 +411,37 @@ class Tracking(BasePolicy):
     def reset(self) -> None:
         self._reset_motion()
         super().reset()
+
+    def set_init_mode(self, *, source: str) -> None:
+        self._drop_planner_go("Shaping")
+        super().set_init_mode(source=source)
+
+    def set_zero_mode(self, *, source: str) -> None:
+        self._drop_planner_go("E-stop")
+        super().set_zero_mode(source=source)
+
+    def _drop_planner_go(self, reason: str) -> None:
+        """A Go lives within one Tracker session: E-stop, Shaping and a new take-over drop it."""
+        if self.motion_backend == "planner" and self.motion_buffer.go_active:
+            self.motion_buffer.abort(reason)
+
+    def planner_go(self, *, source: str) -> None:
+        """B with the Planner: the first press in Hold is Go (attempted at the next tick:
+        height check, new generation, go clock). Later presses have no effect."""
+        mode = self.state_dict.get("control_mode")
+        if mode != "policy":
+            logger.warning(
+                "Planner: Go ignored (via {}): Go needs the Tracker in Hold (A, then R1); control mode is {}",
+                source, mode,
+            )
+            return
+        if self.motion_buffer.go_active:
+            logger.info(
+                "Planner: B ignored (via {}): Go was already accepted; R2 then A -> R1 -> B restarts", source
+            )
+            return
+        logger.info("Planner: Go requested via {}", source)
+        self.motion_buffer.request_go()
 
     def toggle_paused(self, *, source: str) -> None:
         paused = not bool(self.state_dict.get("paused", False))
@@ -421,12 +489,14 @@ class Tracking(BasePolicy):
         if not extra_keys:
             return
 
+        # B: Go with the Planner, play/pause with File Playback.
+        b_pressed = self.planner_go if self.motion_backend == "planner" else self.toggle_paused
         if isinstance(self.controller, KeyboardController) and (
             "space" in extra_keys or " " in extra_keys
         ):
-            self.toggle_paused(source="keyboard:space")
+            b_pressed(source="keyboard:space")
         elif isinstance(self.controller, UnitreeJoystickController) and "B" in extra_keys:
-            self.toggle_paused(source="joystick:B")
+            b_pressed(source="joystick:B")
 
 
 @dataclass
@@ -437,6 +507,12 @@ class TrackingArgs(BasePolicyArgs):
     motion_path: Optional[str] = None
     planner_checkpoint: Optional[str] = None
     """motion_backend=planner: checkpoint path (default: the pinned ModelScope d1146 file)."""
+    depth_ssh_host: Optional[str] = None
+    """motion_backend=planner: SSH host of the Onboard Computer (motion.depth.ssh_host; default unitree@192.168.123.164)."""
+    depth_remote_executable: Optional[str] = None
+    """motion_backend=planner: absolute path of the depth capture program on the Onboard Computer."""
+    depth_log_dir: Optional[str] = None
+    """motion_backend=planner: directory for the depth receiver's logs (default outputs/planner_depth/<time>)."""
     motion_zmq_connect: Optional[str] = None
     motion_zmq_hwm: int = 1
     motion_tolerance_s: float = 0.04

@@ -24,6 +24,8 @@ stubs
 !/tests/test_vehicle_sim2sim.py
 !/tests/test_planner_port.py
 !/tests/test_planner_reference.py
+!/tests/test_planner_depth.py
+!/tests/test_planner_real_robot.py
 /third_party/*
 !/third_party/dh116s_sdk/
 /third_party/dh116s_sdk/*

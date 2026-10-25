@@ -1,0 +1,22 @@
+{
+  "description": "The Onboard Computer's depth capture program, copied byte for byte from Scalecar_v2 deploy/sensors. build.sh is sim2real's own (g++ without CMake).",
+  "scalecar_v2_commit": "7b8f370d2c7c6d0c1089af80b9d2934d3c74aae0",
+  "files": {
+    "depth_stream.cpp": {
+      "source": "deploy/sensors/depth_stream.cpp",
+      "sha256": "464d865304f7ac2473f2e536bc29c3115b235800a90bb190e4f22eb21eec0935"
+    },
+    "depth_clock.hpp": {
+      "source": "deploy/sensors/depth_clock.hpp",
+      "sha256": "7d80f27cbf535b48ea274cbda1e42f7727e5d3a7ad898f1ade20a8eefbd662aa"
+    },
+    "test_depth_clock.cpp": {
+      "source": "deploy/sensors/test_depth_clock.cpp",
+      "sha256": "dc5a7bff5f2eee5bf17951319a4181a8aeeb47c976f0d5bca8e68cf321c12488"
+    },
+    "CMakeLists.txt": {
+      "source": "deploy/sensors/CMakeLists.txt",
+      "sha256": "278dbe82a7a615964ff5135c9976991b25a8deb5cc0f08bf7ae21f7acd4a7642"
+    }
+  }
+}
