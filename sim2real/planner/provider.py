@@ -27,6 +27,10 @@ JOINT_NAMES = (
     "left_wrist_yaw_joint", "right_wrist_yaw_joint",
 )
 
+# Cold inference normally takes 0.1–0.5 s. Retry a missing warmup reply without
+# replacing an in-flight request every 50 Hz tick.
+WARMUP_RETRY_S = 1.0
+
 
 @dataclass(frozen=True)
 class PlannerState:
@@ -58,6 +62,7 @@ class PlannerProvider:
     - ``sample`` also returns the resampled rows (``ReferenceDecision.rows``);
     - ``start`` records why it refused a Go (``start_rejection``);
     - ``abort`` (E-stop) drops the current Go and re-warms the worker before the next Go;
+    - warmup recovers from worker errors in Hold and retries rejected requests or missing replies;
     - every Planner result is kept in ``plans`` for latency statistics (no TraceWriter).
     """
 
@@ -76,7 +81,7 @@ class PlannerProvider:
         self.next_plan = None
         self.active = False
         self.warmed = False
-        self.warm_submitted = False
+        self.warm_submitted_at: float | None = None
         self.fault = None
         self.failed_start = None
         self.camera_session = None
@@ -117,6 +122,11 @@ class PlannerProvider:
         item = self.worker.poll()
         if item is not None and item.get("status") == "error":
             self.worker_error = item["error"]
+            if self.go is None and self.warmed:
+                # A restarted worker needs a fresh warmup even before the first Go.
+                # Keep result_id: replaying its old mailbox reply cannot clear this error.
+                self.warmed = False
+                self.warm_submitted_at = None
         if item is not None and item.get("status") == "ready":
             identity = (item["generation"], item["request_id"])
             self._record_plan(identity, item)
@@ -129,6 +139,7 @@ class PlannerProvider:
                 self.worker_error = None
                 if item["warmup"]:
                     self.warmed = True
+                    self.warm_submitted_at = None
                 elif self.go is not None:
                     chunk = item["chunk"]
                     if (
@@ -185,13 +196,13 @@ class PlannerProvider:
         gravity = m38.quat_to_matrix(quat).T @ np.array([0.0, 0.0, -1.0])
         return state.joint_pos, np.array([0.0, 0.0, height]), quat, gravity
 
-    def _submit(self, now: float, warmup: bool) -> None:
+    def _submit(self, now: float, warmup: bool) -> bool:
         observer = runtime.Observer(self.depth, self.states)
         observer.start(self.go if self.go is not None else now)
         obs = observer.observe(now)
         times = [self.depth.t[i] for i in obs.depth_idx]
         self.request_id += 1
-        if self.worker.submit(
+        submitted = self.worker.submit(
             dict(
                 generation=self.generation,
                 request_id=self.request_id,
@@ -199,17 +210,21 @@ class PlannerProvider:
                 depth_times=times,
                 warmup=warmup,
             )
-        ):
+        )
+        if submitted:
             self.plans_requested += not warmup
+        return submitted
 
     def warmup(self, state, now: float) -> None:
-        if self.warmed or (self.warm_submitted and not self.worker_error) or not self.depth.t:
+        if self.go is not None or self.warmed or not self.depth.t:
+            return
+        if self.warm_submitted_at is not None and now - self.warm_submitted_at < WARMUP_RETRY_S:
             return
         # Warmup is never used for movement or accepted as a measured initialization.
         self.states = runtime.StateBuffer()
         self.states.push(now, *self._robot_row(state, 0.7842))
-        self._submit(now, warmup=True)
-        self.warm_submitted = True
+        if self._submit(now, warmup=True):
+            self.warm_submitted_at = now
 
     def readiness(self, now: float) -> dict:
         age = None if not self.depth.t else now - self.depth.t[-1]
@@ -267,11 +282,11 @@ class PlannerProvider:
 
         The worker is warmed up again before the next Go: without a Go nothing else is
         planned, so a worker error (a crash, then a restart) would otherwise never be
-        cleared, and a restarted worker would take its first plan cold. As at startup, the
-        warmup is resubmitted while the worker reports an error, and Go waits for it."""
+        cleared, and a restarted worker would take its first plan cold. As at startup,
+        unsuccessful warmups are retried, and Go waits for a successful reply."""
         self.generation += 1
         self.warmed = False
-        self.warm_submitted = False
+        self.warm_submitted_at = None
         self.worker_error = None
         self.go = None
         self.next_plan = None

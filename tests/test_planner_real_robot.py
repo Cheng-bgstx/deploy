@@ -537,6 +537,42 @@ def test_the_joystick_b_is_go_and_r2_drops_it(operator_rig):
     assert mode(rig) == "zero" and rig.reference.holding and rig.reference.go_time is None
 
 
+@pytest.mark.parametrize("controller", ["keyboard", "joystick"])
+def test_a_worker_crash_before_go_recovers_through_the_operator_keys(operator_rig, monkeypatch, controller):
+    rig = operator_rig(controller=controller)
+    keys = (A, R1, B, R2) if controller == "keyboard" else ("A", "R1", "B", "R2")
+    shaping, take_over, go, e_stop = keys
+    rig.tick(2)
+    rig.key(shaping, ticks=5)
+    rig.key(take_over)
+    assert mode(rig) == "policy" and rig.reference.holding
+    old_reply = rig.planner.last
+    answer = rig.planner.submit
+    pending = []
+    monkeypatch.setattr(rig.planner, "submit", lambda item: pending.append(item) or True)
+
+    rig.planner.last = dict(status="error", error="GPU planner exited; restarting on CUDA")
+    rig.tick(3)
+    rig.key(e_stop)
+    rig.key(shaping)
+    rig.key(take_over)
+    rig.key(go)
+    assert rig.reference.go_time is None and rig.reference.holding
+
+    rig.planner.last = dict(status="loaded")
+    rig.tick()
+    rig.planner.last = old_reply  # The restarted worker may replay its old mailbox.
+    rig.key(go)
+    assert rig.reference.go_time is None and rig.reference.holding
+    assert pending and pending[-1]["warmup"]
+    monkeypatch.setattr(rig.planner, "submit", answer)
+    answer(pending[-1])
+    rig.tick()
+    assert rig.reference.holding  # Recovery itself must never start Go.
+    rig.key(go, ticks=4)
+    assert rig.reference.phase == "running" and rig.reference.go_time is not None
+
+
 def test_file_playback_b_still_toggles_play_and_pause(operator_rig):
     rig = operator_rig(backend="npz")
     tracker = rig.tracker

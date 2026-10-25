@@ -480,6 +480,104 @@ def test_after_a_worker_crash_and_an_e_stop_the_next_go_waits_for_the_restarted_
     np.testing.assert_allclose(rig.step(2).joint_pos[0], 0.7)
 
 
+def test_worker_crash_in_hold_rewarms_before_the_first_go():
+    rig = Rig()
+    previous_warmup = rig.worker.submitted[-1]
+    rig.worker.last = dict(status="error", error="GPU planner exited; restarting on CUDA")
+    assert rig.step(3) is rig.hold
+    rig.go()
+    assert rig.reference.go_time is None
+
+    rig.worker.last = dict(status="loaded")
+    rig.step()
+    # A restarted worker can replay its mailbox's already accepted warmup.
+    # That result must not stand in for the fresh warmup requested after the crash.
+    rig.worker.respond(request=previous_warmup)
+    rig.step()
+    rig.go()
+    assert rig.reference.go_time is None
+
+    fresh_warmup = rig.worker.submitted[-1]
+    assert fresh_warmup["warmup"] and fresh_warmup is not previous_warmup
+    rig.worker.respond(request=fresh_warmup)
+    assert rig.step() is rig.hold
+    rig.go()
+    assert rig.reference.phase == "waiting_first_chunk"
+    rig.worker.respond(rows=constant_rows(0.7))
+    np.testing.assert_allclose(rig.step(2).joint_pos[0], 0.7)
+
+
+@pytest.mark.parametrize("after_abort", [False, True], ids=["startup", "after_e_stop"])
+def test_rejected_warmup_submission_is_retried(monkeypatch, after_abort):
+    worker_submit = ManualWorker.submit
+    attempts = []
+    reject_next = not after_abort
+
+    def submit(worker, item):
+        nonlocal reject_next
+        attempts.append(item)
+        if reject_next:
+            reject_next = False
+            return False  # LatestMailbox.publish can lose a non-blocking lock race.
+        return worker_submit(worker, item)
+
+    monkeypatch.setattr(ManualWorker, "submit", submit)
+    rig = Rig(warm=after_abort)
+    if after_abort:
+        rig.go()
+        rig.reference.abort()
+        reject_next = True
+        rig.step()
+    rejected = attempts[-1]
+    assert rejected["warmup"]
+    assert all(item is not rejected for item in rig.worker.submitted)
+
+    rig.step()
+    retried = rig.worker.submitted[-1] if rig.worker.submitted else None
+    assert retried is not None and retried["request_id"] > rejected["request_id"]
+    assert retried["warmup"]
+    rig.worker.respond()
+    rig.step()
+    rig.go()
+    assert rig.reference.phase == "waiting_first_chunk"
+
+
+@pytest.mark.parametrize("after_abort", [False, True], ids=["startup", "after_e_stop"])
+def test_missing_warmup_result_is_retried_without_flooding_the_worker(after_abort):
+    rig = Rig(warm=after_abort)
+    if after_abort:
+        rig.go()
+        rig.reference.abort()
+        rig.step()
+    pending = rig.worker.submitted[-1]
+    count = len(rig.worker.submitted)
+    rig.step(20)  # A slow but normal warmup must not be replaced every tick.
+    assert len(rig.worker.submitted) == count
+    rig.step(80)  # The result was lost without an error: retry within two seconds.
+    assert count < len(rig.worker.submitted) <= count + 2
+    assert rig.worker.submitted[-1]["request_id"] > pending["request_id"]
+    assert rig.reference.holding and rig.reference.go_time is None
+
+    rig.worker.respond()
+    rig.step()
+    rig.go()
+    assert rig.reference.phase == "waiting_first_chunk"
+
+
+def test_worker_error_during_go_keeps_planning_instead_of_starting_a_warmup():
+    rig = Rig()
+    rig.go()
+    rig.worker.respond(rows=constant_rows(0.5))
+    rig.step(2)
+    assert rig.reference.phase == "running"
+    count = len(rig.worker.submitted)
+    rig.worker.last = dict(status="error", error="GPU planner exited; restarting on CUDA")
+    rig.step(15)
+    assert rig.reference.phase == "running"
+    assert len(rig.worker.submitted) > count
+    assert all(not request["warmup"] for request in rig.worker.submitted[count:])
+
+
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_planner_stats_restart_with_each_go():
     rig = Rig()

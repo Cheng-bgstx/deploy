@@ -461,6 +461,9 @@ Planner: first Chunk applied 0.060 s after Go
 Shaping 或再次按 R1 时会打印 `Planner: Go dropped (...)`；随后 Planner 会重新执行一次
 预热规划，下一次 Go 要等它完成。如果 worker 崩溃过，要等它重启后这次预热才会完成。
 
+如果 worker 在首次 Go 前的 Hold 阶段故障，Planner 也会自动重新预热。预热请求或回复
+丢失时会自动重试。恢复期间机器人保持 Hold；恢复后需要再次按 B 请求 Go。
+
 Go 之后每 5 s 打印一行统计：规划次数、延迟 p50/p95、迟到的 Chunk、覆盖耗尽、深度
 帧龄和 Planner 的阶段。
 

@@ -499,6 +499,10 @@ prints `Planner: Go dropped (...)`; the Planner then runs a fresh warmup plan,
 which the next Go waits for. If the worker crashed, that warmup is answered once
 it has restarted.
 
+If the worker fails in Hold before the first Go, the Planner also warms it up
+again automatically. Warmup retries if a request or reply is lost. The robot
+stays in Hold during recovery; press B again after recovery to request Go.
+
 Every 5 s after Go, a stats line reports the plan count, latency p50/p95, late
 Chunks, coverage exhaustion, depth age and the Planner phase.
 
