@@ -105,6 +105,7 @@ uses `uv sync --extra inference-cpu --extra robot-g1`. See
 - [Getting Started](./docs/getting-started/README.md)
 - [Offline Motion Tracking Tutorial](./docs/tutorials/offline-motion-tracking.md)
 - [Pico Teleoperation Tutorial](./docs/tutorials/pico-teleoperation.md)
+- [Scalecar Vehicle Entry Tutorial](./docs/tutorials/scalecar-vehicle-entry.md)
 
 ## Citation
 

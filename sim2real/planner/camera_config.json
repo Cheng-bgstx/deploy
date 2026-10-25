@@ -1,0 +1,2981 @@
+{
+    "schema_version": 1,
+    "sdk_version": "2.50.0",
+    "device": {
+        "Name": "Intel RealSense D435I",
+        "Serial Number": "233522076355",
+        "Firmware Version": "05.13.00.55",
+        "Recommended Firmware Version": "05.13.00.50",
+        "Physical Port": "2-2.2-3",
+        "Debug Op Code": "15",
+        "Advanced Mode": "YES",
+        "Product Id": "0B3A",
+        "Camera Locked": "YES",
+        "Usb Type Descriptor": "3.2",
+        "Product Line": "D400",
+        "Asic Serial Number": "226523134293",
+        "Firmware Update Id": "226523134293"
+    },
+    "depth_scale_m_per_unit": 1.0000000474974513e-03,
+    "requested_frames": 900,
+    "depth_zero_meaning": "invalid or no measurement",
+    "capture_streams": [
+        {
+            "stream": "Depth",
+            "format": "Z16",
+            "fps": 30,
+            "width": 640,
+            "height": 480
+        },
+        {
+            "stream": "Color",
+            "format": "RGB8",
+            "fps": 30,
+            "width": 640,
+            "height": 480
+        }
+    ],
+    "depth_intrinsics": {
+        "width": 640,
+        "height": 480,
+        "fx": 3.9040945434570312e+02,
+        "fy": 3.9040945434570312e+02,
+        "cx": 3.2480609130859375e+02,
+        "cy": 2.3797149658203125e+02,
+        "distortion_model": "Brown Conrady",
+        "coefficients": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+        ],
+        "horizontal_fov_deg": 7.8673469543457031e+01,
+        "vertical_fov_deg": 6.3160781860351562e+01
+    },
+    "color_intrinsics": {
+        "width": 640,
+        "height": 480,
+        "fx": 6.0676660156250000e+02,
+        "fy": 6.0622296142578125e+02,
+        "cx": 3.2319033813476562e+02,
+        "cy": 2.4788626098632812e+02,
+        "distortion_model": "Inverse Brown Conrady",
+        "coefficients": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+        ],
+        "horizontal_fov_deg": 5.5611675262451172e+01,
+        "vertical_fov_deg": 4.3190139770507812e+01
+    },
+    "depth_to_color": {
+        "rotation_column_major": [
+            9.9997162818908691e-01,
+            -6.5805278718471527e-03,
+            3.6616937723010778e-03,
+            6.5641035325825214e-03,
+            9.9996840953826904e-01,
+            4.4796545989811420e-03,
+            -3.6910567432641983e-03,
+            -4.4554919004440308e-03,
+            9.9998325109481812e-01
+        ],
+        "translation_m": [
+            1.4491419307887554e-02,
+            -1.8469567294232547e-05,
+            6.3572207000106573e-04
+        ]
+    },
+    "color_to_depth": {
+        "rotation_column_major": [
+            9.9997162818908691e-01,
+            6.5641035325825214e-03,
+            -3.6910567432641983e-03,
+            -6.5805278718471527e-03,
+            9.9996840953826904e-01,
+            -4.4554919004440308e-03,
+            3.6616937723010778e-03,
+            4.4796545989811420e-03,
+            9.9998325109481812e-01
+        ],
+        "translation_m": [
+            -1.4493457973003387e-02,
+            -7.9502002336084843e-05,
+            -5.8230507420375943e-04
+        ]
+    },
+    "sensors": [
+        {
+            "name": "Stereo Module",
+            "options": [
+                {
+                    "name": "Exposure",
+                    "value": 8500.0,
+                    "min": 1.0,
+                    "max": 200000.0,
+                    "step": 1.0,
+                    "default": 8500.0,
+                    "readonly": 0,
+                    "description": "Depth Exposure (usec)"
+                },
+                {
+                    "name": "Gain",
+                    "value": 16.0,
+                    "min": 16.0,
+                    "max": 248.0,
+                    "step": 1.0,
+                    "default": 16.0,
+                    "readonly": 0,
+                    "description": "UVC image gain"
+                },
+                {
+                    "name": "Enable Auto Exposure",
+                    "value": 1.0,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 1.0,
+                    "default": 1.0,
+                    "readonly": 0,
+                    "description": "Enable Auto Exposure"
+                },
+                {
+                    "name": "Visual Preset",
+                    "value": 0.0,
+                    "min": 0.0,
+                    "max": 5.0,
+                    "step": 1.0,
+                    "default": 0.0,
+                    "readonly": 0,
+                    "description": "Advanced-Mode Preset"
+                },
+                {
+                    "name": "Laser Power",
+                    "value": 150.0,
+                    "min": 0.0,
+                    "max": 360.0,
+                    "step": 30.0,
+                    "default": 150.0,
+                    "readonly": 0,
+                    "description": "Manual laser power in mw. applicable only when laser power mode is set to Manual"
+                },
+                {
+                    "name": "Emitter Enabled",
+                    "value": 1.0,
+                    "min": 0.0,
+                    "max": 2.0,
+                    "step": 1.0,
+                    "default": 1.0,
+                    "readonly": 0,
+                    "description": "Emitter select, 0-disable all emitters, 1-enable laser, 2-enable laser auto (opt), 3-enable LED (opt)"
+                },
+                {
+                    "name": "Frames Queue Size",
+                    "value": 16.0,
+                    "min": 0.0,
+                    "max": 32.0,
+                    "step": 1.0,
+                    "default": 16.0,
+                    "readonly": 0,
+                    "description": "Max number of frames you can hold at a given time. Increasing this number will reduce frame drops but increase latency, and vice versa"
+                },
+                {
+                    "name": "Asic Temperature",
+                    "value": 49.0,
+                    "min": -40.0,
+                    "max": 125.0,
+                    "step": 0.0,
+                    "default": 0.0,
+                    "readonly": 1,
+                    "description": "Current Asic Temperature (degree celsius)"
+                },
+                {
+                    "name": "Error Polling Enabled",
+                    "value": 1.0,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 1.0,
+                    "default": 0.0,
+                    "readonly": 0,
+                    "description": "Enable / disable polling of camera internal errors"
+                },
+                {
+                    "name": "Projector Temperature",
+                    "value": 44.0,
+                    "min": -40.0,
+                    "max": 125.0,
+                    "step": 0.0,
+                    "default": 0.0,
+                    "readonly": 1,
+                    "description": "Current Projector Temperature (degree celsius)"
+                },
+                {
+                    "name": "Output Trigger Enabled",
+                    "value": 0.0,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 1.0,
+                    "default": 0.0,
+                    "readonly": 0,
+                    "description": "Generate trigger from the camera to external device once per frame"
+                },
+                {
+                    "name": "Depth Units",
+                    "value": 1.0000000474974513e-03,
+                    "min": 9.9999999747524271e-07,
+                    "max": 9.9999997764825821e-03,
+                    "step": 9.9999999747524271e-07,
+                    "default": 1.0000000474974513e-03,
+                    "readonly": 0,
+                    "description": "Number of meters represented by a single depth unit"
+                },
+                {
+                    "name": "Stereo Baseline",
+                    "value": 4.9951816558837891e+01,
+                    "min": 4.9951816558837891e+01,
+                    "max": 4.9951816558837891e+01,
+                    "step": 0.0,
+                    "default": 4.9951816558837891e+01,
+                    "readonly": 1,
+                    "description": "Distance in mm between the stereo imagers"
+                },
+                {
+                    "name": "Inter Cam Sync Mode",
+                    "value": 0.0,
+                    "min": 0.0,
+                    "max": 260.0,
+                    "step": 1.0,
+                    "default": 0.0,
+                    "readonly": 1,
+                    "description": "Inter-camera synchronization mode: 0:Default, 1:Master, 2:Slave, 3:Full Salve, 4-258:Genlock with burst count of 1-255 frames for each trigger, 259 and 260 for two frames per trigger with laser ON-OFF and OFF-ON."
+                },
+                {
+                    "name": "Emitter On Off",
+                    "value": 0.0,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 1.0,
+                    "default": 0.0,
+                    "readonly": 0,
+                    "description": "Alternating emitter pattern, toggled on/off on per-frame basis"
+                },
+                {
+                    "name": "Global Time Enabled",
+                    "value": 1.0,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 1.0,
+                    "default": 1.0,
+                    "readonly": 0,
+                    "description": "Enable/Disable global timestamp"
+                },
+                {
+                    "name": "Emitter Always On",
+                    "value": 0.0,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 1.0,
+                    "default": 0.0,
+                    "readonly": 0,
+                    "description": "Emitter always on mode: 0:disabled(default), 1:enabled"
+                },
+                {
+                    "name": "Hdr Enabled",
+                    "value": 0.0,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 1.0,
+                    "default": 0.0,
+                    "readonly": 0,
+                    "description": "HDR Option"
+                },
+                {
+                    "name": "Sequence Name",
+                    "value": 0.0,
+                    "min": 0.0,
+                    "max": 3.0,
+                    "step": 1.0,
+                    "default": 1.0,
+                    "readonly": 0,
+                    "description": "HDR Option"
+                },
+                {
+                    "name": "Sequence Size",
+                    "value": 2.0,
+                    "min": 2.0,
+                    "max": 2.0,
+                    "step": 1.0,
+                    "default": 2.0,
+                    "readonly": 0,
+                    "description": "HDR Option"
+                },
+                {
+                    "name": "Sequence Id",
+                    "value": 0.0,
+                    "min": 0.0,
+                    "max": 2.0,
+                    "step": 1.0,
+                    "default": 0.0,
+                    "readonly": 0,
+                    "description": "HDR Option"
+                },
+                {
+                    "name": "Auto Exposure Limit",
+                    "value": 200000.0,
+                    "min": 1.0,
+                    "max": 200000.0,
+                    "step": 1.0,
+                    "default": 8500.0,
+                    "readonly": 1,
+                    "description": "Exposure limit is in microseconds. Default is 0 which means full exposure range. If the requested exposure limit is greater than frame time, it will be set to frame time at runtime. Setting will not take effect until next streaming session."
+                },
+                {
+                    "name": "Auto Gain Limit",
+                    "value": 248.0,
+                    "min": 16.0,
+                    "max": 248.0,
+                    "step": 1.0,
+                    "default": 16.0,
+                    "readonly": 1,
+                    "description": "Gain limits ranges from 16 to 248. Default is 0 which means full gain. If the requested gain limit is less than 16, it will be set to 16. If the requested gain limit is greater than 248, it will be set to 248. Setting will not take effect until next streaming session."
+                },
+                {
+                    "name": "Auto Exposure Limit Toggle",
+                    "value": 0.0,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 1.0,
+                    "default": 0.0,
+                    "readonly": 0,
+                    "description": "Toggle Auto-Exposure Limit"
+                },
+                {
+                    "name": "Auto Gain Limit Toggle",
+                    "value": 0.0,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 1.0,
+                    "default": 0.0,
+                    "readonly": 0,
+                    "description": "Toggle Auto-Gain Limit"
+                }
+            ],
+            "supported_profiles": [
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 30,
+                    "stream_index": 1,
+                    "width": 1280,
+                    "height": 800
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y16",
+                    "fps": 25,
+                    "stream_index": 1,
+                    "width": 1280,
+                    "height": 800
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y16",
+                    "fps": 15,
+                    "stream_index": 1,
+                    "width": 1280,
+                    "height": 800
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 15,
+                    "stream_index": 1,
+                    "width": 1280,
+                    "height": 800
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 30,
+                    "stream_index": 1,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 15,
+                    "stream_index": 1,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 6,
+                    "stream_index": 1,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 90,
+                    "stream_index": 1,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 60,
+                    "stream_index": 1,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 30,
+                    "stream_index": 1,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 15,
+                    "stream_index": 1,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 6,
+                    "stream_index": 1,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 300,
+                    "stream_index": 1,
+                    "width": 848,
+                    "height": 100
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 100,
+                    "stream_index": 1,
+                    "width": 848,
+                    "height": 100
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 90,
+                    "stream_index": 1,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 60,
+                    "stream_index": 1,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 30,
+                    "stream_index": 1,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 15,
+                    "stream_index": 1,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 6,
+                    "stream_index": 1,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y16",
+                    "fps": 25,
+                    "stream_index": 1,
+                    "width": 640,
+                    "height": 400
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y16",
+                    "fps": 15,
+                    "stream_index": 1,
+                    "width": 640,
+                    "height": 400
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 90,
+                    "stream_index": 1,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 60,
+                    "stream_index": 1,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 30,
+                    "stream_index": 1,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 15,
+                    "stream_index": 1,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 6,
+                    "stream_index": 1,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 90,
+                    "stream_index": 1,
+                    "width": 480,
+                    "height": 270
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 60,
+                    "stream_index": 1,
+                    "width": 480,
+                    "height": 270
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 30,
+                    "stream_index": 1,
+                    "width": 480,
+                    "height": 270
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 15,
+                    "stream_index": 1,
+                    "width": 480,
+                    "height": 270
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 6,
+                    "stream_index": 1,
+                    "width": 480,
+                    "height": 270
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 90,
+                    "stream_index": 1,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 60,
+                    "stream_index": 1,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 30,
+                    "stream_index": 1,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 15,
+                    "stream_index": 1,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Infrared 1",
+                    "format": "Y8",
+                    "fps": 6,
+                    "stream_index": 1,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 30,
+                    "stream_index": 2,
+                    "width": 1280,
+                    "height": 800
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y16",
+                    "fps": 25,
+                    "stream_index": 2,
+                    "width": 1280,
+                    "height": 800
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y16",
+                    "fps": 15,
+                    "stream_index": 2,
+                    "width": 1280,
+                    "height": 800
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 15,
+                    "stream_index": 2,
+                    "width": 1280,
+                    "height": 800
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 30,
+                    "stream_index": 2,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 15,
+                    "stream_index": 2,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 6,
+                    "stream_index": 2,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 90,
+                    "stream_index": 2,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 60,
+                    "stream_index": 2,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 30,
+                    "stream_index": 2,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 15,
+                    "stream_index": 2,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 6,
+                    "stream_index": 2,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 300,
+                    "stream_index": 2,
+                    "width": 848,
+                    "height": 100
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 100,
+                    "stream_index": 2,
+                    "width": 848,
+                    "height": 100
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 90,
+                    "stream_index": 2,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 60,
+                    "stream_index": 2,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 30,
+                    "stream_index": 2,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 15,
+                    "stream_index": 2,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 6,
+                    "stream_index": 2,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y16",
+                    "fps": 25,
+                    "stream_index": 2,
+                    "width": 640,
+                    "height": 400
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y16",
+                    "fps": 15,
+                    "stream_index": 2,
+                    "width": 640,
+                    "height": 400
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 90,
+                    "stream_index": 2,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 60,
+                    "stream_index": 2,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 30,
+                    "stream_index": 2,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 15,
+                    "stream_index": 2,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 6,
+                    "stream_index": 2,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 90,
+                    "stream_index": 2,
+                    "width": 480,
+                    "height": 270
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 60,
+                    "stream_index": 2,
+                    "width": 480,
+                    "height": 270
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 30,
+                    "stream_index": 2,
+                    "width": 480,
+                    "height": 270
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 15,
+                    "stream_index": 2,
+                    "width": 480,
+                    "height": 270
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 6,
+                    "stream_index": 2,
+                    "width": 480,
+                    "height": 270
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 90,
+                    "stream_index": 2,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 60,
+                    "stream_index": 2,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 30,
+                    "stream_index": 2,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 15,
+                    "stream_index": 2,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Infrared 2",
+                    "format": "Y8",
+                    "fps": 6,
+                    "stream_index": 2,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 90,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 300,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 100
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 100,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 100
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 90,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 90,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 90,
+                    "stream_index": 0,
+                    "width": 480,
+                    "height": 270
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 480,
+                    "height": 270
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 480,
+                    "height": 270
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 480,
+                    "height": 270
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 480,
+                    "height": 270
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 90,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 300,
+                    "stream_index": 0,
+                    "width": 256,
+                    "height": 144
+                },
+                {
+                    "stream": "Depth",
+                    "format": "Z16",
+                    "fps": 90,
+                    "stream_index": 0,
+                    "width": 256,
+                    "height": 144
+                }
+            ]
+        },
+        {
+            "name": "RGB Camera",
+            "options": [
+                {
+                    "name": "Backlight Compensation",
+                    "value": 0.0,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 1.0,
+                    "default": 0.0,
+                    "readonly": 0,
+                    "description": "Enable / disable backlight compensation"
+                },
+                {
+                    "name": "Brightness",
+                    "value": 0.0,
+                    "min": -64.0,
+                    "max": 64.0,
+                    "step": 1.0,
+                    "default": 0.0,
+                    "readonly": 0,
+                    "description": "UVC image brightness"
+                },
+                {
+                    "name": "Contrast",
+                    "value": 50.0,
+                    "min": 0.0,
+                    "max": 100.0,
+                    "step": 1.0,
+                    "default": 50.0,
+                    "readonly": 0,
+                    "description": "UVC image contrast"
+                },
+                {
+                    "name": "Exposure",
+                    "value": 166.0,
+                    "min": 1.0,
+                    "max": 10000.0,
+                    "step": 1.0,
+                    "default": 166.0,
+                    "readonly": 0,
+                    "description": "Controls exposure time of color camera. Setting any value will disable auto exposure"
+                },
+                {
+                    "name": "Gain",
+                    "value": 64.0,
+                    "min": 0.0,
+                    "max": 128.0,
+                    "step": 1.0,
+                    "default": 64.0,
+                    "readonly": 0,
+                    "description": "UVC image gain"
+                },
+                {
+                    "name": "Gamma",
+                    "value": 300.0,
+                    "min": 100.0,
+                    "max": 500.0,
+                    "step": 1.0,
+                    "default": 300.0,
+                    "readonly": 0,
+                    "description": "UVC image gamma setting"
+                },
+                {
+                    "name": "Hue",
+                    "value": 0.0,
+                    "min": -180.0,
+                    "max": 180.0,
+                    "step": 1.0,
+                    "default": 0.0,
+                    "readonly": 0,
+                    "description": "UVC image hue"
+                },
+                {
+                    "name": "Saturation",
+                    "value": 64.0,
+                    "min": 0.0,
+                    "max": 100.0,
+                    "step": 1.0,
+                    "default": 64.0,
+                    "readonly": 0,
+                    "description": "UVC image saturation setting"
+                },
+                {
+                    "name": "Sharpness",
+                    "value": 50.0,
+                    "min": 0.0,
+                    "max": 100.0,
+                    "step": 1.0,
+                    "default": 50.0,
+                    "readonly": 0,
+                    "description": "UVC image sharpness setting"
+                },
+                {
+                    "name": "White Balance",
+                    "value": 4600.0,
+                    "min": 2800.0,
+                    "max": 6500.0,
+                    "step": 10.0,
+                    "default": 4600.0,
+                    "readonly": 0,
+                    "description": "Controls white balance of color image. Setting any value will disable auto white balance"
+                },
+                {
+                    "name": "Enable Auto Exposure",
+                    "value": 1.0,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 1.0,
+                    "default": 1.0,
+                    "readonly": 0,
+                    "description": "Enable / disable auto-exposure"
+                },
+                {
+                    "name": "Enable Auto White Balance",
+                    "value": 1.0,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 1.0,
+                    "default": 1.0,
+                    "readonly": 0,
+                    "description": "Enable / disable auto-white-balance"
+                },
+                {
+                    "name": "Frames Queue Size",
+                    "value": 16.0,
+                    "min": 0.0,
+                    "max": 32.0,
+                    "step": 1.0,
+                    "default": 16.0,
+                    "readonly": 0,
+                    "description": "Max number of frames you can hold at a given time. Increasing this number will reduce frame drops but increase latency, and vice versa"
+                },
+                {
+                    "name": "Power Line Frequency",
+                    "value": 3.0,
+                    "min": 0.0,
+                    "max": 3.0,
+                    "step": 1.0,
+                    "default": 3.0,
+                    "readonly": 0,
+                    "description": "Power Line Frequency"
+                },
+                {
+                    "name": "Auto Exposure Priority",
+                    "value": 0.0,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 1.0,
+                    "default": 0.0,
+                    "readonly": 0,
+                    "description": "Restrict Auto-Exposure to enforce constant FPS rate. Turn ON to remove the restrictions (may result in FPS drop)"
+                },
+                {
+                    "name": "Global Time Enabled",
+                    "value": 1.0,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 1.0,
+                    "default": 1.0,
+                    "readonly": 0,
+                    "description": "Enable/Disable global timestamp"
+                }
+            ],
+            "supported_profiles": [
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 1920,
+                    "height": 1080
+                },
+                {
+                    "stream": "Color",
+                    "format": "RAW16",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 1920,
+                    "height": 1080
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 1920,
+                    "height": 1080
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 1920,
+                    "height": 1080
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 1920,
+                    "height": 1080
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 1920,
+                    "height": 1080
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 1920,
+                    "height": 1080
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 1920,
+                    "height": 1080
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 1920,
+                    "height": 1080
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 1920,
+                    "height": 1080
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 1920,
+                    "height": 1080
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 1920,
+                    "height": 1080
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 1920,
+                    "height": 1080
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 1920,
+                    "height": 1080
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 1920,
+                    "height": 1080
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 1920,
+                    "height": 1080
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 1920,
+                    "height": 1080
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 1920,
+                    "height": 1080
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 1920,
+                    "height": 1080
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 1280,
+                    "height": 720
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 960,
+                    "height": 540
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 848,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 480
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 640,
+                    "height": 360
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 15,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 424,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 240
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 180
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 180
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 180
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 180
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 180
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 60,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 180
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 180
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 180
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 180
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 180
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 180
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 30,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 180
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGB8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 180
+                },
+                {
+                    "stream": "Color",
+                    "format": "Y16",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 180
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGRA8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 180
+                },
+                {
+                    "stream": "Color",
+                    "format": "RGBA8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 180
+                },
+                {
+                    "stream": "Color",
+                    "format": "BGR8",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 180
+                },
+                {
+                    "stream": "Color",
+                    "format": "YUYV",
+                    "fps": 6,
+                    "stream_index": 0,
+                    "width": 320,
+                    "height": 180
+                }
+            ]
+        },
+        {
+            "name": "Motion Module",
+            "options": [
+                {
+                    "name": "Frames Queue Size",
+                    "value": 16.0,
+                    "min": 0.0,
+                    "max": 32.0,
+                    "step": 1.0,
+                    "default": 16.0,
+                    "readonly": 0,
+                    "description": "Max number of frames you can hold at a given time. Increasing this number will reduce frame drops but increase latency, and vice versa"
+                },
+                {
+                    "name": "Enable Motion Correction",
+                    "value": 1.0,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 1.0,
+                    "default": 1.0,
+                    "readonly": 0,
+                    "description": "Enable/Disable Automatic Motion Data Correction"
+                },
+                {
+                    "name": "Global Time Enabled",
+                    "value": 1.0,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 1.0,
+                    "default": 1.0,
+                    "readonly": 0,
+                    "description": "Enable/Disable global timestamp"
+                }
+            ],
+            "supported_profiles": [
+                {
+                    "stream": "Accel",
+                    "format": "MOTION_XYZ32F",
+                    "fps": 200,
+                    "stream_index": 0
+                },
+                {
+                    "stream": "Accel",
+                    "format": "MOTION_XYZ32F",
+                    "fps": 100,
+                    "stream_index": 0
+                },
+                {
+                    "stream": "Gyro",
+                    "format": "MOTION_XYZ32F",
+                    "fps": 400,
+                    "stream_index": 0
+                },
+                {
+                    "stream": "Gyro",
+                    "format": "MOTION_XYZ32F",
+                    "fps": 200,
+                    "stream_index": 0
+                }
+            ]
+        }
+    ],
+    "software_filters_applied": [
+    ],
+    "depth_colorization": {
+        "min_m": 2.9999999999999999e-01,
+        "max_m": 4.0,
+        "scheme": "RealSense Jet",
+        "histogram_equalization": 0
+    }
+}

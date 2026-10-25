@@ -1,0 +1,101 @@
+{
+  "description": "Files taken from Scalecar_v2. verbatim: byte-identical copies; modified: one documented change; ported: sim2real code adapted from the source (only the source is pinned).",
+  "scalecar_v2_commit": "7b8f370d2c7c6d0c1089af80b9d2934d3c74aae0",
+  "files": {
+    "scalecar_dp/__init__.py": {
+      "source": "source/scalecar_dp/scalecar_dp/__init__.py",
+      "source_sha256": "7a759eadca04cf48c7db545f20c3cbf4e1f4905bbb31a019bb7afd94f13ccdaa",
+      "sha256": "7a759eadca04cf48c7db545f20c3cbf4e1f4905bbb31a019bb7afd94f13ccdaa",
+      "kind": "verbatim"
+    },
+    "scalecar_dp/motion38d.py": {
+      "source": "source/scalecar_dp/scalecar_dp/motion38d.py",
+      "source_sha256": "b60af6b79eb2fefe38397c99484c94d484172a7b4333d991264699229c022b79",
+      "sha256": "b60af6b79eb2fefe38397c99484c94d484172a7b4333d991264699229c022b79",
+      "kind": "verbatim"
+    },
+    "scalecar_dp/dp/__init__.py": {
+      "source": "source/scalecar_dp/scalecar_dp/dp/__init__.py",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "verbatim"
+    },
+    "scalecar_dp/dp/runtime.py": {
+      "source": "source/scalecar_dp/scalecar_dp/dp/runtime.py",
+      "source_sha256": "5b9e989558fe106f42cc1dfa942ef9cb11a6664e40b12c692e31741091605bcb",
+      "sha256": "5b9e989558fe106f42cc1dfa942ef9cb11a6664e40b12c692e31741091605bcb",
+      "kind": "verbatim"
+    },
+    "scalecar_dp/dp/model.py": {
+      "source": "source/scalecar_dp/scalecar_dp/dp/model.py",
+      "source_sha256": "40b7b4dc53a8a413fcdffaa980783f76a6ef09f28f082af5562eeb949947a1d0",
+      "sha256": "b3954b3bd2eaaeda11a7b16e7c00a69ff82ff78b511555e9b02b83849613ca4f",
+      "kind": "modified",
+      "change": "line 16 'import torchvision' -> sim2real/planner/resnet.py (torchvision-free ResNet-18, same state_dict keys, bitwise outputs)"
+    },
+    "scalecar_dp/dp/flow.py": {
+      "source": "source/scalecar_dp/scalecar_dp/dp/flow.py",
+      "source_sha256": "d4888fffa2331019295e431b1e4fdac335dfcc48be489ff63290d34f2f6b00fc",
+      "sha256": "d4888fffa2331019295e431b1e4fdac335dfcc48be489ff63290d34f2f6b00fc",
+      "kind": "verbatim"
+    },
+    "scalecar_dp/dp/normalizer.py": {
+      "source": "source/scalecar_dp/scalecar_dp/dp/normalizer.py",
+      "source_sha256": "fc4d1be387be90ac226b80f2efabecb8f23fd307376cd2ed043e41034cab12ce",
+      "sha256": "fc4d1be387be90ac226b80f2efabecb8f23fd307376cd2ed043e41034cab12ce",
+      "kind": "verbatim"
+    },
+    "scalecar_dp/dp/contract.py": {
+      "source": "source/scalecar_dp/scalecar_dp/dp/contract.py",
+      "source_sha256": "3a1d3764bc92c41b9c867bd6eeb4c92e239371fca381e4bbd8f9c19ccb1053a8",
+      "sha256": "3a1d3764bc92c41b9c867bd6eeb4c92e239371fca381e4bbd8f9c19ccb1053a8",
+      "kind": "verbatim"
+    },
+    "scalecar_dp/dp/depth_preprocess.py": {
+      "source": "source/scalecar_dp/scalecar_dp/dp/depth_preprocess.py",
+      "source_sha256": "1fc96890902f71e58df7288d4b827319b93d00f0002200e5d4f97ac65a8dfe0a",
+      "sha256": "1fc96890902f71e58df7288d4b827319b93d00f0002200e5d4f97ac65a8dfe0a",
+      "kind": "verbatim"
+    },
+    "mailbox.py": {
+      "source": "source/scalecar_deploy/scalecar_deploy/mailbox.py",
+      "source_sha256": "e04831242afe0f05e4619aac50130231861513b27fc62a466e10c8da93673831",
+      "sha256": "e04831242afe0f05e4619aac50130231861513b27fc62a466e10c8da93673831",
+      "kind": "verbatim"
+    },
+    "profiles/g1_leg_kinematics.json": {
+      "source": "source/scalecar_deploy/scalecar_deploy/profiles/g1_leg_kinematics.json",
+      "source_sha256": "6af4ec81b35edefa3b79cc120dd4434a07750b42b4abf9d8849b2e22fb48dc15",
+      "sha256": "6af4ec81b35edefa3b79cc120dd4434a07750b42b4abf9d8849b2e22fb48dc15",
+      "kind": "verbatim"
+    },
+    "camera_config.json": {
+      "source": "source/scalecar_dp/scalecar_dp/camera_config.json",
+      "source_sha256": "ab1636f686218c903e4e2aea87e2461120b0b03691c61cd058cd9d56ecef3974",
+      "sha256": "ab1636f686218c903e4e2aea87e2461120b0b03691c61cd058cd9d56ecef3974",
+      "kind": "verbatim"
+    }
+  },
+  "ported": {
+    "provider.py": {
+      "source": "source/scalecar_deploy/scalecar_deploy/hardware/dp.py",
+      "source_sha256": "1bada9fd8b178aed46c37e981d49a1a717109b6d9af9085ad9b2cf04f167e319"
+    },
+    "worker.py": {
+      "source": "source/scalecar_deploy/scalecar_deploy/dp_worker.py",
+      "source_sha256": "e9fc603bc84290cad60268986e0d65c44514763295aff9f28134adb206dcf934"
+    },
+    "height.py": {
+      "source": "source/scalecar_deploy/scalecar_deploy/hardware/height.py",
+      "source_sha256": "6bc8908d781f000a5c3412098db62a61f2306ba04e6c78697b70a231575bcc1a"
+    },
+    "sim.py": {
+      "source": "source/scalecar_deploy/scalecar_deploy/simulation/depth.py",
+      "source_sha256": "407acefa5db3d94b6cde09b2f97d2b062a22cd5ad096f08776a7c16c9a570d4e"
+    },
+    "depth.py": {
+      "source": "source/scalecar_deploy/scalecar_deploy/hardware/depth.py",
+      "source_sha256": "6ff1c18355b03885a558beca76edd904eef4b1799263800cf3d7e419561c0b09"
+    }
+  }
+}

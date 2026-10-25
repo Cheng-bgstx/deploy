@@ -24,6 +24,7 @@ from sim2real.rl_policy.utils.motion import (
     motion_dataset_first_motion,
 )
 from sim2real.rl_policy.inference import Timer, build_inference_module
+from sim2real.rl_policy.utils.joint_targets import JointTargetPostprocessor
 from sim2real.sim_env.utils.mjcf import load_sim_model
 from sim2real.utils.mjviser_viewer import MjviserMujocoViewer
 from sim2real.utils.math import (
@@ -256,6 +257,15 @@ class IntegratedPolicyRuntime:
         else:
             raise ValueError(f"Invalid action scale type: {type(action_scale_cfg)}")
 
+        # Tracker action post-processing (soft clip + target rate limit), as in
+        # BasePolicy; None when the policy YAML does not configure it.
+        self.target_postprocessor = JointTargetPostprocessor.from_policy_config(
+            self.policy_config,
+            joint_names=self.action_joint_names,
+            policy_joint_names=self.policy_joint_names,
+            control_dt=self.env_dt,
+        )
+
         self.init_count = 0
         self.perf_dict: Dict[str, float] = {}
         self._obs_profile_totals: dict[str, float] = {}
@@ -278,6 +288,9 @@ class IntegratedPolicyRuntime:
 
         self.setup_policy(self.model_path)
         self.setup_observations(self.policy_config["observation"])
+        if self.target_postprocessor is not None:
+            # A playback reset restarts the rate limit from measured q.
+            self.reset_callbacks.append(self.target_postprocessor.reset)
 
     @property
     def motion_config(self) -> Dict[str, Any]:
@@ -338,6 +351,10 @@ class IntegratedPolicyRuntime:
 
             q_target = self.default_dof_angles.copy()
             q_target[self.controlled_joint_indices] += action * self.action_scale
+            if self.target_postprocessor is not None:
+                q_target = self.target_postprocessor(
+                    q_target, self.state_processor.joint_pos
+                )
             return action, q_target, input_dict
 
         self.policy = policy

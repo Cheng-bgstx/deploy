@@ -16,8 +16,9 @@ from sim2real.rl_policy.controllers.pico import PicoController
 from sim2real.rl_policy.controllers.unitree_joystick import UnitreeJoystickController
 from sim2real.rl_policy.inference import Timer, build_inference_module
 from sim2real.rl_policy.observations import Observation, ObsGroup, normalize_observation_array
-from sim2real.rl_policy.robot_io import create_robot_io
+from sim2real.rl_policy.robot_io import RobotIO, create_robot_io
 from sim2real.rl_policy.utils.command_sender import ActionManager
+from sim2real.rl_policy.utils.joint_targets import JointTargetPostprocessor
 from sim2real.rl_policy.utils.state_processor import StateProcessor
 from sim2real.utils.common import PORTS
 from sim2real.utils.profiling import ScopedTimer
@@ -73,12 +74,7 @@ class BasePolicy:
         self.body_names_simulation = list(policy_config["body_names_simulation"])
 
         self.robot_io_mode = args.robot_io
-        self.robot_io = create_robot_io(
-            mode=args.robot_io,
-            robot_name=args.robot,
-            robot_cfg=self.robot_cfg,
-            interface=args.robot_interface,
-        )
+        self.robot_io = self._create_robot_io()
 
         self.state_processor = StateProcessor(
             self.robot_cfg,
@@ -129,6 +125,15 @@ class BasePolicy:
         else:
             raise ValueError(f"Invalid action scale type: {type(action_scale_cfg)}")
 
+        # Tracker action post-processing (soft clip + target rate limit); None
+        # when the policy YAML does not configure it.
+        self.target_postprocessor = JointTargetPostprocessor.from_policy_config(
+            policy_config,
+            joint_names=self.action_manager.joint_names,
+            policy_joint_names=self.policy_joint_names,
+            control_dt=self.rl_dt,
+        )
+
         self.init_count = 0
         # Perf metrics dict is reused; initialize early so background threads can record.
         self.perf_dict: Dict[str, float] = {}
@@ -170,6 +175,13 @@ class BasePolicy:
         # Setup observations after state processor is initialized
         self.setup_policy(model_path)
         self.setup_observations(policy_config["observation"])
+        if self.target_postprocessor is not None:
+            # Entering `policy` mode (reset) restarts the rate limit from measured q.
+            self.reset_callbacks.append(self.target_postprocessor.reset)
+        # Where `init` (Shaping) interpolates to; None means default_dof_angles.
+        self.shaping_target = self._resolve_shaping_target(
+            policy_config.get("shaping_target", "default_joint_pos")
+        )
         self._record_enabled = bool(args.record)
         self._record_output = self._resolve_record_output(args.record_output)
         self._record_frames: list[dict[str, Any]] = []
@@ -177,6 +189,15 @@ class BasePolicy:
 
     def prepare_policy_config(self, policy_config):
         return policy_config
+
+    def _create_robot_io(self) -> RobotIO:
+        """Robot transport. A runner that hosts the robot in-process overrides this."""
+        return create_robot_io(
+            mode=self.args.robot_io,
+            robot_name=self.args.robot,
+            robot_cfg=self.robot_cfg,
+            interface=self.args.robot_interface,
+        )
 
     def _build_controller(self) -> ControllerBase:
         self.keyboard_controller = None
@@ -229,6 +250,10 @@ class BasePolicy:
 
             q_target = self.default_dof_angles.copy()
             q_target[self.controlled_joint_indices] += action * self.action_scale
+            if self.target_postprocessor is not None:
+                q_target = self.target_postprocessor(
+                    q_target, self.state_processor.joint_pos
+                )
 
             return action, q_target, input_dict
 
@@ -279,14 +304,39 @@ class BasePolicy:
 
         return obs_dict, obs_components
 
+    def _resolve_shaping_target(self, shaping_target: str) -> np.ndarray | None:
+        if shaping_target == "default_joint_pos":
+            return None
+        if shaping_target != "motion_first_frame":
+            raise ValueError(
+                "shaping_target must be 'default_joint_pos' or 'motion_first_frame', "
+                f"got {shaping_target!r}"
+            )
+        if self.policy_config.get("soft_joint_pos_limits") is None:
+            raise ValueError(
+                "shaping_target: motion_first_frame clips the Motion's first frame "
+                "to soft_joint_pos_limits; set them in the policy YAML"
+            )
+        return self.target_postprocessor.clip(self.motion_first_frame_joint_pos())
+
+    def motion_first_frame_joint_pos(self) -> np.ndarray:
+        """Joint positions of the Motion's first frame, in robot joint order."""
+        raise ValueError(
+            "shaping_target: motion_first_frame needs a policy that loads a Motion "
+            "(sim2real/rl_policy/tracking.py)"
+        )
+
     def get_init_target(self):
         if self.init_count > 500:
             self.init_count = 500
 
-        # interpolate from current dof_pos to default angles
+        # interpolate from current dof_pos to the Shaping target
+        shaping_target = (
+            self.default_dof_angles if self.shaping_target is None else self.shaping_target
+        )
         dof_pos = self.state_processor.joint_pos
         progress = self.init_count / 500
-        q_target = dof_pos + (self.default_dof_angles - dof_pos) * progress
+        q_target = dof_pos + (shaping_target - dof_pos) * progress
         self.init_count += 1
         return q_target
 
