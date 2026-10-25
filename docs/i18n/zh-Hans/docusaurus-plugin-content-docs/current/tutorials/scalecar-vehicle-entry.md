@@ -386,18 +386,19 @@ Onboard Computer 上不运行其他任何程序，采集程序的启动和停止
 用网线连接 Host 和 G1，Host 使用 `192.168.123.x` 网段的地址，参见
 [Network Configuration](/getting-started/network-configuration)。用 `ip -br link`
 查网口名。把机器人放在 Motion 的起点：打开的驾驶员车门后方，摆成 Motion 第 0 帧的
-姿态。两个终端都需要 [Host 环境](#host-setup) 中的 export。
+姿态。两个终端都需要 [Host 环境](#host-setup) 中的 export；下面的命令还会自己设置这两个
+`HF_HUB_*` 变量，因此在任何 shell 中都不会发起 Hugging Face 请求。
 
 终端 1，Bridge。它启动时会释放机器人内置的运动模式：
 
 ```bash
-uv run scripts/g1/real_bridge.py --interface <host_ethernet_interface>
+HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run scripts/g1/real_bridge.py --interface <host_ethernet_interface>
 ```
 
 终端 2，Tracker，Reference Source 为 Planner：
 
 ```bash
-uv run sim2real/rl_policy/tracking.py \
+HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run sim2real/rl_policy/tracking.py \
   --policy-config checkpoints/scalecar_d1146/tracker/ft500ema/policy.yaml \
   --motion-path checkpoints/scalecar_d1146/motions/motions/take1512.npz \
   --motion-backend planner --robot-io zmq --controller keyboard \
@@ -408,7 +409,7 @@ uv run sim2real/rl_policy/tracking.py \
 或者用 File Playback，不需要深度：
 
 ```bash
-uv run sim2real/rl_policy/tracking.py \
+HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run sim2real/rl_policy/tracking.py \
   --policy-config checkpoints/scalecar_d1146/tracker/ft500ema/policy.yaml \
   --motion-path checkpoints/scalecar_d1146/motions/motions/take1512.npz \
   --motion-backend npz --robot-io zmq --controller keyboard

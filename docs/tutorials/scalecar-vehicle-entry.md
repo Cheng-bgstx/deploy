@@ -420,19 +420,20 @@ Connect the Host to the G1 over Ethernet with an address on `192.168.123.x`, as
 in [Network Configuration](/getting-started/network-configuration). Find the
 interface name with `ip -br link`. Place the robot where the Motion starts:
 behind the open driver door, in the Motion's first-frame pose. Both terminals
-need the exports from [Host Setup](#host-setup).
+need the exports from [Host Setup](#host-setup); the commands also set the two
+`HF_HUB_*` variables themselves, so no shell makes a Hugging Face request.
 
 Terminal 1, the Bridge. It releases the robot's built-in motion mode when it
 starts:
 
 ```bash
-uv run scripts/g1/real_bridge.py --interface <host_ethernet_interface>
+HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run scripts/g1/real_bridge.py --interface <host_ethernet_interface>
 ```
 
 Terminal 2, the Tracker with the Planner as Reference Source:
 
 ```bash
-uv run sim2real/rl_policy/tracking.py \
+HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run sim2real/rl_policy/tracking.py \
   --policy-config checkpoints/scalecar_d1146/tracker/ft500ema/policy.yaml \
   --motion-path checkpoints/scalecar_d1146/motions/motions/take1512.npz \
   --motion-backend planner --robot-io zmq --controller keyboard \
@@ -443,7 +444,7 @@ uv run sim2real/rl_policy/tracking.py \
 Or with File Playback, which needs no depth:
 
 ```bash
-uv run sim2real/rl_policy/tracking.py \
+HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run sim2real/rl_policy/tracking.py \
   --policy-config checkpoints/scalecar_d1146/tracker/ft500ema/policy.yaml \
   --motion-path checkpoints/scalecar_d1146/motions/motions/take1512.npz \
   --motion-backend npz --robot-io zmq --controller keyboard
