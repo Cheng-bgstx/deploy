@@ -80,6 +80,7 @@ def _apply_runtime_motion_config(
     motion_zmq_hwm: int,
     motion_dt_s: float,
     motion_tolerance_s: float,
+    planner_checkpoint: Optional[str] = None,
 ):
     policy_config = deepcopy(policy_config)
     motion_cfg = policy_config.setdefault("motion", {})
@@ -101,6 +102,12 @@ def _apply_runtime_motion_config(
     if resolved_backend == "npz" and motion_path is not None:
         motion_cfg["motion_path"] = motion_path
         motion_cfg["motion_dt_s"] = motion_dt_s
+    if resolved_backend == "planner":
+        # The Motion gives the Hold Reference (frame 0) and the Shaping target.
+        if motion_path is not None:
+            motion_cfg["motion_path"] = motion_path
+        if planner_checkpoint is not None:
+            motion_cfg.setdefault("planner", {})["checkpoint"] = planner_checkpoint
     if resolved_backend in {"zmq", "smpl_zmq"}:
         motion_cfg["motion_zmq_connect"] = _resolve_motion_zmq_connect(
             motion_backend=resolved_backend,
@@ -127,6 +134,7 @@ class Tracking(BasePolicy):
             motion_zmq_hwm=self.args.motion_zmq_hwm,
             motion_dt_s=1 / self.args.rl_rate,
             motion_tolerance_s=self.args.motion_tolerance_s,
+            planner_checkpoint=self.args.planner_checkpoint,
         )
         motion_cfg = policy_config.get("motion", {})
         resolved_backend = str(motion_cfg.get("motion_backend", ""))
@@ -192,6 +200,13 @@ class Tracking(BasePolicy):
             self.motion_body_names = list(self.motion_buffer.body_names)
             return
 
+        if self.motion_backend == "planner":
+            self.motion_buffer = self._create_planner_reference()
+            self.motion_data = self.motion_buffer.motion_data  # Hold until the first Chunk
+            self.motion_joint_names = list(self.motion_buffer.joint_names)
+            self.motion_body_names = list(self.motion_buffer.body_names)
+            return
+
         if self.motion_backend == "smpl_zmq":
             self.motion_buffer = RealtimeSmplMotionBuffer(
                 robot_cfg=self.robot_cfg,
@@ -208,6 +223,73 @@ class Tracking(BasePolicy):
             return
 
         raise ValueError(f"Unsupported motion_backend: {self.motion_backend}")
+
+    def _create_planner_reference(self):
+        """The Planner as Reference Source (``sim2real/planner``).
+
+        Hold shows the Motion's frame 0 (``--motion-path`` / ``motion.motion_path``),
+        as File Playback does while paused. ``motion.planner`` holds the worker
+        options (checkpoint, checkpoint_sha256, device, seed; defaults: the pinned
+        ModelScope d1146 checkpoint on cuda:0). Depth, worker and clock come from
+        ``_planner_io``.
+        """
+        from sim2real.planner.provider import JOINT_NAMES, PlannerProvider
+        from sim2real.planner.reference import PlannerReference, hold_motion_data
+        from sim2real.planner.worker import worker_options
+
+        if abs(1.0 / self.args.rl_rate - 0.02) > 1e-9:
+            raise ValueError("motion_backend=planner runs at the Planner's 50 Hz (rl_rate 50)")
+        missing = sorted(set(JOINT_NAMES) - set(self.robot_cfg.joint_names))
+        if missing:
+            raise ValueError(f"motion_backend=planner needs the robot joints {missing}")
+        self._planner_joint_index = np.asarray([self.robot_cfg.joint_names.index(n) for n in JOINT_NAMES])
+
+        motion_path = self.motion_config.get("motion_path")
+        if motion_path is None:
+            raise ValueError(
+                "motion_backend=planner needs a Motion for the Hold Reference: "
+                "pass --motion-path or set motion.motion_path"
+            )
+        dataset = motion_dataset_first_motion(
+            MotionDataset.create_from_path(
+                motion_path, robot_cfg=self.robot_cfg, mjcf_path=self.motion_config.get("mjcf_path")
+            )
+        )
+        root = str(self.motion_config.get("root_body_name", "pelvis"))
+        first = np.zeros(1, dtype=int)
+        frame0 = dataset.get_slice(first, first, first)
+        hold = hold_motion_data(
+            joint_pos=[frame0.joint_pos[0, 0, dataset.joint_names.index(n)] for n in JOINT_NAMES],
+            pelvis_pos=frame0.body_pos_w[0, 0, dataset.body_names.index(root)],
+            pelvis_quat_wxyz=frame0.body_quat_w[0, 0, dataset.body_names.index(root)],
+            future_steps=self.motion_future_steps,
+        )
+        io = self._planner_io(worker_options(self.motion_config.get("planner")))
+        self._planner_clock = io.clock
+        provider = PlannerProvider(JOINT_NAMES, source=io.source, worker=io.worker)
+        return PlannerReference(provider, hold=hold, future_steps=self.motion_future_steps)
+
+    def _planner_io(self, options: dict):
+        """Depth source, Planner worker and clock for ``motion_backend=planner``.
+
+        On the robot this is the Host depth receiver, ``GpuPlannerWorker(options)``
+        and ``time.monotonic`` (dixiatielu/sim2real_scalecar#8); the vehicle sim2sim
+        overrides it with rendered depth on simulation time.
+        """
+        raise NotImplementedError(
+            "motion_backend=planner on the robot needs the Host depth receiver (dixiatielu/sim2real_scalecar#8)"
+        )
+
+    def close_reference_source(self) -> None:
+        """Stops the Planner worker process (no-op for the other backends)."""
+        if self.motion_backend == "planner":
+            self.motion_buffer.close()
+
+    def run(self):
+        try:
+            super().run()
+        finally:
+            self.close_reference_source()
 
     def motion_first_frame_joint_pos(self) -> np.ndarray:
         """Frame 0 of the Motion, in robot joint order (Shaping target).
@@ -257,6 +339,16 @@ class Tracking(BasePolicy):
                 self.motion_data.body_ang_vel_w[:] = 0.0
             return
 
+        if self.motion_backend == "planner":
+            from sim2real.planner.provider import PlannerState
+
+            state = PlannerState(
+                joint_pos=np.asarray(self.state_processor.joint_pos, dtype=np.float64)[self._planner_joint_index],
+                root_quat_wxyz=np.asarray(self.state_processor.root_quat_w, dtype=np.float64).copy(),
+            )
+            self.motion_data = self.motion_buffer.tick(state, self._planner_clock())
+            return
+
         self.motion_data = self.motion_buffer.get_obs()
         self.motion_joint_names = list(self.motion_buffer.joint_names)
         if self.motion_backend == "zmq":
@@ -265,6 +357,10 @@ class Tracking(BasePolicy):
             self.motion_body_names = []
 
     def _reset_motion(self) -> None:
+        if self.motion_backend == "planner":
+            # Entering the Tracker does not run a Planner cycle; the next tick does.
+            self.motion_data = self.motion_buffer.motion_data
+            return
         if self.motion_backend == "npz":
             self.motion_t[:] = 0
         self._update_motion_data(paused=True)
@@ -337,8 +433,10 @@ class Tracking(BasePolicy):
 class TrackingArgs(BasePolicyArgs):
     """Robot."""
 
-    motion_backend: Optional[Literal["npz", "zmq", "smpl_zmq"]] = None
+    motion_backend: Optional[Literal["npz", "zmq", "smpl_zmq", "planner"]] = None
     motion_path: Optional[str] = None
+    planner_checkpoint: Optional[str] = None
+    """motion_backend=planner: checkpoint path (default: the pinned ModelScope d1146 file)."""
     motion_zmq_connect: Optional[str] = None
     motion_zmq_hwm: int = 1
     motion_tolerance_s: float = 0.04

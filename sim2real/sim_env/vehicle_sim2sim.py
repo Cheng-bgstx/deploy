@@ -3,14 +3,16 @@
 One episode per (Tracker, Motion) case, each in its own process::
 
     HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 UV_FROZEN=1 uv run python -m sim2real.sim_env.vehicle_sim2sim \
-        --trackers ft500ema ft1000ema --motions take1512 take0595
+        --trackers ft500ema ft1000ema --motions take1512 take0595 [--reference-source planner]
 
 Inputs and results default to ``checkpoints/scalecar_d1146/`` of this checkout
 (``--artifact-root`` points elsewhere, e.g. from a git worktree). Physics, scene
-and judgement follow Scalecar's d1146 entry-only File Playback episode; the
-Tracker side is sim2real's own runtime (``tracking.py``). Each case writes
-``<case>.json`` (result), ``<case>.rollout.npz`` and ``<case>.log`` to the
-output directory, plus one ``summary.json`` per invocation.
+and judgement follow Scalecar's d1146 entry-only episodes; the Tracker side is
+sim2real's own runtime (``tracking.py``). The Reference Source is File Playback
+(default) or the Planner (``motion_backend: planner``: depth rendered from the
+physics model, simulation time with each plan's measured latency injected).
+Each case writes ``<case>.json`` (result), ``<case>.rollout.npz`` and
+``<case>.log`` to the output directory, plus one ``summary.json`` per invocation.
 """
 
 from __future__ import annotations
@@ -343,6 +345,55 @@ class FilePlaybackFlow:
             self.stage = "done"
 
 
+class PlannerFlow:
+    """The operator script and clock of one Planner episode, in control ticks.
+
+    Tick 0: the Tracker takes over (R1), Hold. After ``hold_s``: Go (B); the
+    Reference stays in Hold until the Planner's first Chunk applies. The episode
+    ends ``planner_s`` after Go (Scalecar's ``dp.seconds``); the Planner has no
+    Final Hold. A refused Go ends the episode at once.
+    """
+
+    def __init__(self, *, control_dt: float, hold_s: float = 5.0, planner_s: float = 40.0):
+        self.control_dt = float(control_dt)
+        self.hold_ticks = round(hold_s / self.control_dt)
+        self.planner_ticks = round(planner_s / self.control_dt)
+        self.tick = 0
+        self.stage = "hold"
+        self.go_time_s: float | None = None
+        self.first_reference_time_s: float | None = None
+        self.go_refused = False
+
+    @property
+    def done(self) -> bool:
+        return self.stage == "done"
+
+    def operator_input(self) -> str | None:
+        if self.tick == 0:
+            return "take_over"
+        if self.tick == self.hold_ticks:
+            return "go"
+        return None
+
+    def tick_done(self, *, go_refused: bool, reference_started: bool) -> None:
+        if self.done:
+            raise RuntimeError("The episode is over")
+        if self.tick == self.hold_ticks:
+            if go_refused:
+                self.go_refused = True
+                self.tick += 1
+                self.stage = "done"
+                return
+            self.stage = "waiting_first_chunk"
+            self.go_time_s = self.tick * self.control_dt
+        if self.stage == "waiting_first_chunk" and reference_started:
+            self.stage = "planner"
+            self.first_reference_time_s = self.tick * self.control_dt
+        self.tick += 1
+        if self.go_time_s is not None and self.tick - self.hold_ticks >= self.planner_ticks:
+            self.stage = "done"
+
+
 class ScriptedOperator(ControllerBase):
     """Stands in for the operator's Controller: a stage switch requested by the runner."""
 
@@ -367,8 +418,9 @@ class VehicleTracking(Tracking):
     ``take_over`` and ``go`` are the operator's R1 and B.
     """
 
-    def __init__(self, args: TrackingArgs, *, robot_io: RobotIO):
+    def __init__(self, args: TrackingArgs, *, robot_io: RobotIO, physics: VehiclePhysics | None = None):
         self._vehicle_robot_io = robot_io
+        self._physics = physics
         self._operator = ScriptedOperator()
         self._went = False
         super().__init__(args=args)
@@ -380,6 +432,30 @@ class VehicleTracking(Tracking):
         self.keyboard_controller = self.joystick_controller = self.pico_controller = None
         return self._operator
 
+    def _planner_io(self, options: dict):
+        """The Planner in the Vehicle Scene: depth rendered from the physics model, simulation time
+        with each plan's measured wall-clock latency injected, the real CUDA worker process."""
+        from sim2real.planner.reference import PlannerIO
+        from sim2real.planner.sim import SimulatedDepthSource, SimulatedTimeWorker
+        from sim2real.planner.worker import GpuPlannerWorker
+
+        physics = self._physics
+        if physics is None:
+            raise ValueError("motion_backend=planner in the vehicle sim2sim needs the physics")
+
+        def clock() -> float:
+            return physics.time_s
+
+        return PlannerIO(
+            source=SimulatedDepthSource(physics.model, physics.data, clock=clock),
+            worker=SimulatedTimeWorker(GpuPlannerWorker(options), clock=clock),
+            clock=clock,
+        )
+
+    def close_reference_source(self) -> None:
+        if self.motion_backend == "planner":
+            self.motion_buffer.close()  # the worker process and the depth renderer
+
     def take_over(self) -> None:
         """R1 at the next tick: the Tracker takes over with the Reference frozen at frame 0 (Hold)."""
         # The robot has been streaming state before R1, so the Tracker's history
@@ -388,7 +464,14 @@ class VehicleTracking(Tracking):
         self._operator.request("policy")
 
     def go(self) -> None:
-        """B (File Playback): the Reference starts moving at the next tick."""
+        """B. File Playback: the Reference starts moving at the next tick. Planner: Go is attempted
+        at the next tick (height check, new generation); the Reference stays in Hold until the first Chunk."""
+        if self.motion_backend == "planner":
+            if self.state_dict.get("control_mode") != "policy" or not self.motion_buffer.holding:
+                raise RuntimeError("Go needs the Tracker in Hold")
+            self.motion_buffer.request_go()
+            self._went = True
+            return
         if self.state_dict.get("control_mode") != "policy" or not self.state_dict.get("paused", False):
             raise RuntimeError("Go needs the Tracker in Hold")
         self.toggle_paused(source=self._operator.name)
@@ -396,7 +479,9 @@ class VehicleTracking(Tracking):
 
     @property
     def reference_ended(self) -> bool:
-        """File Playback has reached the Motion's last frame (Final Hold)."""
+        """File Playback has reached the Motion's last frame (Final Hold). Never for the Planner."""
+        if self.motion_backend == "planner":
+            return False
         return self._went and bool(self.state_dict.get("paused", False))
 
 
@@ -441,6 +526,10 @@ class EpisodeCase:
     output_dir: Path
     hold_s: float = 5.0
     final_hold_s: float = 2.0
+    reference_source: str = "file_playback"  # or "planner"
+    planner_s: float = 40.0
+    planner_checkpoint: str | None = None
+    parallel_episodes: int = 1
 
     @property
     def result_path(self) -> Path:
@@ -461,12 +550,15 @@ def load_vehicle_scene(scene_dir: Path) -> tuple[mujoco.MjModel, dict]:
 
 
 def run_episode(case: EpisodeCase) -> dict:
-    """Run one File Playback episode and return its result (also written to ``case.result_path``)."""
+    """Run one episode and return its result (also written to ``case.result_path``)."""
     wall_start = time.perf_counter()
     contract_path = case.policy_config.parent / "deployment.json"
     contract = json.loads(contract_path.read_text(encoding="utf-8"))
     control_dt = float(contract["control_dt"])
     robot_cfg = get_robot_cfg("g1")
+    planner = case.reference_source == "planner"
+    if case.reference_source not in ("file_playback", "planner"):
+        raise ValueError(f"Unknown reference source {case.reference_source!r}")
 
     model, build = load_vehicle_scene(case.scene_dir)
     physics = VehiclePhysics(model, contract, joint_names=robot_cfg.joint_names)
@@ -475,22 +567,84 @@ def run_episode(case: EpisodeCase) -> dict:
     tracker = VehicleTracking(
         TrackingArgs(
             policy_config=str(case.policy_config),
-            motion_backend="npz",
+            motion_backend="planner" if planner else "npz",
             motion_path=str(case.motion),
+            planner_checkpoint=case.planner_checkpoint,
             rl_rate=1.0 / control_dt,
             inference_backend="onnx-cpu",
         ),
         robot_io=robot_io,
+        physics=physics,
     )
-    if tracker.policy_joint_names != contract["joint_names"]:
-        raise ValueError("policy.yaml and deployment.json disagree on the Tracker joint order")
+    try:
+        if tracker.policy_joint_names != contract["joint_names"]:
+            raise ValueError("policy.yaml and deployment.json disagree on the Tracker joint order")
+        planner_loaded = wait_for_planner(tracker) if planner else None
+        result = _run_loop(case, contract, control_dt, model, build, physics, robot_io, tracker, wall_start)
+    finally:
+        tracker.close_reference_source()
+    if planner:
+        result["planner"] = _planner_result(case, tracker, planner_loaded)
+    result["wall"]["total_s"] = time.perf_counter() - wall_start
+    case.result_path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    return result
 
+
+def wait_for_planner(tracker: VehicleTracking, timeout_s: float = 300.0) -> dict:
+    """Blocks until the Planner worker has loaded its checkpoint on CUDA (before simulated time starts)."""
+    worker = tracker.motion_buffer.provider.worker.worker  # SimulatedTimeWorker -> GpuPlannerWorker
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        item = worker.poll()
+        if item is not None and item.get("status") == "loaded":
+            logger.info("Planner loaded on {} ({}), cuDNN enabled: {}", item["gpu"], item["device"], item["cudnn_enabled"])
+            return item
+        if item is not None and item.get("status") == "error":
+            raise RuntimeError(f"The Planner worker failed: {item['error']}")
+        time.sleep(0.05)
+    raise TimeoutError(f"The Planner worker did not load within {timeout_s} s")
+
+
+def _planner_result(case: EpisodeCase, tracker: VehicleTracking, loaded: dict) -> dict:
+    """Planner statistics of the episode: latency, late Chunks, coverage, depth, provenance."""
+    from sim2real.planner.reference import _percentiles
+    from sim2real.planner.worker import worker_options
+
+    reference = tracker.motion_buffer
+    options = worker_options(tracker.motion_config.get("planner"))
+    source = reference.provider.source
+    return {
+        **reference.stats(),
+        "depth_frames": source.frame + 1,
+        "depth_render_ms": _percentiles([1000.0 * t for t in source.camera.times]),
+        "simulation_waited_for_planner_s": reference.provider.worker.wait_s,
+        # LatestMailbox.publish never blocks: a request meeting the worker's read lock is dropped.
+        "requests_dropped": reference.provider.worker.worker.dropped,
+        "worker_restarts": reference.provider.worker.worker.restarts,
+        "parallel_episodes": case.parallel_episodes,
+        "checkpoint": options["checkpoint"],
+        "checkpoint_sha256": options["checkpoint_sha256"],
+        "device": loaded["device"],
+        "gpu": loaded["gpu"],
+        "cudnn_enabled": loaded["cudnn_enabled"],
+        "torch": loaded["torch"],
+        "seed": options["seed"],
+        "history_source": "self",
+    }
+
+
+def _run_loop(case, contract, control_dt, model, build, physics, robot_io, tracker, wall_start) -> dict:
+    planner = case.reference_source == "planner"
     region = np.asarray(build["task_envelope"]["sources"]["cabin_feet_region"])
-    flow = FilePlaybackFlow(control_dt=control_dt, hold_s=case.hold_s, final_hold_s=case.final_hold_s)
+    if planner:
+        flow = PlannerFlow(control_dt=control_dt, hold_s=case.hold_s, planner_s=case.planner_s)
+    else:
+        flow = FilePlaybackFlow(control_dt=control_dt, hold_s=case.hold_s, final_hold_s=case.final_hold_s)
     judge = EntryJudge(region, control_dt)  # Hold: only a Fall can happen; replaced at Go
     guard = EnvelopeGuard(model, build["task_envelope"]["min"], build["task_envelope"]["max"])
     bodies = {name: _name2id(model, mujoco.mjtObj.mjOBJ_BODY, name) for name in JUDGE_BODIES}
-    rollout = {key: [] for key in ("time", "qpos", "qvel", "joint_target", "reference_frame", "margin")}
+    reference_key = "reference_holding" if planner else "reference_frame"
+    rollout = {key: [] for key in ("time", "qpos", "qvel", "joint_target", reference_key, "margin")}
 
     termination = "completed"
     setup_s = time.perf_counter() - wall_start
@@ -507,7 +661,18 @@ def run_episode(case: EpisodeCase) -> dict:
         if robot_io.commands_sent != sent + 1:
             raise RuntimeError(f"The Tracker sent no joint command at t={physics.time_s:.2f} s")
         physics.step(robot_io.joint_targets)
-        flow.tick_done(reference_ended=tracker.reference_ended)
+        if planner:
+            reference = tracker.motion_buffer
+            flow.tick_done(
+                go_refused=command == "go" and reference.go_time is None,
+                reference_started=not reference.holding,
+            )
+        else:
+            flow.tick_done(reference_ended=tracker.reference_ended)
+        if planner and flow.go_refused:
+            termination = "go_refused"
+            logger.warning("Go refused: {}", tracker.motion_buffer.provider.start_rejection)
+            break
 
         data = physics.data
         judge.update(
@@ -522,7 +687,10 @@ def run_episode(case: EpisodeCase) -> dict:
         rollout["qpos"].append(data.qpos.copy())
         rollout["qvel"].append(data.qvel.copy())
         rollout["joint_target"].append(robot_io.joint_targets.copy())
-        rollout["reference_frame"].append(int(tracker.motion_t[0]))
+        if planner:
+            rollout["reference_holding"].append(bool(tracker.motion_buffer.holding))
+        else:
+            rollout["reference_frame"].append(int(tracker.motion_t[0]))
         rollout["margin"].append(margin)
         if not (np.isfinite(data.qpos).all() and np.isfinite(data.qvel).all()):
             termination = "nonfinite_state"
@@ -535,10 +703,30 @@ def run_episode(case: EpisodeCase) -> dict:
 
     after_go = flow.go_time_s is not None
     completed = termination == "completed"
+    timeline = {
+        "control_dt_s": control_dt,
+        "hold_s": case.hold_s,
+        "go_time_s": _seconds(flow.go_time_s),
+    }
+    if planner:
+        timeline.update(
+            first_reference_time_s=_seconds(flow.first_reference_time_s),
+            planner_s=case.planner_s,
+            end_time_s=_seconds(physics.time_s),
+            ticks=flow.tick,
+        )
+    else:
+        timeline.update(
+            reference_end_time_s=_seconds(flow.reference_end_time_s),
+            final_hold_s=case.final_hold_s,
+            end_time_s=_seconds(physics.time_s),
+            ticks=flow.tick,
+            motion_frames=int(tracker.motion_length),
+        )
     result = {
         "schema_version": 1,
         "case": case.name,
-        "reference_source": "file_playback",
+        "reference_source": case.reference_source,
         "entered": bool(after_go and judge.entered),
         "entry_time_s": _seconds(judge.entry_time_s) if after_go else None,
         "fallen": judge.fallen,
@@ -554,16 +742,7 @@ def run_episode(case: EpisodeCase) -> dict:
             "closest": guard.closest,
             "first_violation": guard.first_violation,
         },
-        "timeline": {
-            "control_dt_s": control_dt,
-            "hold_s": case.hold_s,
-            "go_time_s": _seconds(flow.go_time_s),
-            "reference_end_time_s": _seconds(flow.reference_end_time_s),
-            "final_hold_s": case.final_hold_s,
-            "end_time_s": _seconds(physics.time_s),
-            "ticks": flow.tick,
-            "motion_frames": int(tracker.motion_length),
-        },
+        "timeline": timeline,
         "wall": {
             "total_s": time.perf_counter() - wall_start,
             "setup_s": setup_s,
@@ -573,7 +752,7 @@ def run_episode(case: EpisodeCase) -> dict:
         },
         "inputs": {
             "policy_config": str(case.policy_config),
-            "deployment_contract": str(contract_path),
+            "deployment_contract": str(case.policy_config.parent / "deployment.json"),
             "motion": str(case.motion),
             "scene": str(Path(case.scene_dir) / build["scene"]["file"]),
             "scene_sha256": build["scene"]["sha256"],
@@ -596,7 +775,6 @@ def run_episode(case: EpisodeCase) -> dict:
         case.output_dir / f"{case.name}.rollout.npz",
         **{key: np.asarray(values) for key, values in rollout.items()},
     )
-    case.result_path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     return result
 
 
@@ -651,17 +829,40 @@ def _init_worker(cpus: list[int]) -> None:
         os.sched_setaffinity(0, cpus)
 
 
+class _WallBudgetFilter:
+    """Drops the runtime's "RL step took X ms, expected 20 ms" warning, counting it instead.
+
+    The vehicle sim2sim is not real time (about 0.35x), and with the Planner a tick also
+    renders depth, which on the robot happens in the depth process. The Planner's timing
+    is measured and injected separately, so the 20 ms wall budget means nothing here.
+    """
+
+    def __init__(self) -> None:
+        self.suppressed = 0
+
+    def __call__(self, record) -> bool:
+        if record["name"] == "sim2real.rl_policy.base_policy" and record["message"].startswith("RL step took"):
+            self.suppressed += 1
+            return False
+        return True
+
+
 def _run_case_logged(case: EpisodeCase) -> dict:
     case.output_dir.mkdir(parents=True, exist_ok=True)
     with open(case.output_dir / f"{case.name}.log", "w", encoding="utf-8") as log, contextlib.redirect_stdout(log):
+        wall_budget = _WallBudgetFilter()
         logger.remove()
-        logger.add(log, level="INFO")
-        logger.add(sys.stderr, level="WARNING", format=f"[{case.name}] {{level}}: {{message}}")
+        logger.add(log, level="INFO", filter=wall_budget)
+        logger.add(
+            sys.stderr, level="WARNING", format=f"[{case.name}] {{level}}: {{message}}", filter=_WallBudgetFilter()
+        )
         try:
             return run_episode(case)
         except Exception:
             logger.exception("Episode {} failed", case.name)
             raise
+        finally:
+            logger.info("Suppressed {} runtime wall-budget warnings (not real time)", wall_budget.suppressed)
 
 
 @dataclass
@@ -675,8 +876,8 @@ class VehicleSim2SimArgs:
     artifact_root: str = str(ARTIFACT_ROOT)
     """checkpoints/scalecar_d1146 with tracker/, motions/ and scene/ (default: this checkout's)."""
     output_dir: str | None = None
-    """Results: <case>.json, <case>.rollout.npz and <case>.log per case, plus summary.json.
-    Default: <artifact-root>/sim2sim."""
+    """Results: <case>.json, <case>.rollout.npz and <case>.log per case, plus summary.json
+    (summary_planner.json with the Planner; its cases end in _planner). Default: <artifact-root>/sim2sim."""
     scene_dir: str | None = None
     """Default: <artifact-root>/scene."""
     tracker_root: str | None = None
@@ -684,11 +885,20 @@ class VehicleSim2SimArgs:
     motion_root: str | None = None
     """any4hdmi dataset root. Default: <artifact-root>/motions."""
     workers: int | None = None
-    """Parallel episodes; default min(cases, physical performance cores)."""
+    """Parallel episodes; default min(cases, physical performance cores), and 1 with the Planner:
+    plans of parallel episodes share the GPU, which inflates the latency injected into each."""
     hold_s: float = 5.0
     final_hold_s: float = 2.0
+    reference_source: str = "file_playback"
+    """file_playback or planner."""
+    planner_s: float = 40.0
+    """Planner episodes: simulated time after Go (Scalecar's dp.seconds)."""
+    planner_checkpoint: str | None = None
+    """Planner checkpoint (default: the pinned ModelScope d1146 file; its sha256 is checked)."""
 
     def __post_init__(self) -> None:
+        if self.reference_source not in ("file_playback", "planner"):
+            raise ValueError(f"--reference-source must be file_playback or planner, not {self.reference_source!r}")
         root = Path(self.artifact_root).expanduser()
         self.output_dir = self.output_dir or str(root / "sim2sim")
         self.scene_dir = self.scene_dir or str(root / "scene")
@@ -696,7 +906,7 @@ class VehicleSim2SimArgs:
         self.motion_root = self.motion_root or str(root / "motions")
 
 
-def resolve_cases(args: VehicleSim2SimArgs) -> list[EpisodeCase]:
+def resolve_cases(args: VehicleSim2SimArgs, *, parallel_episodes: int = 1) -> list[EpisodeCase]:
     def tracker_path(value: str) -> Path:
         path = Path(value).expanduser()
         return path if path.suffix in (".yaml", ".yml") else Path(args.tracker_root) / value / "policy.yaml"
@@ -711,15 +921,20 @@ def resolve_cases(args: VehicleSim2SimArgs) -> list[EpisodeCase]:
             for required in (tracker, tracker.parent / "deployment.json", motion):
                 if not required.is_file():
                     raise FileNotFoundError(required)
+            suffix = "_planner" if args.reference_source == "planner" else ""
             cases.append(
                 EpisodeCase(
-                    name=f"{tracker.parent.name}_{motion.stem}",
+                    name=f"{tracker.parent.name}_{motion.stem}{suffix}",
                     policy_config=tracker.resolve(),
                     motion=motion.resolve(),
                     scene_dir=Path(args.scene_dir).resolve(),
                     output_dir=Path(args.output_dir).resolve(),
                     hold_s=args.hold_s,
                     final_hold_s=args.final_hold_s,
+                    reference_source=args.reference_source,
+                    planner_s=args.planner_s,
+                    planner_checkpoint=args.planner_checkpoint,
+                    parallel_episodes=parallel_episodes,
                 )
             )
     names = [case.name for case in cases]
@@ -731,20 +946,35 @@ def resolve_cases(args: VehicleSim2SimArgs) -> list[EpisodeCase]:
 def _summary_line(result: dict) -> str:
     entry = f"{result['entry_time_s']:.2f} s" if result["entered"] else "-"
     validity = "valid" if result["valid"] else "INVALID (left the Task Envelope)"
-    return (
+    line = (
         f"{result['case']}: task_success={result['task_success']} entry={entry} fallen={result['fallen']} "
         f"termination={result['termination']} {validity} min_margin={result['envelope']['min_margin_m']:.3f} m "
         f"wall={result['wall']['total_s']:.0f} s"
     )
+    planner = result.get("planner")
+    if planner:
+        latency = planner["latency_ms"]
+        line += (
+            f" planner latency p50/p95={latency['p50']:.1f}/{latency['p95']:.1f} ms"
+            if latency
+            else " planner latency=-"
+        ) + (
+            f" late_chunks={planner['late_chunks']} coverage_exhausted={planner['coverage_exhausted_events']}"
+            f" ({planner['coverage_exhausted_ticks']} ticks)"
+        )
+    return line
 
 
 def main(args: VehicleSim2SimArgs) -> int:
     import multiprocessing
 
-    cases = resolve_cases(args)
-    workers = min(len(cases), args.workers or performance_core_count())
+    default_workers = 1 if args.reference_source == "planner" else performance_core_count()
+    workers = min(len(resolve_cases(args)), args.workers or default_workers)
     if workers < 1:
         raise ValueError("--workers must be positive")
+    cases = resolve_cases(args, parallel_episodes=workers)
+    # The Planner's depth camera renders offscreen; spawned episodes import mujoco with this set.
+    os.environ.setdefault("MUJOCO_GL", "egl")
     # One ONNX Runtime thread per episode, as Scalecar; the episodes are the parallelism.
     os.environ.setdefault("SIM2REAL_ORT_NUM_THREADS", "1")
     for var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
@@ -784,12 +1014,23 @@ def main(args: VehicleSim2SimArgs) -> int:
                     for key in ("task_success", "entered", "entry_time_s", "fallen", "completed", "valid")
                     if case.name in results
                 },
+                **(
+                    {
+                        "planner": {
+                            key: results[case.name]["planner"][key]
+                            for key in ("latency_ms", "late_chunks", "coverage_exhausted_events", "coverage_exhausted_ticks")
+                        }
+                    }
+                    if case.name in results and "planner" in results[case.name]
+                    else {}
+                ),
             }
             for case in cases
         },
         "args": asdict(args),
     }
-    (output_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    summary_name = "summary_planner.json" if args.reference_source == "planner" else "summary.json"
+    (output_dir / summary_name).write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     ok = not errors and all(r["task_success"] and r["valid"] for r in results.values())
     return 0 if ok else 1
 
