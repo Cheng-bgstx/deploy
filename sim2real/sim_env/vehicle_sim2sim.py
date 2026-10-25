@@ -476,10 +476,6 @@ class VehicleTracking(Tracking):
             raise
         return PlannerIO(source=source, worker=worker, clock=clock)
 
-    def close_reference_source(self) -> None:
-        if self.motion_backend == "planner":
-            self.motion_buffer.close()  # the worker process and the depth renderer
-
     def take_over(self) -> None:
         """R1 at the next tick: the Tracker takes over with the Reference frozen at frame 0 (Hold)."""
         # The robot has been streaming state before R1, so the Tracker's history
