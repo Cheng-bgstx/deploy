@@ -11,6 +11,8 @@ Reference as sim2real ``MotionData``: joints and pelvis only, no FK.
   orientation; joint velocity by ``np.gradient`` at 50 Hz), taken at the Tracker's
   future steps. Past the end of the Chunk the last row is held (coverage exhausted).
 - Invalid tokens: the last valid Reference is kept.
+
+Stale depth and camera disconnects are reported on the terminal (``depth_status``).
 """
 
 from __future__ import annotations
@@ -24,6 +26,7 @@ from loguru import logger
 
 from sim2real.rl_policy.utils.motion import MotionData
 
+from .depth_status import DepthStatus
 from .provider import JOINT_NAMES, PlannerProvider, PlannerState
 from .scalecar_dp import motion38d as m38
 from .scalecar_dp.dp import contract as C
@@ -105,6 +108,7 @@ class PlannerReference:
         self._last_valid: MotionData | None = None
         self._last_rows: np.ndarray | None = None
         self._next_stats: float | None = None
+        self.depth_status = DepthStatus()
 
     # -- operator hooks -------------------------------------------------------
 
@@ -112,14 +116,22 @@ class PlannerReference:
         """Go (B): attempted at the next ``tick`` with that tick's state and time."""
         self.go_requested = True
 
-    def abort(self) -> None:
+    def abort(self, reason: str = "E-stop") -> None:
         """E-stop: the current Go is dropped and the Reference returns to Hold."""
         self.go_requested = False
         self.provider.abort()
         self.go_time = self.first_reference_time = None
         self._last_valid = self._last_rows = None
         self.motion_data, self.phase = self.hold, "standing"
-        logger.warning("Planner: Go dropped (E-stop); take over again and press Go to restart")
+        logger.warning(
+            "Planner: Go dropped ({}); the Reference is back in Hold at the Motion's frame 0. "
+            "Restart with A -> R1 -> B", reason,
+        )
+
+    @property
+    def go_active(self) -> bool:
+        """A Go is requested or accepted (planning, or Hold until its first Chunk)."""
+        return self.go_requested or self.go_time is not None
 
     @property
     def holding(self) -> bool:
@@ -131,6 +143,7 @@ class PlannerReference:
     def tick(self, state: PlannerState, now: float) -> MotionData:
         provider = self.provider
         provider.poll(state, now)
+        self._report_depth(now)
         provider.warmup(state, now)
         if self.go_requested:
             self.go_requested = False
@@ -163,6 +176,14 @@ class PlannerReference:
             )
         else:
             logger.warning("Planner: Go refused, staying in Hold: {}", self.provider.start_rejection)
+
+    def _report_depth(self, now: float) -> None:
+        provider = self.provider
+        age = None if not provider.depth.t else now - provider.depth.t[-1]
+        for level, message in self.depth_status.update(
+            now, age_s=age, error=provider.depth_error, session=provider.camera_session
+        ):
+            logger.log(level, message)
 
     # -- statistics -----------------------------------------------------------
 
