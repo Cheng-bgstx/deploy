@@ -166,20 +166,14 @@ uv run --with torch==2.7.0 --index https://download.pytorch.org/whl/cpu \
 
 ### Motions {#motions}
 
-With `MS` set as above:
-
 ```bash
 uv run python -I scripts/scalecar/convert_motions.py --takes take1512 take0595 \
-  --tar "$MS/assets/motions_merged1146_converted_50hz_v1.tar" \
-  --sha256sums "$MS/assets/SHA256SUMS" \
   --output-dir checkpoints/scalecar_d1146/motions
 ```
 
 - This extracts the two takes from the verified tar and converts them into an
   any4hdmi dataset: `motions/manifest.json` and
   `motions/motions/take1512.npz`, `motions/motions/take0595.npz`.
-- Pass `--tar` and `--sha256sums` as shown: the script's built-in defaults
-  point at one particular home directory.
 - `python -I` keeps the current directory off `sys.path`, because the tar
   contents are treated as untrusted.
 - Point `--motion-path` at a Motion **file**. With the dataset root,

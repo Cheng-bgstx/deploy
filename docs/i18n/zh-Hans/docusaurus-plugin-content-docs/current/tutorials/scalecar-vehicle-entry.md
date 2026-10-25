@@ -152,20 +152,14 @@ uv run --with torch==2.7.0 --index https://download.pytorch.org/whl/cpu \
 
 ### Motion {#motions}
 
-沿用上面设置的 `MS`：
-
 ```bash
 uv run python -I scripts/scalecar/convert_motions.py --takes take1512 take0595 \
-  --tar "$MS/assets/motions_merged1146_converted_50hz_v1.tar" \
-  --sha256sums "$MS/assets/SHA256SUMS" \
   --output-dir checkpoints/scalecar_d1146/motions
 ```
 
 - 脚本从校验过的 tar 中取出这两条 take，转换成 any4hdmi 数据集：
   `motions/manifest.json`，以及 `motions/motions/take1512.npz`、
   `motions/motions/take0595.npz`。
-- 按上面的写法显式传入 `--tar` 和 `--sha256sums`：脚本内置的默认值指向某个特定
-  用户的 home 目录。
 - `python -I` 不把当前目录加入 `sys.path`，因为 tar 中的内容按不可信数据处理。
 - `--motion-path` 要指向 Motion **文件**（动作文件）。如果指向数据集根目录，
   `tracking.py` 会静默地只使用其中第一个 Motion。
