@@ -172,6 +172,7 @@ class Tracking(BasePolicy):
     def _init_motion_backend(self) -> None:
         self.motion_config = dict(self.policy_config.get("motion", {}))
         self.motion_data: MotionData | None = None
+        self._first_frame: tuple[MotionData, list[str], list[str]] | None = None
         self.motion_future_steps = np.asarray(
             self.motion_config.get("future_steps", []),
             dtype=int,
@@ -268,24 +269,12 @@ class Tracking(BasePolicy):
         self._planner_options = worker_options(self.motion_config.get("planner"))
         self._planner_joint_index = np.asarray([self.robot_cfg.joint_names.index(n) for n in JOINT_NAMES])
 
-        motion_path = self.motion_config.get("motion_path")
-        if motion_path is None:
-            raise ValueError(
-                "motion_backend=planner needs a Motion for the Hold Reference: "
-                "pass --motion-path or set motion.motion_path"
-            )
-        dataset = motion_dataset_first_motion(
-            MotionDataset.create_from_path(
-                motion_path, robot_cfg=self.robot_cfg, mjcf_path=self.motion_config.get("mjcf_path")
-            )
-        )
+        frame0, joint_names, body_names = self._motion_first_frame("motion_backend=planner (the Hold Reference)")
         root = str(self.motion_config.get("root_body_name", "pelvis"))
-        first = np.zeros(1, dtype=int)
-        frame0 = dataset.get_slice(first, first, first)
         return hold_motion_data(
-            joint_pos=[frame0.joint_pos[0, 0, dataset.joint_names.index(n)] for n in JOINT_NAMES],
-            pelvis_pos=frame0.body_pos_w[0, 0, dataset.body_names.index(root)],
-            pelvis_quat_wxyz=frame0.body_quat_w[0, 0, dataset.body_names.index(root)],
+            joint_pos=[frame0.joint_pos[0, 0, joint_names.index(n)] for n in JOINT_NAMES],
+            pelvis_pos=frame0.body_pos_w[0, 0, body_names.index(root)],
+            pelvis_quat_wxyz=frame0.body_quat_w[0, 0, body_names.index(root)],
             future_steps=self.motion_future_steps,
         )
 
@@ -355,36 +344,48 @@ class Tracking(BasePolicy):
         finally:
             self.close_reference_source()
 
-    def motion_first_frame_joint_pos(self) -> np.ndarray:
-        """Frame 0 of the Motion, in robot joint order (Shaping target).
+    def _motion_first_frame(self, needed_by: str) -> tuple[MotionData, list[str], list[str]]:
+        """Frame 0 of the Motion (one-step ``MotionData``) with its joint and body names.
 
         File Playback uses the Motion it plays. A streamed Reference (zmq
         backends, the Planner) still needs a Motion file for its first frame:
-        ``--motion-path`` or ``motion.motion_path``.
+        ``--motion-path`` or ``motion.motion_path``, loaded once.
         """
-        if self.motion_backend == "npz":
-            dataset = self.motion_dataset
-        else:
-            motion_path = self.args.motion_path or self.motion_config.get("motion_path")
-            if motion_path is None:
-                raise ValueError(
-                    "shaping_target: motion_first_frame with "
-                    f"motion_backend={self.motion_backend} needs a Motion for its "
-                    "first frame: pass --motion-path or set motion.motion_path"
+        if self._first_frame is None:
+            if self.motion_backend == "npz":
+                dataset = self.motion_dataset
+            else:
+                motion_path = self.args.motion_path or self.motion_config.get("motion_path")
+                if motion_path is None:
+                    raise ValueError(
+                        f"{needed_by} needs a Motion for its first frame: "
+                        "pass --motion-path or set motion.motion_path"
+                    )
+                dataset = motion_dataset_first_motion(
+                    MotionDataset.create_from_path(
+                        motion_path,
+                        robot_cfg=self.robot_cfg,
+                        mjcf_path=self.motion_config.get("mjcf_path"),
+                    )
                 )
-            dataset = motion_dataset_first_motion(
-                MotionDataset.create_from_path(
-                    motion_path,
-                    robot_cfg=self.robot_cfg,
-                    mjcf_path=self.motion_config.get("mjcf_path"),
-                )
+            first = np.zeros(1, dtype=int)
+            self._first_frame = (
+                dataset.get_slice(first, first, first),
+                list(dataset.joint_names),
+                list(dataset.body_names),
             )
-        first = np.zeros(1, dtype=int)
-        joint_pos = dataset.get_slice(first, first, first).joint_pos[0, 0]
+        return self._first_frame
+
+    def motion_first_frame_joint_pos(self) -> np.ndarray:
+        """Frame 0 of the Motion, in robot joint order (Shaping target)."""
+        frame0, joint_names, _ = self._motion_first_frame(
+            f"shaping_target: motion_first_frame with motion_backend={self.motion_backend}"
+        )
+        joint_pos = frame0.joint_pos[0, 0]
         q = self.default_dof_angles.copy()
         for index, name in enumerate(self.action_manager.joint_names):
-            if name in dataset.joint_names:
-                q[index] = joint_pos[dataset.joint_names.index(name)]
+            if name in joint_names:
+                q[index] = joint_pos[joint_names.index(name)]
         return q
 
     def _update_motion_data(self, *, paused: bool = False) -> None:

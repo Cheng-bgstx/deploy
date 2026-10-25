@@ -706,3 +706,26 @@ def test_a_started_planner_is_closed_with_the_tracker(recorded_planner_io):
     tracker.close_reference_source()
 
     assert recorded_planner_io.events[2:] == ["depth closed", "worker closed"]
+
+
+def test_the_planner_loads_its_motion_once_for_hold_and_shaping(recorded_planner_io, monkeypatch):
+    loads = []
+
+    def load(cls, *args, **kwargs):
+        loads.append(args)
+        return motion_dataset()
+
+    monkeypatch.setattr(MotionDataset, "create_from_path", classmethod(load))
+    config = tracker_yaml("planner")
+    config["soft_joint_pos_limits"] = {name: [-0.25, 0.25] for name in TRACKER_JOINTS}
+    config["shaping_target"] = "motion_first_frame"
+
+    tracker = recorded_planner_io.build(config)
+
+    assert len(loads) == 1
+    frame0 = motion_dataset().get_slice(np.zeros(1, int), np.zeros(1, int), np.zeros(1, int))
+    np.testing.assert_array_equal(tracker.shaping_target, np.clip(frame0.joint_pos[0, 0], -0.25, 0.25))
+    np.testing.assert_array_equal(
+        tracker.motion_buffer.hold.joint_pos[0, 0],
+        [frame0.joint_pos[0, 0, G1_JOINTS.index(name)] for name in TRACKER_JOINTS],
+    )
