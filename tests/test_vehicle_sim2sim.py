@@ -539,6 +539,12 @@ def test_the_cli_rejects_bad_episode_timing_before_running_anything(cli_inputs, 
     assert not (cli_inputs / "sim2sim").exists()
 
 
+@pytest.mark.parametrize("workers", [0, -1])
+def test_the_cli_rejects_fewer_than_one_worker(cli_inputs, workers):
+    with pytest.raises(ValueError, match="--workers"):
+        VehicleSim2SimArgs(motions=["take1512"], artifact_root=str(cli_inputs), workers=workers)
+
+
 # ---------------------------------------------------------------------------
 # Tracker adapter: sim2real's Tracking runtime, stepped by the runner
 # ---------------------------------------------------------------------------

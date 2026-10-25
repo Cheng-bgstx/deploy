@@ -924,6 +924,8 @@ class VehicleSim2SimArgs:
     def __post_init__(self) -> None:
         if self.reference_source not in ("file_playback", "planner"):
             raise ValueError(f"--reference-source must be file_playback or planner, not {self.reference_source!r}")
+        if self.workers is not None and self.workers < 1:
+            raise ValueError(f"--workers must be at least 1, got {self.workers}")
         root = Path(self.artifact_root).expanduser()
         self.output_dir = self.output_dir or str(root / "sim2sim")
         self.scene_dir = self.scene_dir or str(root / "scene")
@@ -994,9 +996,7 @@ def main(args: VehicleSim2SimArgs) -> int:
     import multiprocessing
 
     default_workers = 1 if args.reference_source == "planner" else performance_core_count()
-    workers = min(len(resolve_cases(args)), args.workers or default_workers)
-    if workers < 1:
-        raise ValueError("--workers must be positive")
+    workers = min(len(resolve_cases(args)), default_workers if args.workers is None else args.workers)
     cases = resolve_cases(args, parallel_episodes=workers)
     for case in cases:  # refuse timings an episode cannot run before starting any
         contract = json.loads((case.policy_config.parent / "deployment.json").read_text(encoding="utf-8"))
