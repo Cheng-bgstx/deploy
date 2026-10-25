@@ -596,8 +596,17 @@ def counting_motion() -> MotionDataset:
 
 @pytest.fixture
 def tracking(tmp_path, monkeypatch):
-    """VehicleTracking over a stand-in robot, a zero-action network and a 5-frame Motion."""
-    network = lambda input_dict: {"action": np.zeros(len(G1_JOINTS), dtype=np.float32)}  # noqa: E731
+    """VehicleTracking over a stand-in robot, a zero-action network and a 5-frame Motion.
+
+    ``network_s`` is how long the network takes per tick (0 by default)."""
+    import time
+
+    timing = SimpleNamespace(network_s=0.0)
+
+    def network(input_dict):
+        time.sleep(timing.network_s)
+        return {"action": np.zeros(len(G1_JOINTS), dtype=np.float32)}
+
     monkeypatch.setattr(base_policy_module, "build_inference_module", lambda *_: network)
     monkeypatch.setattr(MotionDataset, "create_from_path", classmethod(lambda cls, *_, **__: counting_motion()))
     config = {
@@ -616,7 +625,7 @@ def tracking(tmp_path, monkeypatch):
     path.write_text(yaml.safe_dump(config))
     robot = StandingRobot()
     tracker = VehicleTracking(TrackingArgs(policy_config=str(path), motion_path="take.npz"), robot_io=robot)
-    return SimpleNamespace(tracker=tracker, robot=robot)
+    return SimpleNamespace(tracker=tracker, robot=robot, timing=timing)
 
 
 def reference_frames(tracker) -> np.ndarray:
@@ -653,6 +662,30 @@ def test_go_plays_the_motion_and_reports_its_end(tracking):
     assert seen[:2] == [[1, 3], [2, 4]]
     assert tracker.reference_ended  # Final Hold: frozen at the last frame
     assert seen[-1] == [NUM_FRAMES - 1, NUM_FRAMES - 1]
+
+
+def test_the_runner_drops_exactly_the_runtimes_wall_budget_warning(tracking):
+    """The filter matches BasePolicy's "RL step took" warning by logger and text; this
+    fails if that warning changes, so the filter cannot silently stop working."""
+    from loguru import logger
+
+    from sim2real.sim_env.vehicle_sim2sim import _WallBudgetFilter
+
+    budget, warned, kept = _WallBudgetFilter(), [], []
+    sinks = [
+        logger.add(lambda m: warned.append(m.record["message"]), level="WARNING"),
+        logger.add(lambda m: kept.append(m.record["message"]), level="WARNING", filter=budget),
+    ]
+    tracking.timing.network_s = 0.03  # over the 20 ms budget of a 50 Hz tick
+    try:
+        tracking.tracker.take_over()
+        tracking.tracker.step()
+    finally:
+        for sink in sinks:
+            logger.remove(sink)
+
+    assert len(warned) == 1  # the runtime reported the slow tick
+    assert budget.suppressed == 1 and kept == []
 
 
 # ---------------------------------------------------------------------------
