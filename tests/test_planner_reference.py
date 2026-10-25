@@ -480,6 +480,39 @@ def test_after_a_worker_crash_and_an_e_stop_the_next_go_waits_for_the_restarted_
     np.testing.assert_allclose(rig.step(2).joint_pos[0], 0.7)
 
 
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_planner_stats_restart_with_each_go():
+    rig = Rig()
+    depth = rig.reference.provider.source
+    rig.go()
+    rig.worker.respond(rows=constant_rows(0.5), latency=0.037)
+    rig.step(10)
+    invalid = constant_rows(0.5)
+    invalid[:, 0] = 1e308 * (-1.0) ** np.arange(128)  # finite rows, overflowing joint velocity
+    rig.worker.respond(rows=invalid, latency=0.037)
+    depth.gaps = [(rig.clock.now + 0.1, rig.clock.now + 0.6)]  # the camera drops out and reconnects
+    rig.step(130)  # no more answers: the last Chunk runs out
+    first = rig.reference.stats()
+    assert first["plans_received"] == 2 and first["plans_requested"] > 2
+    assert first["invalid_token_ticks"] > 0 and first["coverage_exhausted_events"] == 1
+    assert first["depth_delay_events"] == 1 and first["camera_recovery_events"] == 1
+
+    rig.reference.abort()
+    rig.step()
+    rig.worker.respond()  # the re-warm plan
+    rig.step()
+    rig.go()
+    assert rig.reference.go_time is not None
+    rig.worker.respond(rows=constant_rows(0.7), latency=0.037)
+    rig.step(12)
+    second = rig.reference.stats()
+
+    assert (second["plans_requested"], second["plans_received"], second["chunks_applied"]) == (2, 1, 1)
+    for key in ("late_chunks", "coverage_exhausted_events", "coverage_exhausted_ticks", "invalid_token_ticks",
+                "depth_delay_events", "camera_recovery_events"):
+        assert second[key] == 0, key
+
+
 # ---------------------------------------------------------------------------
 # Simulation clock with injected latency
 # ---------------------------------------------------------------------------

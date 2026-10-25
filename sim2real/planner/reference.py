@@ -113,6 +113,7 @@ class PlannerReference:
         self._last_valid: MotionData | None = None
         self._last_rows: np.ndarray | None = None
         self._next_stats: float | None = None
+        self._counted_from = self._provider_counts()
         self.depth_status = DepthStatus()
 
     # -- operator hooks -------------------------------------------------------
@@ -127,6 +128,7 @@ class PlannerReference:
         self.provider.abort()
         self.go_time = self.first_reference_time = self._next_stats = None
         self._last_valid = self._last_rows = None
+        self._counted_from, self.invalid_token_ticks = self._provider_counts(), 0
         self.motion_data, self.phase = self.hold, "standing"
         logger.warning(
             "Planner: Go dropped ({}); the Reference is back in Hold at the Motion's frame 0. "
@@ -172,8 +174,10 @@ class PlannerReference:
         return self.motion_data
 
     def _go(self, state: PlannerState, now: float) -> None:
+        counts = self._provider_counts()  # before start(), which requests the first plan
         if self.provider.start(state, now):
             self.go_time = now
+            self._counted_from, self.invalid_token_ticks = counts, 0
             init = self.provider.initialization
             logger.info(
                 "Planner: Go accepted. Pelvis height {:.3f} m (feet {:.3f} / {:.3f} m); Hold until the first Chunk",
@@ -193,21 +197,26 @@ class PlannerReference:
     # -- statistics -----------------------------------------------------------
 
     def stats(self) -> dict:
-        """Planning latency, late Chunks and coverage exhaustion since the last Go."""
+        """Planning latency, late Chunks, coverage exhaustion and the other counts of the current Go.
+
+        Every count starts over when a Go is accepted and when ``abort`` drops it (so it is
+        zero until the next Go). ``warmup_latency_ms`` is the latest warmup plan's.
+        """
         provider = self.provider
-        plans = [p for p in provider.plans if not p["warmup"] and (self.go_time is None or p["t0"] >= self.go_time)]
+        plans = [p for p in provider.plans if not p["warmup"] and p["identity"][0] == provider.generation]
         latency_ms = [1000.0 * p["latency_s"] for p in plans]
         inference_ms = [p["inference_ms"] for p in plans if p["inference_ms"] is not None]
         warmups = [p for p in provider.plans if p["warmup"]]
+        counts = {key: value - self._counted_from[key] for key, value in self._provider_counts().items()}
         return {
-            "plans_requested": provider.plans_requested,
+            "plans_requested": counts["plans_requested"],
             "plans_received": len(plans),
             "chunks_applied": sum(p["accepted_at"] is not None for p in plans),
             "latency_ms": _percentiles(latency_ms),
             "inference_ms": _percentiles(inference_ms),
             "prefix_frames": _percentiles([p["prefix"] for p in plans]),
             "late_chunks": provider.buffer.late_switches,
-            "coverage_exhausted_events": provider.reference_hold_events,
+            "coverage_exhausted_events": counts["coverage_exhausted_events"],
             "coverage_exhausted_ticks": provider.buffer.stale,
             "invalid_token_ticks": self.invalid_token_ticks,
             "warmup_latency_ms": 1000.0 * warmups[-1]["latency_s"] if warmups else None,
@@ -216,6 +225,16 @@ class PlannerReference:
             if self.first_reference_time is None
             else self.first_reference_time - self.go_time,
             "go_initialization": provider.initialization,
+            "depth_delay_events": counts["depth_delay_events"],
+            "camera_recovery_events": counts["camera_recovery_events"],
+        }
+
+    def _provider_counts(self) -> dict:
+        """The provider's running totals (Scalecar's, never reset); ``stats`` reports them per Go."""
+        provider = self.provider
+        return {
+            "plans_requested": provider.plans_requested,
+            "coverage_exhausted_events": provider.reference_hold_events,
             "depth_delay_events": provider.depth_delay_events,
             "camera_recovery_events": provider.recovery_events,
         }
