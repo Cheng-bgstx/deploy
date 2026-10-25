@@ -14,6 +14,7 @@ import os
 
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+os.environ.setdefault("MUJOCO_GL", "egl")  # the Planner's depth camera renders offscreen
 
 import importlib.util
 import math
@@ -34,6 +35,7 @@ from sim2real.sim_env.vehicle_sim2sim import (
     EntryJudge,
     EnvelopeGuard,
     FilePlaybackFlow,
+    PlannerFlow,
     SceneRobotIO,
     VehiclePhysics,
     VehicleTracking,
@@ -438,6 +440,50 @@ def test_episode_ends_2_s_after_the_reference_ends():
     assert flow.stage == "done"
 
 
+def drive_planner(flow: PlannerFlow, *, first_chunk_after: int | None, refuse_go: bool = False):
+    """Runs the Planner flow against a Planner whose first Chunk applies `first_chunk_after` ticks after Go."""
+    inputs, go_tick = {}, None
+    while not flow.done and flow.tick < 10_000:
+        tick = flow.tick
+        command = flow.operator_input()
+        if command is not None:
+            inputs[tick] = command
+        if command == "go":
+            go_tick = tick
+        started = (
+            go_tick is not None and not refuse_go and first_chunk_after is not None and tick - go_tick >= first_chunk_after
+        )
+        flow.tick_done(go_refused=refuse_go and command == "go", reference_started=started)
+    return inputs
+
+
+def test_planner_episode_goes_after_5_s_of_hold_and_runs_40_s_from_go():
+    flow = PlannerFlow(control_dt=0.02, hold_s=5.0, planner_s=40.0)
+
+    inputs = drive_planner(flow, first_chunk_after=3)
+
+    assert inputs == {0: "take_over", 250: "go"}
+    assert flow.go_time_s == pytest.approx(5.0)
+    assert flow.first_reference_time_s == pytest.approx(5.06)
+    # Scalecar's DP episode: 250 Hold ticks, then dp.seconds = 40 s of control after Go.
+    assert flow.tick == 2250 and flow.stage == "done" and not flow.go_refused
+
+
+def test_planner_episode_holds_until_the_first_chunk():
+    flow = PlannerFlow(control_dt=0.02, hold_s=5.0, planner_s=40.0)
+    drive_planner(flow, first_chunk_after=None)
+
+    assert flow.first_reference_time_s is None and flow.tick == 2250
+
+
+def test_a_refused_go_ends_the_planner_episode():
+    flow = PlannerFlow(control_dt=0.02, hold_s=5.0, planner_s=40.0)
+
+    drive_planner(flow, first_chunk_after=3, refuse_go=True)
+
+    assert flow.go_refused and flow.done and flow.tick == 251 and flow.go_time_s is None
+
+
 # ---------------------------------------------------------------------------
 # Tracker adapter: sim2real's Tracking runtime, stepped by the runner
 # ---------------------------------------------------------------------------
@@ -546,3 +592,99 @@ def test_go_plays_the_motion_and_reports_its_end(tracking):
     assert seen[:2] == [[1, 3], [2, 4]]
     assert tracker.reference_ended  # Final Hold: frozen at the last frame
     assert seen[-1] == [NUM_FRAMES - 1, NUM_FRAMES - 1]
+
+
+# ---------------------------------------------------------------------------
+# Planner depth: the head D435i rendered from the physics model (dixiatielu/sim2real_scalecar#7)
+# ---------------------------------------------------------------------------
+
+SCALECAR = Path("/home/galbot/projects/Scalecar_v2")
+CAMERA_SCENE = """
+<mujoco>
+  <worldbody>
+    <geom name="ground" type="plane" size="6 6 0.1"/>
+    <geom name="wall" type="box" pos="3.5 0 1" size="0.1 3 1"/>
+    <geom name="post" type="cylinder" pos="1.2 0.4 0.5" size="0.08 0.5"/>
+    <body name="torso_link" pos="0 0 0.6">
+      <freejoint/>
+      <geom type="box" size="0.05 0.05 0.05" group="3" mass="1"/>
+    </body>
+  </worldbody>
+</mujoco>
+"""
+
+
+def camera_scene():
+    model = mujoco.MjModel.from_xml_string(CAMERA_SCENE)
+    data = mujoco.MjData(model)
+    mujoco.mj_forward(model, data)
+    return model, data
+
+
+def test_depth_camera_sees_the_ground_along_its_optical_axis():
+    from sim2real.planner.sim import DepthCamera
+
+    model, data = camera_scene()
+    camera = DepthCamera(model)
+    try:
+        depth = camera.render(data)
+    finally:
+        camera.close()
+
+    assert depth.shape == (480, 640) and depth.dtype == np.uint16
+    # Camera 0.6 + 0.42987 m above the ground, optical axis pitched 0.8307767 rad down:
+    # the axis meets the ground at z = 1.02987 / sin(0.8307767) = 1.3946 m.
+    assert depth[238, 325] == pytest.approx(1394.6, abs=3)
+
+
+@pytest.mark.skipif(not SCALECAR.is_dir(), reason="Scalecar_v2 checkout not present")
+def test_depth_camera_renders_like_scalecars():
+    import importlib
+    import sys
+
+    from sim2real.planner.sim import DepthCamera
+
+    sys.dont_write_bytecode = True
+    for path in (SCALECAR / "source/scalecar_dp", SCALECAR / "source/scalecar_deploy"):
+        if str(path) not in sys.path:
+            sys.path.append(str(path))
+    ScalecarCamera = importlib.import_module("scalecar_deploy.simulation.depth").DepthCamera
+
+    model, data = camera_scene()
+    data.qpos[:3] = [0.1, -0.2, 0.62]
+    data.qpos[3:7] = [0.9887711, 0.0099833, 0.0, 0.1490712]  # turned and slightly rolled
+    mujoco.mj_forward(model, data)
+    ours, theirs = DepthCamera(model), ScalecarCamera(model)
+    try:
+        np.testing.assert_array_equal(ours.render(data), theirs.render(data))
+    finally:
+        ours.close()
+        theirs.close()
+
+
+def test_simulated_depth_arrives_at_30_hz_of_simulation_time_downsampled():
+    from sim2real.planner.scalecar_dp.dp.depth_preprocess import downsample_z16
+    from sim2real.planner.sim import DepthCamera, SimulatedDepthSource
+
+    model, data = camera_scene()
+    clock = SimpleNamespace(now=0.0)
+    source = SimulatedDepthSource(model, data, clock=lambda: clock.now)
+    packets = []
+    try:
+        for tick in range(50):
+            clock.now = tick * DT
+            packet = source.poll()
+            if packet is not None:
+                packets.append(packet)
+        reference = DepthCamera(model)
+        expected = downsample_z16(reference.render(data))
+        reference.close()
+    finally:
+        source.close()
+
+    assert len(packets) == 30
+    assert [p["frame"] for p in packets] == list(range(30))
+    assert {p["session"] for p in packets} == {0}
+    # Frame k is rendered at the first tick at or after k/30 s.
+    np.testing.assert_allclose([p["acquired"] for p in packets][:5], [0.0, 0.04, 0.08, 0.10, 0.14])
+    np.testing.assert_array_equal(packets[-1]["depth_mm"], expected)
