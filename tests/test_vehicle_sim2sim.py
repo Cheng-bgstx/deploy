@@ -38,7 +38,9 @@ from sim2real.sim_env.vehicle_sim2sim import (
     PlannerFlow,
     SceneRobotIO,
     VehiclePhysics,
+    VehicleSim2SimArgs,
     VehicleTracking,
+    main,
     motion_start_state,
 )
 
@@ -482,6 +484,59 @@ def test_a_refused_go_ends_the_planner_episode():
     drive_planner(flow, first_chunk_after=3, refuse_go=True)
 
     assert flow.go_refused and flow.done and flow.tick == 251 and flow.go_time_s is None
+
+
+@pytest.mark.parametrize(
+    ("flow", "timing"),
+    [
+        (FilePlaybackFlow, dict(hold_s=0.0)),
+        (FilePlaybackFlow, dict(hold_s=0.019)),
+        (FilePlaybackFlow, dict(hold_s=-5.0)),
+        (FilePlaybackFlow, dict(final_hold_s=-0.02)),
+        (PlannerFlow, dict(hold_s=0.0)),
+        (PlannerFlow, dict(hold_s=0.01)),
+        (PlannerFlow, dict(planner_s=-40.0)),
+    ],
+)
+def test_a_hold_shorter_than_one_tick_or_a_negative_duration_is_rejected(flow, timing):
+    with pytest.raises(ValueError, match="_s must be"):
+        flow(control_dt=0.02, **timing)
+
+
+def test_a_one_tick_hold_goes_at_the_second_tick():
+    playback = FilePlaybackFlow(control_dt=0.02, hold_s=0.02, final_hold_s=0.0)
+    assert drive(playback, reference_frames=3) == {0: "take_over", 1: "go"}
+    assert playback.go_time_s == pytest.approx(0.02) and playback.tick == 4
+
+    planner = PlannerFlow(control_dt=0.02, hold_s=0.02, planner_s=0.0)
+    assert drive_planner(planner, first_chunk_after=0) == {0: "take_over", 1: "go"}
+    assert planner.go_time_s == pytest.approx(0.02) and planner.done
+
+
+@pytest.fixture
+def cli_inputs(tmp_path):
+    """The files the CLI checks before it starts any episode (contents never read past control_dt)."""
+    tracker = tmp_path / "tracker" / "ft500ema"
+    tracker.mkdir(parents=True)
+    (tracker / "policy.yaml").write_text("{}\n")
+    (tracker / "deployment.json").write_text('{"control_dt": 0.02}\n')
+    motions = tmp_path / "motions" / "motions"
+    motions.mkdir(parents=True)
+    (motions / "take1512.npz").write_bytes(b"")
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    "timing",
+    [dict(hold_s=0.01), dict(final_hold_s=-1.0), dict(reference_source="planner", planner_s=-1.0)],
+)
+def test_the_cli_rejects_bad_episode_timing_before_running_anything(cli_inputs, timing):
+    args = VehicleSim2SimArgs(motions=["take1512"], artifact_root=str(cli_inputs), **timing)
+
+    with pytest.raises(ValueError, match="_s must be"):
+        main(args)
+
+    assert not (cli_inputs / "sim2sim").exists()
 
 
 # ---------------------------------------------------------------------------
