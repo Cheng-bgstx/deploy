@@ -46,7 +46,11 @@ build-backend = "setuptools.build_meta"
 include = ["sim2real*"]
 
 [tool.setuptools.package-data]
-sim2real = ["teleop/configs/xrobot_to_h2.json"]
+sim2real = [
+    "teleop/configs/xrobot_to_h2.json",
+    "planner/camera_config.json",
+    "planner/profiles/g1_leg_kinematics.json",
+]
 
 [tool.uv]
 package = true

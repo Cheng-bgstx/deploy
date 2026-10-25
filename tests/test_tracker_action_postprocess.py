@@ -421,3 +421,95 @@ def test_misconfigured_post_processing_is_rejected_at_startup(make_rig, motion_f
     motion_files["take1512"] = motion_dataset(MOTION_FRAME0)
     with pytest.raises(ValueError, match=message):
         make_rig(tracking_config(**extra), policy_cls=Tracking, args_cls=TrackingArgs, motion_path="take1512")
+
+
+# ---------------------------------------------------------------------------
+# Non-finite inputs never latch the rate limit (review finding 1)
+# ---------------------------------------------------------------------------
+
+import sys  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+from loguru import logger  # noqa: E402
+
+from sim2real.rl_policy.utils.joint_targets import JointTargetPostprocessor  # noqa: E402
+
+SCALECAR = Path("/home/galbot/projects/Scalecar_v2")
+
+
+@pytest.fixture
+def warnings_logged():
+    lines: list[str] = []
+    sink = logger.add(lambda m: lines.append(m.record["message"]), level="WARNING")
+    yield lines
+    logger.remove(sink)
+
+
+def test_a_non_finite_action_keeps_the_previous_target_and_does_not_latch(make_rig, warnings_logged):
+    rig = make_rig(policy_config(max_target_velocity_rad_s=15.0), rl_rate=50.0)
+    moving = tracker_action(left_hip_pitch=4.0, left_knee=1.0)
+
+    first = rig.tick(mode="policy", action=moving)
+    held = [rig.tick(action=tracker_action(left_hip_pitch=bad, left_knee=1.0)) for bad in (np.nan, np.inf, -np.inf)]
+    resumed = [rig.tick(action=moving) for _ in range(2)]
+
+    # The bad joint keeps its last finite target; the others carry on.
+    assert [c[HIP_PITCH] for c in [first, *held, *resumed]] == pytest.approx([0.3, 0.3, 0.3, 0.3, 0.6, 0.9])
+    assert [c[KNEE] for c in [first, *held, *resumed]] == pytest.approx([0.3, 0.5, 0.5, 0.5, 0.5, 0.5])
+    assert all(np.isfinite(c).all() for c in [first, *held, *resumed])
+    # One warning naming the joint, not one per tick.
+    assert len(warnings_logged) == 1 and "left_hip_pitch_joint" in warnings_logged[0]
+
+
+def test_a_non_finite_measured_position_on_entry_does_not_latch(make_rig, warnings_logged):
+    rig = make_rig(policy_config(max_target_velocity_rad_s=15.0), rl_rate=50.0)
+    broken = g1_vector(left_hip_pitch=0.4)
+    broken[KNEE] = np.nan
+    rig.tick(mode="zero", measured=broken)
+
+    first = rig.tick(mode="policy", action=tracker_action(left_knee=1.0))
+    second = rig.tick(action=tracker_action(left_knee=2.0), measured=g1_vector(left_knee=0.1, left_hip_pitch=0.4))
+
+    # No finite position to start from: the knee's target passes unlimited once, then the
+    # rate limit runs from it. The other joints start from their measured positions.
+    assert first[KNEE] == pytest.approx(0.5) and second[KNEE] == pytest.approx(0.8)
+    assert first[HIP_PITCH] == pytest.approx(0.1, abs=1e-6) and second[HIP_PITCH] == pytest.approx(0.0, abs=1e-6)
+    assert np.isfinite(first).all() and np.isfinite(second).all()
+    assert len(warnings_logged) == 1 and "left_knee_joint" in warnings_logged[0]
+
+
+@pytest.mark.skipif(not SCALECAR.is_dir(), reason="Scalecar_v2 checkout not present")
+def test_finite_targets_are_bitwise_scalecars_position_controller():
+    sys.dont_write_bytecode = True
+    path = str(SCALECAR / "source/scalecar_deploy")
+    if path not in sys.path:
+        sys.path.append(path)
+    from scalecar_deploy.control import PositionController
+
+    rng = np.random.default_rng(7)
+    n = len(TRACKER_JOINTS)
+    lower = rng.uniform(-2.5, -0.01, n)
+    contract = {
+        "default_joint_pos": rng.uniform(-0.5, 0.5, n).tolist(),
+        "action_scale": rng.uniform(0.1, 0.6, n).tolist(),
+        "soft_joint_pos_limits": np.stack([lower, lower + rng.uniform(0.02, 3.0, n)], 1).tolist(),
+        "stiffness": [1.0] * n, "damping": [1.0] * n, "effort_limit_sim": [1.0] * n,
+        "max_target_velocity_rad_s": 15.0, "control_dt": 0.02,
+    }
+    theirs = PositionController(contract)
+    ours = JointTargetPostprocessor.from_policy_config(
+        {"soft_joint_pos_limits": {name: bound for name, bound in zip(TRACKER_JOINTS, contract["soft_joint_pos_limits"])},
+         "max_target_velocity_rad_s": 15.0},
+        joint_names=TRACKER_JOINTS, policy_joint_names=TRACKER_JOINTS, control_dt=0.02,
+    )
+    default, scale = np.asarray(contract["default_joint_pos"]), np.asarray(contract["action_scale"])
+    for entry in range(3):
+        measured = rng.uniform(-1.5, 1.5, n).astype(np.float32).astype(np.float64)
+        theirs.reset(measured)
+        ours.reset()
+        for tick in range(200):
+            action = (rng.standard_normal(n) * (4.0 if tick % 7 else 0.3)).astype(np.float32)
+            raw = default.copy()
+            raw += action * scale  # BasePolicy: default + action * action_scale
+            expected = theirs.target(action)
+            np.testing.assert_array_equal(ours(raw, measured), expected, err_msg=f"entry {entry} tick {tick}")

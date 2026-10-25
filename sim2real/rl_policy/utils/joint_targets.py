@@ -10,6 +10,14 @@ training also applied:
 ``prev`` is the previous target; after ``reset()`` the next call takes it from
 the measured joint positions instead.
 
+Scalecar raises on a non-finite action or measured position. Here a non-finite
+value never becomes ``prev`` (it would keep every later target non-finite until
+the next reset): a joint whose raw target is not finite keeps its previous
+target, and a joint without a finite previous target (its measured position was
+not finite on entry) takes its soft-clipped target without the rate limit, once;
+the rate limit continues from there. Both are reported in a warning at most once per second. With finite inputs the
+targets are bitwise Scalecar's.
+
 It is opt-in per policy through optional top-level YAML keys; a policy without
 them gets ``None`` from ``JointTargetPostprocessor.from_policy_config`` and its
 targets are left untouched:
@@ -24,11 +32,16 @@ Either key alone enables only its half. ``BasePolicy`` also clips the
 
 from __future__ import annotations
 
+import time
 from typing import Any, Sequence
 
 import numpy as np
+from loguru import logger
 
 from sim2real.utils.strings import resolve_matching_names_values
+
+
+WARNING_INTERVAL_S = 1.0
 
 
 class JointTargetPostprocessor:
@@ -40,11 +53,17 @@ class JointTargetPostprocessor:
         lower: np.ndarray,
         upper: np.ndarray,
         max_delta: float | None,
+        joint_names: Sequence[str] | None = None,
     ):
         self.lower = np.asarray(lower, dtype=np.float64)
         self.upper = np.asarray(upper, dtype=np.float64)
         self.max_delta = max_delta
+        self.joint_names = None if joint_names is None else list(joint_names)
+        # The previous target, finite wherever ``_known``; None until the first call after reset().
         self._previous: np.ndarray | None = None
+        self._known: np.ndarray | None = None
+        self._next_warning = -np.inf
+        self._suppressed_warnings = 0
 
     @classmethod
     def from_policy_config(
@@ -97,7 +116,7 @@ class JointTargetPostprocessor:
                     f"max_target_velocity_rad_s must be positive, got {max_velocity}"
                 )
             max_delta = max_velocity * float(control_dt)
-        return cls(lower=lower, upper=upper, max_delta=max_delta)
+        return cls(lower=lower, upper=upper, max_delta=max_delta, joint_names=joint_names)
 
     def clip(self, joint_pos: np.ndarray) -> np.ndarray:
         """Clip joint positions to the soft limits."""
@@ -112,8 +131,49 @@ class JointTargetPostprocessor:
         if self.max_delta is None:
             return desired
         if self._previous is None:
-            self._previous = np.array(measured_joint_pos, dtype=np.float64, copy=True)
-        self._previous = self._previous + np.clip(
+            self._previous = np.zeros(desired.shape)
+            self._known = np.zeros(desired.shape, dtype=bool)
+        if not self._known.all():
+            measured = np.asarray(measured_joint_pos, dtype=np.float64)
+            seed = ~self._known & np.isfinite(measured)
+            self._previous[seed] = measured[seed]
+            self._known |= seed
+        target = self._previous + np.clip(
             desired - self._previous, -self.max_delta, self.max_delta
         )
-        return self._previous.copy()
+        valid = np.isfinite(raw_target)
+        if not (valid.all() and self._known.all()):
+            held = self._known & ~valid
+            unlimited = ~self._known
+            target[held] = self._previous[held]
+            target[unlimited] = desired[unlimited]
+            self._warn(held, unlimited)
+            self._known |= unlimited & valid
+        self._previous[self._known] = target[self._known]
+        return target
+
+    def _warn(self, held: np.ndarray, unlimited: np.ndarray) -> None:
+        now = time.monotonic()
+        if now < self._next_warning:
+            self._suppressed_warnings += 1
+            return
+        parts = []
+        if held.any():
+            parts.append(f"non-finite target for {self._names(held)}; keeping their previous targets")
+        if unlimited.any():
+            parts.append(
+                f"no finite measured position for {self._names(unlimited)} to start the rate limit from; "
+                "sending their soft-clipped targets unlimited"
+            )
+        suppressed = (
+            f" ({self._suppressed_warnings} more since the last warning)" if self._suppressed_warnings else ""
+        )
+        logger.warning("Joint target post-processing: {}{}", "; ".join(parts), suppressed)
+        self._next_warning = now + WARNING_INTERVAL_S
+        self._suppressed_warnings = 0
+
+    def _names(self, mask: np.ndarray) -> list:
+        indices = np.flatnonzero(mask)
+        if self.joint_names is None:
+            return indices.tolist()
+        return [self.joint_names[i] for i in indices]

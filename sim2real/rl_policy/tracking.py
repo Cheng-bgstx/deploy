@@ -134,6 +134,13 @@ def _apply_runtime_motion_config(
 class Tracking(BasePolicy):
     args: "TrackingArgs"
 
+    def __init__(self, args: "TrackingArgs"):
+        super().__init__(args)
+        if self.motion_backend == "planner":
+            # The depth source and the Planner worker are child processes: they start only
+            # after every startup check has passed, so a misconfiguration leaves none running.
+            self._start_planner()
+
     def prepare_policy_config(self, policy_config):
         policy_config = super().prepare_policy_config(policy_config)
         policy_config = _apply_runtime_motion_config(
@@ -165,6 +172,7 @@ class Tracking(BasePolicy):
     def _init_motion_backend(self) -> None:
         self.motion_config = dict(self.policy_config.get("motion", {}))
         self.motion_data: MotionData | None = None
+        self._first_frame: tuple[MotionData, list[str], list[str]] | None = None
         self.motion_future_steps = np.asarray(
             self.motion_config.get("future_steps", []),
             dtype=int,
@@ -214,10 +222,12 @@ class Tracking(BasePolicy):
             return
 
         if self.motion_backend == "planner":
-            self.motion_buffer = self._create_planner_reference()
-            self.motion_data = self.motion_buffer.motion_data  # Hold until the first Chunk
-            self.motion_joint_names = list(self.motion_buffer.joint_names)
-            self.motion_body_names = list(self.motion_buffer.body_names)
+            from sim2real.planner.reference import PlannerReference
+
+            self._planner_hold = self._planner_hold_reference()
+            self.motion_data = self._planner_hold  # Hold until the first Chunk
+            self.motion_joint_names = list(PlannerReference.joint_names)
+            self.motion_body_names = list(PlannerReference.body_names)
             return
 
         if self.motion_backend == "smpl_zmq":
@@ -237,17 +247,17 @@ class Tracking(BasePolicy):
 
         raise ValueError(f"Unsupported motion_backend: {self.motion_backend}")
 
-    def _create_planner_reference(self):
-        """The Planner as Reference Source (``sim2real/planner``).
+    def _planner_hold_reference(self):
+        """Checks the Planner configuration and returns the Hold Reference; starts nothing.
 
         Hold shows the Motion's frame 0 (``--motion-path`` / ``motion.motion_path``),
         as File Playback does while paused. ``motion.planner`` holds the worker
         options (checkpoint, checkpoint_sha256, device, seed; defaults: the pinned
-        ModelScope d1146 checkpoint on cuda:0). Depth, worker and clock come from
-        ``_planner_io``.
+        ModelScope d1146 checkpoint on cuda:0). ``_start_planner`` starts the
+        Planner once the rest of the runtime is set up.
         """
-        from sim2real.planner.provider import JOINT_NAMES, PlannerProvider
-        from sim2real.planner.reference import PlannerReference, hold_motion_data
+        from sim2real.planner.provider import JOINT_NAMES
+        from sim2real.planner.reference import check_future_steps, hold_motion_data
         from sim2real.planner.worker import worker_options
 
         if abs(1.0 / self.args.rl_rate - 0.02) > 1e-9:
@@ -255,32 +265,38 @@ class Tracking(BasePolicy):
         missing = sorted(set(JOINT_NAMES) - set(self.robot_cfg.joint_names))
         if missing:
             raise ValueError(f"motion_backend=planner needs the robot joints {missing}")
+        check_future_steps(self.motion_future_steps)
+        self._planner_options = worker_options(self.motion_config.get("planner"))
         self._planner_joint_index = np.asarray([self.robot_cfg.joint_names.index(n) for n in JOINT_NAMES])
 
-        motion_path = self.motion_config.get("motion_path")
-        if motion_path is None:
-            raise ValueError(
-                "motion_backend=planner needs a Motion for the Hold Reference: "
-                "pass --motion-path or set motion.motion_path"
-            )
-        dataset = motion_dataset_first_motion(
-            MotionDataset.create_from_path(
-                motion_path, robot_cfg=self.robot_cfg, mjcf_path=self.motion_config.get("mjcf_path")
-            )
-        )
+        frame0, joint_names, body_names = self._motion_first_frame("motion_backend=planner (the Hold Reference)")
         root = str(self.motion_config.get("root_body_name", "pelvis"))
-        first = np.zeros(1, dtype=int)
-        frame0 = dataset.get_slice(first, first, first)
-        hold = hold_motion_data(
-            joint_pos=[frame0.joint_pos[0, 0, dataset.joint_names.index(n)] for n in JOINT_NAMES],
-            pelvis_pos=frame0.body_pos_w[0, 0, dataset.body_names.index(root)],
-            pelvis_quat_wxyz=frame0.body_quat_w[0, 0, dataset.body_names.index(root)],
+        return hold_motion_data(
+            joint_pos=[frame0.joint_pos[0, 0, joint_names.index(n)] for n in JOINT_NAMES],
+            pelvis_pos=frame0.body_pos_w[0, 0, body_names.index(root)],
+            pelvis_quat_wxyz=frame0.body_quat_w[0, 0, body_names.index(root)],
             future_steps=self.motion_future_steps,
         )
-        io = self._planner_io(worker_options(self.motion_config.get("planner")))
+
+    def _start_planner(self) -> None:
+        """Starts the depth source and the Planner worker (``_planner_io``) behind the Planner
+        Reference Source; if anything fails on the way, closes what was started."""
+        from sim2real.planner.provider import JOINT_NAMES, PlannerProvider
+        from sim2real.planner.reference import PlannerReference
+
+        io = self._planner_io(self._planner_options)
+        try:
+            provider = PlannerProvider(JOINT_NAMES, source=io.source, worker=io.worker)
+            self.motion_buffer = PlannerReference(
+                provider, hold=self._planner_hold, future_steps=self.motion_future_steps
+            )
+        except BaseException:
+            try:
+                io.source.close()
+            finally:
+                io.worker.close()
+            raise
         self._planner_clock = io.clock
-        provider = PlannerProvider(JOINT_NAMES, source=io.source, worker=io.worker)
-        return PlannerReference(provider, hold=hold, future_steps=self.motion_future_steps)
 
     def _planner_io(self, options: dict):
         """Depth source, Planner worker and clock for ``motion_backend=planner``.
@@ -309,15 +325,17 @@ class Tracking(BasePolicy):
             "Planner depth: starting {} on {} through SSH (local port {}); logs in {}",
             depth_cfg["remote_executable"], depth_cfg["ssh_host"], depth_cfg["local_port"], log_dir,
         )
-        return PlannerIO(
-            source=depth.DepthSource(depth_cfg, log_dir),
-            worker=worker.GpuPlannerWorker(options),
-            clock=time.monotonic,
-        )
+        source = depth.DepthSource(depth_cfg, log_dir)
+        try:
+            planner = worker.GpuPlannerWorker(options)
+        except BaseException:
+            source.close()
+            raise
+        return PlannerIO(source=source, worker=planner, clock=time.monotonic)
 
     def close_reference_source(self) -> None:
-        """Stops the Planner worker process (no-op for the other backends)."""
-        if self.motion_backend == "planner":
+        """Stops the Planner's depth source and worker process (no-op for the other backends)."""
+        if self.motion_backend == "planner" and getattr(self, "motion_buffer", None) is not None:
             self.motion_buffer.close()
 
     def run(self):
@@ -326,36 +344,48 @@ class Tracking(BasePolicy):
         finally:
             self.close_reference_source()
 
-    def motion_first_frame_joint_pos(self) -> np.ndarray:
-        """Frame 0 of the Motion, in robot joint order (Shaping target).
+    def _motion_first_frame(self, needed_by: str) -> tuple[MotionData, list[str], list[str]]:
+        """Frame 0 of the Motion (one-step ``MotionData``) with its joint and body names.
 
         File Playback uses the Motion it plays. A streamed Reference (zmq
         backends, the Planner) still needs a Motion file for its first frame:
-        ``--motion-path`` or ``motion.motion_path``.
+        ``--motion-path`` or ``motion.motion_path``, loaded once.
         """
-        if self.motion_backend == "npz":
-            dataset = self.motion_dataset
-        else:
-            motion_path = self.args.motion_path or self.motion_config.get("motion_path")
-            if motion_path is None:
-                raise ValueError(
-                    "shaping_target: motion_first_frame with "
-                    f"motion_backend={self.motion_backend} needs a Motion for its "
-                    "first frame: pass --motion-path or set motion.motion_path"
+        if self._first_frame is None:
+            if self.motion_backend == "npz":
+                dataset = self.motion_dataset
+            else:
+                motion_path = self.args.motion_path or self.motion_config.get("motion_path")
+                if motion_path is None:
+                    raise ValueError(
+                        f"{needed_by} needs a Motion for its first frame: "
+                        "pass --motion-path or set motion.motion_path"
+                    )
+                dataset = motion_dataset_first_motion(
+                    MotionDataset.create_from_path(
+                        motion_path,
+                        robot_cfg=self.robot_cfg,
+                        mjcf_path=self.motion_config.get("mjcf_path"),
+                    )
                 )
-            dataset = motion_dataset_first_motion(
-                MotionDataset.create_from_path(
-                    motion_path,
-                    robot_cfg=self.robot_cfg,
-                    mjcf_path=self.motion_config.get("mjcf_path"),
-                )
+            first = np.zeros(1, dtype=int)
+            self._first_frame = (
+                dataset.get_slice(first, first, first),
+                list(dataset.joint_names),
+                list(dataset.body_names),
             )
-        first = np.zeros(1, dtype=int)
-        joint_pos = dataset.get_slice(first, first, first).joint_pos[0, 0]
+        return self._first_frame
+
+    def motion_first_frame_joint_pos(self) -> np.ndarray:
+        """Frame 0 of the Motion, in robot joint order (Shaping target)."""
+        frame0, joint_names, _ = self._motion_first_frame(
+            f"shaping_target: motion_first_frame with motion_backend={self.motion_backend}"
+        )
+        joint_pos = frame0.joint_pos[0, 0]
         q = self.default_dof_angles.copy()
         for index, name in enumerate(self.action_manager.joint_names):
-            if name in dataset.joint_names:
-                q[index] = joint_pos[dataset.joint_names.index(name)]
+            if name in joint_names:
+                q[index] = joint_pos[joint_names.index(name)]
         return q
 
     def _update_motion_data(self, *, paused: bool = False) -> None:

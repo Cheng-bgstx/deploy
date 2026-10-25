@@ -36,6 +36,8 @@ import numpy as np
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from sim2real.planner.checkpoint import MODELSCOPE_ROOT  # noqa: E402
+
 REFERENCE_OFFSETS = (0, 2, 4, 8, 16, 32)
 TOKEN_COMPONENTS = {
     "q": slice(0, 29),
@@ -46,12 +48,9 @@ TOKEN_COMPONENTS = {
     "offset": slice(68, 69),
 }
 ROOT_BODY_NAME = "pelvis"
-SCALECAR_ROOT = Path("/home/galbot/projects/Scalecar_v2")
+SCALECAR_ROOT = Path.home() / "projects/Scalecar_v2"
 SCALECAR_REFERENCE_PY = SCALECAR_ROOT / "source/scalecar_policy/scalecar_policy/reference.py"
-TRACKER_CONTRACT = Path(
-    "/home/galbot/.cache/modelscope/models/Hzzzz001--scalecar_v2/snapshots/master/"
-    "trackers/d1146_dpsd_ft/ft500ema/deployment.json"
-)
+TRACKER_CONTRACT = MODELSCOPE_ROOT / "trackers/d1146_dpsd_ft/ft500ema/deployment.json"
 
 ReferenceFeatures = Callable[..., np.ndarray]
 
@@ -304,8 +303,9 @@ class CompareArgs:
     """Scalecar motions tar (default: the ModelScope cache path used by convert_motions)."""
     sha256sums: Path | None = None
     scalecar_reference: Path = SCALECAR_REFERENCE_PY
+    """Scalecar's reference.py (default: in the Scalecar_v2 checkout at ~/projects/Scalecar_v2)."""
     contract: Path = TRACKER_CONTRACT
-    """deployment.json whose joint_names give the tracker joint order."""
+    """deployment.json whose joint_names give the tracker joint order (default: in the ModelScope cache)."""
     output_json: Path | None = None
     """Default: <dataset_root>/../motion_token_comparison.json"""
 

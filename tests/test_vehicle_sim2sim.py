@@ -38,7 +38,9 @@ from sim2real.sim_env.vehicle_sim2sim import (
     PlannerFlow,
     SceneRobotIO,
     VehiclePhysics,
+    VehicleSim2SimArgs,
     VehicleTracking,
+    main,
     motion_start_state,
 )
 
@@ -484,6 +486,65 @@ def test_a_refused_go_ends_the_planner_episode():
     assert flow.go_refused and flow.done and flow.tick == 251 and flow.go_time_s is None
 
 
+@pytest.mark.parametrize(
+    ("flow", "timing"),
+    [
+        (FilePlaybackFlow, dict(hold_s=0.0)),
+        (FilePlaybackFlow, dict(hold_s=0.019)),
+        (FilePlaybackFlow, dict(hold_s=-5.0)),
+        (FilePlaybackFlow, dict(final_hold_s=-0.02)),
+        (PlannerFlow, dict(hold_s=0.0)),
+        (PlannerFlow, dict(hold_s=0.01)),
+        (PlannerFlow, dict(planner_s=-40.0)),
+    ],
+)
+def test_a_hold_shorter_than_one_tick_or_a_negative_duration_is_rejected(flow, timing):
+    with pytest.raises(ValueError, match="_s must be"):
+        flow(control_dt=0.02, **timing)
+
+
+def test_a_one_tick_hold_goes_at_the_second_tick():
+    playback = FilePlaybackFlow(control_dt=0.02, hold_s=0.02, final_hold_s=0.0)
+    assert drive(playback, reference_frames=3) == {0: "take_over", 1: "go"}
+    assert playback.go_time_s == pytest.approx(0.02) and playback.tick == 4
+
+    planner = PlannerFlow(control_dt=0.02, hold_s=0.02, planner_s=0.0)
+    assert drive_planner(planner, first_chunk_after=0) == {0: "take_over", 1: "go"}
+    assert planner.go_time_s == pytest.approx(0.02) and planner.done
+
+
+@pytest.fixture
+def cli_inputs(tmp_path):
+    """The files the CLI checks before it starts any episode (contents never read past control_dt)."""
+    tracker = tmp_path / "tracker" / "ft500ema"
+    tracker.mkdir(parents=True)
+    (tracker / "policy.yaml").write_text("{}\n")
+    (tracker / "deployment.json").write_text('{"control_dt": 0.02}\n')
+    motions = tmp_path / "motions" / "motions"
+    motions.mkdir(parents=True)
+    (motions / "take1512.npz").write_bytes(b"")
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    "timing",
+    [dict(hold_s=0.01), dict(final_hold_s=-1.0), dict(reference_source="planner", planner_s=-1.0)],
+)
+def test_the_cli_rejects_bad_episode_timing_before_running_anything(cli_inputs, timing):
+    args = VehicleSim2SimArgs(motions=["take1512"], artifact_root=str(cli_inputs), **timing)
+
+    with pytest.raises(ValueError, match="_s must be"):
+        main(args)
+
+    assert not (cli_inputs / "sim2sim").exists()
+
+
+@pytest.mark.parametrize("workers", [0, -1])
+def test_the_cli_rejects_fewer_than_one_worker(cli_inputs, workers):
+    with pytest.raises(ValueError, match="--workers"):
+        VehicleSim2SimArgs(motions=["take1512"], artifact_root=str(cli_inputs), workers=workers)
+
+
 # ---------------------------------------------------------------------------
 # Tracker adapter: sim2real's Tracking runtime, stepped by the runner
 # ---------------------------------------------------------------------------
@@ -535,8 +596,17 @@ def counting_motion() -> MotionDataset:
 
 @pytest.fixture
 def tracking(tmp_path, monkeypatch):
-    """VehicleTracking over a stand-in robot, a zero-action network and a 5-frame Motion."""
-    network = lambda input_dict: {"action": np.zeros(len(G1_JOINTS), dtype=np.float32)}  # noqa: E731
+    """VehicleTracking over a stand-in robot, a zero-action network and a 5-frame Motion.
+
+    ``network_s`` is how long the network takes per tick (0 by default)."""
+    import time
+
+    timing = SimpleNamespace(network_s=0.0)
+
+    def network(input_dict):
+        time.sleep(timing.network_s)
+        return {"action": np.zeros(len(G1_JOINTS), dtype=np.float32)}
+
     monkeypatch.setattr(base_policy_module, "build_inference_module", lambda *_: network)
     monkeypatch.setattr(MotionDataset, "create_from_path", classmethod(lambda cls, *_, **__: counting_motion()))
     config = {
@@ -555,7 +625,7 @@ def tracking(tmp_path, monkeypatch):
     path.write_text(yaml.safe_dump(config))
     robot = StandingRobot()
     tracker = VehicleTracking(TrackingArgs(policy_config=str(path), motion_path="take.npz"), robot_io=robot)
-    return SimpleNamespace(tracker=tracker, robot=robot)
+    return SimpleNamespace(tracker=tracker, robot=robot, timing=timing)
 
 
 def reference_frames(tracker) -> np.ndarray:
@@ -592,6 +662,30 @@ def test_go_plays_the_motion_and_reports_its_end(tracking):
     assert seen[:2] == [[1, 3], [2, 4]]
     assert tracker.reference_ended  # Final Hold: frozen at the last frame
     assert seen[-1] == [NUM_FRAMES - 1, NUM_FRAMES - 1]
+
+
+def test_the_runner_drops_exactly_the_runtimes_wall_budget_warning(tracking):
+    """The filter matches BasePolicy's "RL step took" warning by logger and text; this
+    fails if that warning changes, so the filter cannot silently stop working."""
+    from loguru import logger
+
+    from sim2real.sim_env.vehicle_sim2sim import _WallBudgetFilter
+
+    budget, warned, kept = _WallBudgetFilter(), [], []
+    sinks = [
+        logger.add(lambda m: warned.append(m.record["message"]), level="WARNING"),
+        logger.add(lambda m: kept.append(m.record["message"]), level="WARNING", filter=budget),
+    ]
+    tracking.timing.network_s = 0.03  # over the 20 ms budget of a 50 Hz tick
+    try:
+        tracking.tracker.take_over()
+        tracking.tracker.step()
+    finally:
+        for sink in sinks:
+            logger.remove(sink)
+
+    assert len(warned) == 1  # the runtime reported the slow tick
+    assert budget.suppressed == 1 and kept == []
 
 
 # ---------------------------------------------------------------------------
@@ -688,3 +782,107 @@ def test_simulated_depth_arrives_at_30_hz_of_simulation_time_downsampled():
     # Frame k is rendered at the first tick at or after k/30 s.
     np.testing.assert_allclose([p["acquired"] for p in packets][:5], [0.0, 0.04, 0.08, 0.10, 0.14])
     np.testing.assert_array_equal(packets[-1]["depth_mm"], expected)
+
+
+# ---------------------------------------------------------------------------
+# Planner startup in the vehicle sim2sim leaves no child process behind (review finding 2)
+# ---------------------------------------------------------------------------
+
+PLANNER_OFFSETS = [0, 2, 4, 8, 16, 32]
+
+
+def planner_tracker_yaml(**extra) -> dict:
+    from sim2real.planner.provider import JOINT_NAMES
+
+    config = {
+        "model_path": "unused.onnx",
+        "observation": {
+            "ref_command": {"sonic_command_multi_future_nonflat": {
+                "_target_": "sonic.sonic_command_multi_future_nonflat", "future_steps": PLANNER_OFFSETS,
+                "joint_names": list(JOINT_NAMES)}},
+        },
+        "joint_names_simulation": G1_JOINTS,
+        "body_names_simulation": ["pelvis"],
+        "policy_joint_names": list(JOINT_NAMES),
+        "default_joint_pos": {".*": 0.0},
+        "joint_kp": {".*": 40.0},
+        "joint_kd": {".*": 2.0},
+        "action_scale": 0.5,
+        "motion": {"motion_backend": "planner", "future_steps": PLANNER_OFFSETS, "root_body_name": "pelvis"},
+    }
+    config.update(extra)
+    return config
+
+
+@pytest.fixture
+def planner_startup(tmp_path, monkeypatch):
+    """VehicleTracking with the Planner, its rendered depth source and CUDA worker replaced by recorders."""
+    import sim2real.planner.sim as sim_module
+    import sim2real.planner.worker as worker_module
+
+    events: list[str] = []
+
+    class DepthSource:
+        def __init__(self, model, data, *, clock):
+            events.append("depth started")
+
+        def poll(self):
+            return None
+
+        def close(self):
+            events.append("depth closed")
+
+    class Worker:
+        fail = False
+
+        def __init__(self, options):
+            if Worker.fail:
+                raise RuntimeError("could not spawn the Planner process")
+            events.append("worker started")
+
+        def submit(self, item):
+            return True
+
+        def poll(self):
+            return None
+
+        def close(self):
+            events.append("worker closed")
+
+    monkeypatch.setattr(sim_module, "SimulatedDepthSource", DepthSource)
+    monkeypatch.setattr(worker_module, "GpuPlannerWorker", Worker)
+    monkeypatch.setattr(base_policy_module, "build_inference_module", lambda *_: (lambda inputs: inputs))
+    monkeypatch.setattr(MotionDataset, "create_from_path", classmethod(lambda cls, *_, **__: counting_motion()))
+    physics = SimpleNamespace(model=None, data=None, time_s=0.0)
+
+    def build(config: dict) -> VehicleTracking:
+        path = tmp_path / "policy.yaml"
+        path.write_text(yaml.safe_dump(config))
+        args = TrackingArgs(policy_config=str(path), motion_backend="planner", motion_path="take.npz")
+        return VehicleTracking(args, robot_io=StandingRobot(), physics=physics)
+
+    return SimpleNamespace(events=events, worker=Worker, build=build)
+
+
+def test_a_planner_episode_with_a_startup_error_starts_no_planner_process(planner_startup):
+    with pytest.raises(ValueError, match="shaping_target"):
+        planner_startup.build(planner_tracker_yaml(shaping_target="frame0"))
+
+    assert planner_startup.events == []
+
+
+def test_a_planner_worker_that_fails_to_start_closes_the_depth_source(planner_startup):
+    planner_startup.worker.fail = True
+
+    with pytest.raises(RuntimeError, match="could not spawn"):
+        planner_startup.build(planner_tracker_yaml())
+
+    assert planner_startup.events == ["depth started", "depth closed"]
+
+
+def test_closing_a_planner_episode_closes_its_depth_source_and_worker(planner_startup):
+    tracker = planner_startup.build(planner_tracker_yaml())
+
+    tracker.close_reference_source()
+
+    assert planner_startup.events == ["depth started", "worker started", "depth closed", "worker closed"]

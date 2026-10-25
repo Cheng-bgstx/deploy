@@ -28,9 +28,9 @@ from typing import Any, Iterable, Mapping
 
 import numpy as np
 
-MODELSCOPE_ASSETS = Path(
-    "/home/galbot/.cache/modelscope/models/Hzzzz001--scalecar_v2/snapshots/master/assets"
-)
+from sim2real.planner.checkpoint import MODELSCOPE_ROOT
+
+MODELSCOPE_ASSETS = MODELSCOPE_ROOT / "assets"
 DEFAULT_TAR = MODELSCOPE_ASSETS / "motions_merged1146_converted_50hz_v1.tar"
 DEFAULT_SHA256SUMS = MODELSCOPE_ASSETS / "SHA256SUMS"
 TAR_MOTIONS_DIR = "data/scalecar_g1_merged1146_20261020_v1/converted_50hz_v1/motions"

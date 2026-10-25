@@ -152,20 +152,14 @@ uv run --with torch==2.7.0 --index https://download.pytorch.org/whl/cpu \
 
 ### Motion {#motions}
 
-沿用上面设置的 `MS`：
-
 ```bash
 uv run python -I scripts/scalecar/convert_motions.py --takes take1512 take0595 \
-  --tar "$MS/assets/motions_merged1146_converted_50hz_v1.tar" \
-  --sha256sums "$MS/assets/SHA256SUMS" \
   --output-dir checkpoints/scalecar_d1146/motions
 ```
 
 - 脚本从校验过的 tar 中取出这两条 take，转换成 any4hdmi 数据集：
   `motions/manifest.json`，以及 `motions/motions/take1512.npz`、
   `motions/motions/take0595.npz`。
-- 按上面的写法显式传入 `--tar` 和 `--sha256sums`：脚本内置的默认值指向某个特定
-  用户的 home 目录。
 - `python -I` 不把当前目录加入 `sys.path`，因为 tar 中的内容按不可信数据处理。
 - `--motion-path` 要指向 Motion **文件**（动作文件）。如果指向数据集根目录，
   `tracking.py` 会静默地只使用其中第一个 Motion。
@@ -392,18 +386,19 @@ Onboard Computer 上不运行其他任何程序，采集程序的启动和停止
 用网线连接 Host 和 G1，Host 使用 `192.168.123.x` 网段的地址，参见
 [Network Configuration](/getting-started/network-configuration)。用 `ip -br link`
 查网口名。把机器人放在 Motion 的起点：打开的驾驶员车门后方，摆成 Motion 第 0 帧的
-姿态。两个终端都需要 [Host 环境](#host-setup) 中的 export。
+姿态。两个终端都需要 [Host 环境](#host-setup) 中的 export；下面的命令还会自己设置这两个
+`HF_HUB_*` 变量，因此在任何 shell 中都不会发起 Hugging Face 请求。
 
 终端 1，Bridge。它启动时会释放机器人内置的运动模式：
 
 ```bash
-uv run scripts/g1/real_bridge.py --interface <host_ethernet_interface>
+HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run scripts/g1/real_bridge.py --interface <host_ethernet_interface>
 ```
 
 终端 2，Tracker，Reference Source 为 Planner：
 
 ```bash
-uv run sim2real/rl_policy/tracking.py \
+HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run sim2real/rl_policy/tracking.py \
   --policy-config checkpoints/scalecar_d1146/tracker/ft500ema/policy.yaml \
   --motion-path checkpoints/scalecar_d1146/motions/motions/take1512.npz \
   --motion-backend planner --robot-io zmq --controller keyboard \
@@ -414,7 +409,7 @@ uv run sim2real/rl_policy/tracking.py \
 或者用 File Playback，不需要深度：
 
 ```bash
-uv run sim2real/rl_policy/tracking.py \
+HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run sim2real/rl_policy/tracking.py \
   --policy-config checkpoints/scalecar_d1146/tracker/ft500ema/policy.yaml \
   --motion-path checkpoints/scalecar_d1146/motions/motions/take1512.npz \
   --motion-backend npz --robot-io zmq --controller keyboard
@@ -463,7 +458,8 @@ Planner: first Chunk applied 0.060 s after Go
 或者 `Planner: Go refused, staying in Hold: <reason>`，原因可能是骨盆高度检查未
 通过、Planner 预热未完成、深度过旧（`depth is 0.350 s old (limit 0.2 s)`），或者
 深度 / worker 出错。在车辆 sim2sim 中，Go 时的站立骨盆高度约 0.79 m。E-stop、
-Shaping 或再次按 R1 时会打印 `Planner: Go dropped (...)`。
+Shaping 或再次按 R1 时会打印 `Planner: Go dropped (...)`；随后 Planner 会重新执行一次
+预热规划，下一次 Go 要等它完成。如果 worker 崩溃过，要等它重启后这次预热才会完成。
 
 Go 之后每 5 s 打印一行统计：规划次数、延迟 p50/p95、迟到的 Chunk、覆盖耗尽、深度
 帧龄和 Planner 的阶段。

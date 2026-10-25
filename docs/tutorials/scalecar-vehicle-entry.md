@@ -166,20 +166,14 @@ uv run --with torch==2.7.0 --index https://download.pytorch.org/whl/cpu \
 
 ### Motions {#motions}
 
-With `MS` set as above:
-
 ```bash
 uv run python -I scripts/scalecar/convert_motions.py --takes take1512 take0595 \
-  --tar "$MS/assets/motions_merged1146_converted_50hz_v1.tar" \
-  --sha256sums "$MS/assets/SHA256SUMS" \
   --output-dir checkpoints/scalecar_d1146/motions
 ```
 
 - This extracts the two takes from the verified tar and converts them into an
   any4hdmi dataset: `motions/manifest.json` and
   `motions/motions/take1512.npz`, `motions/motions/take0595.npz`.
-- Pass `--tar` and `--sha256sums` as shown: the script's built-in defaults
-  point at one particular home directory.
 - `python -I` keeps the current directory off `sys.path`, because the tar
   contents are treated as untrusted.
 - Point `--motion-path` at a Motion **file**. With the dataset root,
@@ -426,19 +420,20 @@ Connect the Host to the G1 over Ethernet with an address on `192.168.123.x`, as
 in [Network Configuration](/getting-started/network-configuration). Find the
 interface name with `ip -br link`. Place the robot where the Motion starts:
 behind the open driver door, in the Motion's first-frame pose. Both terminals
-need the exports from [Host Setup](#host-setup).
+need the exports from [Host Setup](#host-setup); the commands also set the two
+`HF_HUB_*` variables themselves, so no shell makes a Hugging Face request.
 
 Terminal 1, the Bridge. It releases the robot's built-in motion mode when it
 starts:
 
 ```bash
-uv run scripts/g1/real_bridge.py --interface <host_ethernet_interface>
+HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run scripts/g1/real_bridge.py --interface <host_ethernet_interface>
 ```
 
 Terminal 2, the Tracker with the Planner as Reference Source:
 
 ```bash
-uv run sim2real/rl_policy/tracking.py \
+HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run sim2real/rl_policy/tracking.py \
   --policy-config checkpoints/scalecar_d1146/tracker/ft500ema/policy.yaml \
   --motion-path checkpoints/scalecar_d1146/motions/motions/take1512.npz \
   --motion-backend planner --robot-io zmq --controller keyboard \
@@ -449,7 +444,7 @@ uv run sim2real/rl_policy/tracking.py \
 Or with File Playback, which needs no depth:
 
 ```bash
-uv run sim2real/rl_policy/tracking.py \
+HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run sim2real/rl_policy/tracking.py \
   --policy-config checkpoints/scalecar_d1146/tracker/ft500ema/policy.yaml \
   --motion-path checkpoints/scalecar_d1146/motions/motions/take1512.npz \
   --motion-backend npz --robot-io zmq --controller keyboard
@@ -500,7 +495,9 @@ or `Planner: Go refused, staying in Hold: <reason>`, where the reason is the
 pelvis height check, an unfinished Planner warmup, stale depth (`depth is
 0.350 s old (limit 0.2 s)`), or a depth or worker error. Standing pelvis height
 at Go is about 0.79 m in the vehicle sim2sim. An E-stop, Shaping or a new R1
-prints `Planner: Go dropped (...)`.
+prints `Planner: Go dropped (...)`; the Planner then runs a fresh warmup plan,
+which the next Go waits for. If the worker crashed, that warmup is answered once
+it has restarted.
 
 Every 5 s after Go, a stats line reports the plan count, latency p50/p95, late
 Chunks, coverage exhaustion, depth age and the Planner phase.

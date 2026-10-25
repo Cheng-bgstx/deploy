@@ -310,6 +310,8 @@ class FilePlaybackFlow:
 
     def __init__(self, *, control_dt: float, hold_s: float = 5.0, final_hold_s: float = 2.0):
         self.control_dt = float(control_dt)
+        _check_hold(hold_s, self.control_dt)
+        _check_not_negative("final_hold_s", final_hold_s)
         self.hold_ticks = round(hold_s / self.control_dt)
         self.final_hold_ticks = round(final_hold_s / self.control_dt)
         self.tick = 0
@@ -356,6 +358,8 @@ class PlannerFlow:
 
     def __init__(self, *, control_dt: float, hold_s: float = 5.0, planner_s: float = 40.0):
         self.control_dt = float(control_dt)
+        _check_hold(hold_s, self.control_dt)
+        _check_not_negative("planner_s", planner_s)
         self.hold_ticks = round(hold_s / self.control_dt)
         self.planner_ticks = round(planner_s / self.control_dt)
         self.tick = 0
@@ -392,6 +396,24 @@ class PlannerFlow:
         self.tick += 1
         if self.go_time_s is not None and self.tick - self.hold_ticks >= self.planner_ticks:
             self.stage = "done"
+
+
+def _check_hold(hold_s: float, control_dt: float) -> None:
+    # Tick 0 is the take-over; Go needs at least one tick of Hold after it.
+    if not hold_s >= control_dt:
+        raise ValueError(f"hold_s must be at least one control tick ({control_dt} s), got {hold_s}")
+
+
+def _check_not_negative(name: str, value: float) -> None:
+    if not value >= 0.0:
+        raise ValueError(f"{name} must be zero or more, got {value}")
+
+
+def episode_flow(case: "EpisodeCase", control_dt: float) -> "FilePlaybackFlow | PlannerFlow":
+    """The operator script of one episode; raises ValueError for timings it cannot run."""
+    if case.reference_source == "planner":
+        return PlannerFlow(control_dt=control_dt, hold_s=case.hold_s, planner_s=case.planner_s)
+    return FilePlaybackFlow(control_dt=control_dt, hold_s=case.hold_s, final_hold_s=case.final_hold_s)
 
 
 class ScriptedOperator(ControllerBase):
@@ -446,15 +468,13 @@ class VehicleTracking(Tracking):
         def clock() -> float:
             return physics.time_s
 
-        return PlannerIO(
-            source=SimulatedDepthSource(physics.model, physics.data, clock=clock),
-            worker=SimulatedTimeWorker(GpuPlannerWorker(options), clock=clock),
-            clock=clock,
-        )
-
-    def close_reference_source(self) -> None:
-        if self.motion_backend == "planner":
-            self.motion_buffer.close()  # the worker process and the depth renderer
+        source = SimulatedDepthSource(physics.model, physics.data, clock=clock)
+        try:
+            worker = SimulatedTimeWorker(GpuPlannerWorker(options), clock=clock)
+        except BaseException:
+            source.close()
+            raise
+        return PlannerIO(source=source, worker=worker, clock=clock)
 
     def take_over(self) -> None:
         """R1 at the next tick: the Tracker takes over with the Reference frozen at frame 0 (Hold)."""
@@ -564,25 +584,29 @@ def run_episode(case: EpisodeCase) -> dict:
     physics = VehiclePhysics(model, contract, joint_names=robot_cfg.joint_names)
     physics.reset(**motion_start_state(case.motion, joint_names=robot_cfg.joint_names))
     robot_io = SceneRobotIO(physics)
-    tracker = VehicleTracking(
-        TrackingArgs(
-            policy_config=str(case.policy_config),
-            motion_backend="planner" if planner else "npz",
-            motion_path=str(case.motion),
-            planner_checkpoint=case.planner_checkpoint,
-            rl_rate=1.0 / control_dt,
-            inference_backend="onnx-cpu",
-        ),
-        robot_io=robot_io,
-        physics=physics,
-    )
+    tracker = None
     try:
+        tracker = VehicleTracking(
+            TrackingArgs(
+                policy_config=str(case.policy_config),
+                motion_backend="planner" if planner else "npz",
+                motion_path=str(case.motion),
+                planner_checkpoint=case.planner_checkpoint,
+                rl_rate=1.0 / control_dt,
+                inference_backend="onnx-cpu",
+            ),
+            robot_io=robot_io,
+            physics=physics,
+        )
         if tracker.policy_joint_names != contract["joint_names"]:
             raise ValueError("policy.yaml and deployment.json disagree on the Tracker joint order")
         planner_loaded = wait_for_planner(tracker) if planner else None
         result = _run_loop(case, contract, control_dt, model, build, physics, robot_io, tracker, wall_start)
     finally:
-        tracker.close_reference_source()
+        # The Planner worker is a non-daemon process: never leave it running. (A Tracking
+        # that fails to construct has already closed whatever it started.)
+        if tracker is not None:
+            tracker.close_reference_source()
     if planner:
         result["planner"] = _planner_result(case, tracker, planner_loaded)
     result["wall"]["total_s"] = time.perf_counter() - wall_start
@@ -636,10 +660,7 @@ def _planner_result(case: EpisodeCase, tracker: VehicleTracking, loaded: dict) -
 def _run_loop(case, contract, control_dt, model, build, physics, robot_io, tracker, wall_start) -> dict:
     planner = case.reference_source == "planner"
     region = np.asarray(build["task_envelope"]["sources"]["cabin_feet_region"])
-    if planner:
-        flow = PlannerFlow(control_dt=control_dt, hold_s=case.hold_s, planner_s=case.planner_s)
-    else:
-        flow = FilePlaybackFlow(control_dt=control_dt, hold_s=case.hold_s, final_hold_s=case.final_hold_s)
+    flow = episode_flow(case, control_dt)
     judge = EntryJudge(region, control_dt)  # Hold: only a Fall can happen; replaced at Go
     guard = EnvelopeGuard(model, build["task_envelope"]["min"], build["task_envelope"]["max"])
     bodies = {name: _name2id(model, mujoco.mjtObj.mjOBJ_BODY, name) for name in JUDGE_BODIES}
@@ -899,6 +920,8 @@ class VehicleSim2SimArgs:
     def __post_init__(self) -> None:
         if self.reference_source not in ("file_playback", "planner"):
             raise ValueError(f"--reference-source must be file_playback or planner, not {self.reference_source!r}")
+        if self.workers is not None and self.workers < 1:
+            raise ValueError(f"--workers must be at least 1, got {self.workers}")
         root = Path(self.artifact_root).expanduser()
         self.output_dir = self.output_dir or str(root / "sim2sim")
         self.scene_dir = self.scene_dir or str(root / "scene")
@@ -969,10 +992,11 @@ def main(args: VehicleSim2SimArgs) -> int:
     import multiprocessing
 
     default_workers = 1 if args.reference_source == "planner" else performance_core_count()
-    workers = min(len(resolve_cases(args)), args.workers or default_workers)
-    if workers < 1:
-        raise ValueError("--workers must be positive")
+    workers = min(len(resolve_cases(args)), default_workers if args.workers is None else args.workers)
     cases = resolve_cases(args, parallel_episodes=workers)
+    for case in cases:  # refuse timings an episode cannot run before starting any
+        contract = json.loads((case.policy_config.parent / "deployment.json").read_text(encoding="utf-8"))
+        episode_flow(case, float(contract["control_dt"]))
     # The Planner's depth camera renders offscreen; spawned episodes import mujoco with this set.
     os.environ.setdefault("MUJOCO_GL", "egl")
     # One ONNX Runtime thread per episode, as Scalecar; the episodes are the parallelism.
