@@ -251,6 +251,22 @@ def test_the_planner_keeps_planning_from_the_last_frame_while_depth_is_stale(mes
     assert rig.planner.submitted[-1]["observation"].depth_age_s.max() > 0.9
 
 
+def test_the_planner_stats_line_starts_over_with_each_go(messages):
+    rig = Rig()
+    rig.step(0.2)
+    rig.reference.request_go()
+    rig.step(6.0, messages)
+    rig.reference.abort()
+    rig.step(2.0)
+    rig.reference.request_go()
+    second_go = rig.clock.now
+    rig.step(6.0, messages)
+
+    stats = [i for i, (_, text) in enumerate(messages) if text.startswith("Planner: ") and " plans, latency" in text]
+    times = [rig.when(messages, i) for i in stats]
+    assert len(times) == 2 and times[1] == pytest.approx(second_go + 5.0, abs=DT / 2)
+
+
 # ---------------------------------------------------------------------------
 # Operator keys through Tracking.step() (motion_backend: planner)
 # ---------------------------------------------------------------------------

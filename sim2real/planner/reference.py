@@ -120,7 +120,7 @@ class PlannerReference:
         """E-stop: the current Go is dropped and the Reference returns to Hold."""
         self.go_requested = False
         self.provider.abort()
-        self.go_time = self.first_reference_time = None
+        self.go_time = self.first_reference_time = self._next_stats = None
         self._last_valid = self._last_rows = None
         self.motion_data, self.phase = self.hold, "standing"
         logger.warning(
