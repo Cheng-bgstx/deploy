@@ -111,7 +111,6 @@ class PlannerReference:
         self.first_reference_time: float | None = None
         self.invalid_token_ticks = 0
         self._last_valid: MotionData | None = None
-        self._last_rows: np.ndarray | None = None
         self._next_stats: float | None = None
         self._counted_from = self._provider_counts()
         self.depth_status = DepthStatus()
@@ -127,7 +126,7 @@ class PlannerReference:
         self.go_requested = False
         self.provider.abort()
         self.go_time = self.first_reference_time = self._next_stats = None
-        self._last_valid = self._last_rows = None
+        self._last_valid = None
         self._counted_from, self.invalid_token_ticks = self._provider_counts(), 0
         self.motion_data, self.phase = self.hold, "standing"
         logger.warning(
@@ -163,9 +162,9 @@ class PlannerReference:
             self.invalid_token_ticks += 1
             self.motion_data = self._last_valid
         else:
-            if decision.rows is not self._last_rows:
-                self._last_valid = motion_data_from_rows(decision.rows)
-                self._last_rows = decision.rows
+            # The provider resamples fresh rows every tick, so they are decoded every tick
+            # (about 0.13 ms; the provider decodes the same rows once more for its tokens).
+            self._last_valid = motion_data_from_rows(decision.rows)
             self.motion_data = self._last_valid
             if self.first_reference_time is None:
                 self.first_reference_time = now
