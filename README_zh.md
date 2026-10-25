@@ -113,6 +113,7 @@ Repo skills 统一放在 `.agents/skills/`，无需手动复制到
 - [Root Project Setup](https://egalahad.github.io/sim2real/zh-Hans/getting-started/root-project)
 - [离线动作跟踪教程](https://egalahad.github.io/sim2real/zh-Hans/tutorials/offline-motion-tracking)
 - [Pico Teleoperation 教程](https://egalahad.github.io/sim2real/zh-Hans/tutorials/pico-teleoperation)
+- [Scalecar 进车部署教程](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/scalecar-vehicle-entry.md)
 
 ## Citation
 

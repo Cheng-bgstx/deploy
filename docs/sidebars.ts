@@ -44,6 +44,7 @@ const sidebars: SidebarsConfig = {
         'tutorials/pico-teleoperation',
         'tutorials/motion-recording',
         'tutorials/run-external-policies',
+        'tutorials/scalecar-vehicle-entry',
       ],
     },
     'faq',
