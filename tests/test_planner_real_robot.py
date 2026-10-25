@@ -608,3 +608,101 @@ def test_on_the_robot_the_planner_reads_depth_through_the_host_receiver(tmp_path
     assert output == tmp_path / "cli_logs" and output.is_dir()
     assert created["worker"]["checkpoint_sha256"] and created["worker"]["device"] == "cuda:0"
     assert tracker._planner_clock is time.monotonic
+
+
+# ---------------------------------------------------------------------------
+# Startup errors leave no child process behind (review finding 2)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def recorded_planner_io(tmp_path, monkeypatch):
+    """The robot's depth receiver and CUDA worker replaced by recorders of start and close."""
+    import sim2real.planner.depth as depth_module
+    import sim2real.planner.worker as worker_module
+
+    events: list[str] = []
+
+    class Receiver:
+        def __init__(self, options, output):
+            events.append("depth started")
+
+        def poll(self):
+            return None
+
+        def close(self):
+            events.append("depth closed")
+
+    class Worker:
+        fail = False
+
+        def __init__(self, options):
+            if Worker.fail:
+                raise RuntimeError("could not spawn the Planner process")
+            events.append("worker started")
+
+        def poll(self):
+            return None
+
+        def close(self):
+            events.append("worker closed")
+
+    monkeypatch.setattr(depth_module, "DepthSource", Receiver)
+    monkeypatch.setattr(worker_module, "GpuPlannerWorker", Worker)
+    monkeypatch.setattr(base_policy_module, "create_robot_io", lambda **_: StandingG1())
+    monkeypatch.setattr(base_policy_module, "build_inference_module", lambda *_: (lambda inputs: inputs))
+    monkeypatch.setattr(base_policy_module, "KeyboardController", Keyboard)
+    monkeypatch.setattr(MotionDataset, "create_from_path", classmethod(lambda cls, *_, **__: motion_dataset()))
+
+    def build(config: dict) -> Tracking:
+        path = tmp_path / "policy.yaml"
+        path.write_text(yaml.safe_dump(config))
+        return Tracking(args=TrackingArgs(policy_config=str(path), depth_log_dir=str(tmp_path / "logs")))
+
+    return SimpleNamespace(events=events, worker=Worker, build=build)
+
+
+def _other_future_steps(config: dict) -> None:
+    config["motion"]["future_steps"] = [0, 2, 4, 8, 16]
+    for group in config["observation"].values():
+        for obs in group.values():
+            obs["future_steps"] = [0, 2, 4, 8, 16]
+
+
+@pytest.mark.parametrize(
+    "misconfigure",
+    [
+        _other_future_steps,
+        lambda config: config.update(shaping_target="frame0"),
+        lambda config: config["observation"]["ref_command"]["sonic_command_multi_future_nonflat"].update(
+            _target_="sonic.no_such_observation"),
+        lambda config: config["motion"].update(planner={"precision": "fp16"}),
+    ],
+    ids=["future_steps", "shaping_target", "observation", "planner_option"],
+)
+def test_a_startup_error_starts_no_planner_process(recorded_planner_io, misconfigure):
+    config = tracker_yaml("planner")
+    misconfigure(config)
+
+    with pytest.raises(Exception):
+        recorded_planner_io.build(config)
+
+    assert recorded_planner_io.events == []
+
+
+def test_a_worker_that_fails_to_start_closes_the_depth_receiver(recorded_planner_io):
+    recorded_planner_io.worker.fail = True
+
+    with pytest.raises(RuntimeError, match="could not spawn"):
+        recorded_planner_io.build(tracker_yaml("planner"))
+
+    assert recorded_planner_io.events == ["depth started", "depth closed"]
+
+
+def test_a_started_planner_is_closed_with_the_tracker(recorded_planner_io):
+    tracker = recorded_planner_io.build(tracker_yaml("planner"))
+    assert recorded_planner_io.events == ["depth started", "worker started"]
+
+    tracker.close_reference_source()
+
+    assert recorded_planner_io.events[2:] == ["depth closed", "worker closed"]

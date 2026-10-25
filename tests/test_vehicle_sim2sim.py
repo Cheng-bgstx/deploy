@@ -688,3 +688,107 @@ def test_simulated_depth_arrives_at_30_hz_of_simulation_time_downsampled():
     # Frame k is rendered at the first tick at or after k/30 s.
     np.testing.assert_allclose([p["acquired"] for p in packets][:5], [0.0, 0.04, 0.08, 0.10, 0.14])
     np.testing.assert_array_equal(packets[-1]["depth_mm"], expected)
+
+
+# ---------------------------------------------------------------------------
+# Planner startup in the vehicle sim2sim leaves no child process behind (review finding 2)
+# ---------------------------------------------------------------------------
+
+PLANNER_OFFSETS = [0, 2, 4, 8, 16, 32]
+
+
+def planner_tracker_yaml(**extra) -> dict:
+    from sim2real.planner.provider import JOINT_NAMES
+
+    config = {
+        "model_path": "unused.onnx",
+        "observation": {
+            "ref_command": {"sonic_command_multi_future_nonflat": {
+                "_target_": "sonic.sonic_command_multi_future_nonflat", "future_steps": PLANNER_OFFSETS,
+                "joint_names": list(JOINT_NAMES)}},
+        },
+        "joint_names_simulation": G1_JOINTS,
+        "body_names_simulation": ["pelvis"],
+        "policy_joint_names": list(JOINT_NAMES),
+        "default_joint_pos": {".*": 0.0},
+        "joint_kp": {".*": 40.0},
+        "joint_kd": {".*": 2.0},
+        "action_scale": 0.5,
+        "motion": {"motion_backend": "planner", "future_steps": PLANNER_OFFSETS, "root_body_name": "pelvis"},
+    }
+    config.update(extra)
+    return config
+
+
+@pytest.fixture
+def planner_startup(tmp_path, monkeypatch):
+    """VehicleTracking with the Planner, its rendered depth source and CUDA worker replaced by recorders."""
+    import sim2real.planner.sim as sim_module
+    import sim2real.planner.worker as worker_module
+
+    events: list[str] = []
+
+    class DepthSource:
+        def __init__(self, model, data, *, clock):
+            events.append("depth started")
+
+        def poll(self):
+            return None
+
+        def close(self):
+            events.append("depth closed")
+
+    class Worker:
+        fail = False
+
+        def __init__(self, options):
+            if Worker.fail:
+                raise RuntimeError("could not spawn the Planner process")
+            events.append("worker started")
+
+        def submit(self, item):
+            return True
+
+        def poll(self):
+            return None
+
+        def close(self):
+            events.append("worker closed")
+
+    monkeypatch.setattr(sim_module, "SimulatedDepthSource", DepthSource)
+    monkeypatch.setattr(worker_module, "GpuPlannerWorker", Worker)
+    monkeypatch.setattr(base_policy_module, "build_inference_module", lambda *_: (lambda inputs: inputs))
+    monkeypatch.setattr(MotionDataset, "create_from_path", classmethod(lambda cls, *_, **__: counting_motion()))
+    physics = SimpleNamespace(model=None, data=None, time_s=0.0)
+
+    def build(config: dict) -> VehicleTracking:
+        path = tmp_path / "policy.yaml"
+        path.write_text(yaml.safe_dump(config))
+        args = TrackingArgs(policy_config=str(path), motion_backend="planner", motion_path="take.npz")
+        return VehicleTracking(args, robot_io=StandingRobot(), physics=physics)
+
+    return SimpleNamespace(events=events, worker=Worker, build=build)
+
+
+def test_a_planner_episode_with_a_startup_error_starts_no_planner_process(planner_startup):
+    with pytest.raises(ValueError, match="shaping_target"):
+        planner_startup.build(planner_tracker_yaml(shaping_target="frame0"))
+
+    assert planner_startup.events == []
+
+
+def test_a_planner_worker_that_fails_to_start_closes_the_depth_source(planner_startup):
+    planner_startup.worker.fail = True
+
+    with pytest.raises(RuntimeError, match="could not spawn"):
+        planner_startup.build(planner_tracker_yaml())
+
+    assert planner_startup.events == ["depth started", "depth closed"]
+
+
+def test_closing_a_planner_episode_closes_its_depth_source_and_worker(planner_startup):
+    tracker = planner_startup.build(planner_tracker_yaml())
+
+    tracker.close_reference_source()
+
+    assert planner_startup.events == ["depth started", "worker started", "depth closed", "worker closed"]

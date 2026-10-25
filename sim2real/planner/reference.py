@@ -85,6 +85,15 @@ def motion_data_from_rows(rows: np.ndarray) -> MotionData:
     return _motion_data(q[idx], dq[idx], pos[idx], quat[idx])
 
 
+def check_future_steps(future_steps) -> None:
+    """The Tracker's ``motion.future_steps`` must be the offsets the Planner's Reference is decoded at."""
+    if [int(s) for s in future_steps] != list(m38.TRACKER_OFFSETS):
+        raise ValueError(
+            f"motion.future_steps {list(future_steps)} must be the Planner's Tracker offsets "
+            f"{list(m38.TRACKER_OFFSETS)}"
+        )
+
+
 class PlannerReference:
     """The Planner as a Reference Source for ``tracking.py`` (``motion_backend: planner``)."""
 
@@ -92,11 +101,7 @@ class PlannerReference:
     body_names = list(BODY_NAMES)
 
     def __init__(self, provider: PlannerProvider, *, hold: MotionData, future_steps) -> None:
-        if [int(s) for s in future_steps] != list(m38.TRACKER_OFFSETS):
-            raise ValueError(
-                f"motion.future_steps {list(future_steps)} must be the Planner's Tracker offsets "
-                f"{list(m38.TRACKER_OFFSETS)}"
-            )
+        check_future_steps(future_steps)
         self.provider = provider
         self.hold = hold
         self.motion_data: MotionData = hold

@@ -446,11 +446,13 @@ class VehicleTracking(Tracking):
         def clock() -> float:
             return physics.time_s
 
-        return PlannerIO(
-            source=SimulatedDepthSource(physics.model, physics.data, clock=clock),
-            worker=SimulatedTimeWorker(GpuPlannerWorker(options), clock=clock),
-            clock=clock,
-        )
+        source = SimulatedDepthSource(physics.model, physics.data, clock=clock)
+        try:
+            worker = SimulatedTimeWorker(GpuPlannerWorker(options), clock=clock)
+        except BaseException:
+            source.close()
+            raise
+        return PlannerIO(source=source, worker=worker, clock=clock)
 
     def close_reference_source(self) -> None:
         if self.motion_backend == "planner":
@@ -564,25 +566,29 @@ def run_episode(case: EpisodeCase) -> dict:
     physics = VehiclePhysics(model, contract, joint_names=robot_cfg.joint_names)
     physics.reset(**motion_start_state(case.motion, joint_names=robot_cfg.joint_names))
     robot_io = SceneRobotIO(physics)
-    tracker = VehicleTracking(
-        TrackingArgs(
-            policy_config=str(case.policy_config),
-            motion_backend="planner" if planner else "npz",
-            motion_path=str(case.motion),
-            planner_checkpoint=case.planner_checkpoint,
-            rl_rate=1.0 / control_dt,
-            inference_backend="onnx-cpu",
-        ),
-        robot_io=robot_io,
-        physics=physics,
-    )
+    tracker = None
     try:
+        tracker = VehicleTracking(
+            TrackingArgs(
+                policy_config=str(case.policy_config),
+                motion_backend="planner" if planner else "npz",
+                motion_path=str(case.motion),
+                planner_checkpoint=case.planner_checkpoint,
+                rl_rate=1.0 / control_dt,
+                inference_backend="onnx-cpu",
+            ),
+            robot_io=robot_io,
+            physics=physics,
+        )
         if tracker.policy_joint_names != contract["joint_names"]:
             raise ValueError("policy.yaml and deployment.json disagree on the Tracker joint order")
         planner_loaded = wait_for_planner(tracker) if planner else None
         result = _run_loop(case, contract, control_dt, model, build, physics, robot_io, tracker, wall_start)
     finally:
-        tracker.close_reference_source()
+        # The Planner worker is a non-daemon process: never leave it running. (A Tracking
+        # that fails to construct has already closed whatever it started.)
+        if tracker is not None:
+            tracker.close_reference_source()
     if planner:
         result["planner"] = _planner_result(case, tracker, planner_loaded)
     result["wall"]["total_s"] = time.perf_counter() - wall_start
