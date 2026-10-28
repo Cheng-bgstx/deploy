@@ -33,6 +33,7 @@ value.
 | GRIT v0.0.1 | `checkpoints/grit/v0_0_1/policy.yaml` | Nine-frame reference context and ten-frame proprioceptive history. |
 | ScaleBFM XL | `checkpoints/scalebfm/humanoid_transformer_xl/policy.yaml` | Normal G1 motion stream. |
 | ScaleBFM M | `checkpoints/scalebfm/humanoid_transformer_m/policy.yaml` | Normal G1 motion stream. |
+| Proteus G1 | `checkpoints/proteus/proteus_60/unitree_g1/policy.yaml` | Normal G1 motion stream; generated from the Proteus checkout, see [Proteus](#proteus). |
 | BFM-Zero | `checkpoints/bfm-zero/exp_lafan40-100style_update_z10/policy.yaml` | Requires the checkpoint-specific MJCF override for ZMQ publishers. |
 | TeleopIT | `checkpoints/teleopit/policy.yaml` | Normal G1 motion stream. |
 | Humanoid-GPT | `checkpoints/humanoid-gpt/policy.yaml` | Normal G1 motion stream. |
@@ -47,12 +48,70 @@ uv run sim2real/rl_policy/tracking.py \
 ```
 
 This applies to ordinary G1 tracking policies that consume the normal G1 motion
-stream, such as HEFT, TeleopIT, Humanoid-GPT, ScaleBFM, HoloMotion, and
+stream, such as HEFT, TeleopIT, Humanoid-GPT, ScaleBFM, Proteus, HoloMotion, and
 standard any4hdmi / SONIC G1 motion policies.
 
 ## Policy-Specific Runtime Requirements
 
 Some adapted policies need a different motion source or extra runtime asset.
+
+### Proteus
+
+[Proteus](https://github.com/zengweishuai/ScaleBFM/tree/main/ScaleTrack#multi-robot-training-proteus)
+is one ONNX actor for 60 humanoids. Each robot has a contract `<robot>.json`
+with its joints mapped to 31 canonical slots, joint signs, default pose, action
+scales, PD gains, the 14 tracked bodies and a morphology descriptor. Generate the
+G1 policy from a Proteus checkout next to this repo:
+
+```bash
+uv run python scripts/export_proteus_onnx.py \
+  --proteus-root ../Proteus --contract unitree_g1 --robot g1
+```
+
+This writes `checkpoints/proteus/proteus_60/unitree_g1/`: `policy.onnx`,
+`policy.yaml`, a copy of the contract, and `comparison.json`, which records the
+check against the released actor. The released graph is wrapped rather than
+re-exported. Its inputs are the `proprioception`, `task` and `action_history`
+observation groups, and the contract's morphology descriptor is baked in as a
+constant. The `action` output holds the G1 joints' slot actions, and the extra
+`next_slot_action` output carries all 31 slots into the next step's action
+history. The ONNX keeps the actor's IR 8 / opset 17, so ONNX Runtime 1.16 on
+the G1 can load it.
+
+Runtime behavior (`proteus` section of `policy.yaml`):
+
+- The task observation compares the reference with the robot's 14 tracked
+  bodies. sim2real computes those bodies by MuJoCo forward kinematics of the
+  robot MJCF at the measured root orientation and joint angles.
+- With `reference_forcing: true` (the default, local tracking), the robot root
+  is placed at the reference pelvis, because the real G1 has no root position.
+  Set it to `false` to track the measured root position instead, for example in
+  sim2sim or on a robot with root localization.
+- The reference frames are `[0, 1, 2, 3, 4, 16]` (motion-lookahead 0.32 s). The
+  far frame 16 matches ScaleBridge; re-export with `--far-offset` (5 to 33) to
+  change it.
+- The Motion is aligned to the robot's heading once, when the policy starts
+  (R1 / `]`).
+
+Check a motion in sim2sim first:
+
+```bash
+uv run sim2real/sim_env/integrated_sim2sim.py \
+  --policy-config checkpoints/proteus/proteus_60/unitree_g1/policy.yaml \
+  --motion-path hf://elijahgalahad/any4hdmi-g1-lafan/motions/walk1_subject1.npz
+```
+
+On the G1, deploy it like any other G1 tracking policy. `checkpoints/` is not
+part of the code sync, so copy `checkpoints/proteus/` to the robot checkout
+first.
+
+```bash
+HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run sim2real/rl_policy/tracking.py \
+  --robot-io inline \
+  --controller joystick \
+  --policy-config checkpoints/proteus/proteus_60/unitree_g1/policy.yaml \
+  --motion-path hf://elijahgalahad/any4hdmi-g1-lafan/motions/walk1_subject1.npz
+```
 
 ### HoloMotion v1.4.0
 

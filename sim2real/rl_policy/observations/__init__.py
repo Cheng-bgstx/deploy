@@ -8,6 +8,7 @@ from .common import *
 from .humanoid_gpt import *
 from .motion import *
 from .mimic_lite import *
+from .proteus import *
 from .scalebfm import *
 from .sonic import *
 from .teleopit import *

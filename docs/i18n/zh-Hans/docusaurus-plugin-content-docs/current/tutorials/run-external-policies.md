@@ -31,6 +31,7 @@ policy YAML。
 | GRIT v0.0.1 | `checkpoints/grit/v0_0_1/policy.yaml` | 九帧参考上下文和十帧本体感知历史。 |
 | ScaleBFM XL | `checkpoints/scalebfm/humanoid_transformer_xl/policy.yaml` | 正常 G1 motion stream。 |
 | ScaleBFM M | `checkpoints/scalebfm/humanoid_transformer_m/policy.yaml` | 正常 G1 motion stream。 |
+| Proteus G1 | `checkpoints/proteus/proteus_60/unitree_g1/policy.yaml` | 正常 G1 motion stream；从 Proteus checkout 生成，见 [Proteus](#proteus)。 |
 | BFM-Zero | `checkpoints/bfm-zero/exp_lafan40-100style_update_z10/policy.yaml` | ZMQ publisher 需要传 checkpoint 对应的 MJCF override。 |
 | TeleopIT | `checkpoints/teleopit/policy.yaml` | 正常 G1 motion stream。 |
 | Humanoid-GPT | `checkpoints/humanoid-gpt/policy.yaml` | 正常 G1 motion stream。 |
@@ -45,12 +46,64 @@ uv run sim2real/rl_policy/tracking.py \
 ```
 
 这适用于普通 G1 tracking policy，也就是消费正常 G1 motion stream 的 policy，
-例如 HEFT、TeleopIT、Humanoid-GPT、ScaleBFM、HoloMotion，以及普通
+例如 HEFT、TeleopIT、Humanoid-GPT、ScaleBFM、Proteus、HoloMotion，以及普通
 any4hdmi / SONIC G1 motion policy。
 
 ## Policy 特殊运行条件
 
 少数 adapted policy 需要不同的 motion source 或额外 runtime asset。
+
+### Proteus
+
+[Proteus](https://github.com/zengweishuai/ScaleBFM/tree/main/ScaleTrack#multi-robot-training-proteus)
+是一个控制 60 种人形机器人的 ONNX actor。每个机器人有一个 contract
+`<robot>.json`，里面是关节到 31 个 canonical slot 的映射、关节符号、默认姿态、
+action scale、PD 增益、14 个 tracked body 和 morphology descriptor。在本 repo
+旁边放一份 Proteus checkout，然后生成 G1 policy：
+
+```bash
+uv run python scripts/export_proteus_onnx.py \
+  --proteus-root ../Proteus --contract unitree_g1 --robot g1
+```
+
+输出目录是 `checkpoints/proteus/proteus_60/unitree_g1/`：`policy.onnx`、
+`policy.yaml`、contract 的拷贝，以及记录和官方 actor 对比结果的
+`comparison.json`。官方 graph 只做包装，不重新导出：输入是
+`proprioception`、`task`、`action_history` 三个 observation group，contract 的
+morphology descriptor 作为常量写进 graph；`action` 输出 G1 关节对应 slot 的
+action，额外的 `next_slot_action` 输出把全部 31 个 slot 带进下一步的 action
+history。ONNX 保持 actor 原来的 IR 8 / opset 17，G1 上的 ONNX Runtime 1.16 可以
+加载。
+
+运行时行为（`policy.yaml` 的 `proteus` 段）：
+
+- task observation 比较 reference 和机器人的 14 个 tracked body。sim2real 用
+  机器人 MJCF 的 MuJoCo 正运动学，在实测 root 朝向和关节角下计算这些 body。
+- `reference_forcing: true`（默认，local tracking）把机器人 root 放在 reference
+  pelvis 上，因为真机 G1 没有 root 位置。设为 `false` 则跟踪实测 root 位置，
+  例如 sim2sim，或有 root 定位的机器人。
+- reference frame 是 `[0, 1, 2, 3, 4, 16]`（motion-lookahead 0.32 s）。远端帧
+  16 和 ScaleBridge 一致；需要改的话用 `--far-offset`（5 到 33）重新导出。
+- Motion 只在 policy 启动时（R1 / `]`）对齐一次机器人朝向。
+
+先在 sim2sim 里检查动作：
+
+```bash
+uv run sim2real/sim_env/integrated_sim2sim.py \
+  --policy-config checkpoints/proteus/proteus_60/unitree_g1/policy.yaml \
+  --motion-path hf://elijahgalahad/any4hdmi-g1-lafan/motions/walk1_subject1.npz
+```
+
+在 G1 上和其他 G1 tracking policy 一样部署。`checkpoints/` 不在代码同步范围内，
+先把 `checkpoints/proteus/` 拷到机器人上的 checkout：
+
+```bash
+HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run sim2real/rl_policy/tracking.py \
+  --robot-io inline \
+  --controller joystick \
+  --policy-config checkpoints/proteus/proteus_60/unitree_g1/policy.yaml \
+  --motion-path hf://elijahgalahad/any4hdmi-g1-lafan/motions/walk1_subject1.npz
+```
 
 ### HoloMotion v1.4.0
 
