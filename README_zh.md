@@ -63,6 +63,7 @@ uv run sim2real/rl_policy/tracking.py \
 | GRIT v0.0.1 | `checkpoints/grit/v0_0_1/policy.yaml` | 九帧参考上下文和十帧本体感知历史。 |
 | ScaleBFM | `checkpoints/scalebfm` | [WeishuaiZeng/ScaleBFM](https://huggingface.co/WeishuaiZeng/ScaleBFM) 的 Humanoid Transformer XL 和 M ONNX exports。 |
 | Proteus | `checkpoints/proteus/proteus_60/unitree_g1/policy.yaml` | [ScaleBFM](https://github.com/zengweishuai/ScaleBFM) 的 60 本体 Proteus actor，由 `scripts/export_proteus_onnx.py` 包装成 G1 policy；见 [Run External Policies](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/run-external-policies.md#proteus)。 |
+| Proteus ET1 | `checkpoints/proteus/proteus_60/galbot_et1/policy.yaml` | Galbot ET1（`--robot et1`）上的 Proteus，contract 由 `scripts/build_proteus_contract.py` 从 Unitree R1 的推导而来；见 [Proteus 部署到 Galbot ET1](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-et1.md)。 |
 | BFM-Zero | `checkpoints/bfm-zero/exp_lafan40-100style_update_z10/policy.yaml` | Latent-conditioned motion tracker。 |
 | TeleopIT | `checkpoints/teleopit/policy.yaml` | TeleopIT policy wrapper。 |
 | Humanoid-GPT | `checkpoints/humanoid-gpt/policy.yaml` | Humanoid-GPT policy wrapper。 |
@@ -115,6 +116,7 @@ Repo skills 统一放在 `.agents/skills/`，无需手动复制到
 - [离线动作跟踪教程](https://egalahad.github.io/sim2real/zh-Hans/tutorials/offline-motion-tracking)
 - [Pico Teleoperation 教程](https://egalahad.github.io/sim2real/zh-Hans/tutorials/pico-teleoperation)
 - [Scalecar 进车部署教程](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/scalecar-vehicle-entry.md)
+- [Proteus 部署到 Galbot ET1](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-et1.md)
 
 ## Citation
 

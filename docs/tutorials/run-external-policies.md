@@ -34,6 +34,7 @@ value.
 | ScaleBFM XL | `checkpoints/scalebfm/humanoid_transformer_xl/policy.yaml` | Normal G1 motion stream. |
 | ScaleBFM M | `checkpoints/scalebfm/humanoid_transformer_m/policy.yaml` | Normal G1 motion stream. |
 | Proteus G1 | `checkpoints/proteus/proteus_60/unitree_g1/policy.yaml` | Normal G1 motion stream; generated from the Proteus checkout, see [Proteus](#proteus). |
+| Proteus ET1 | `checkpoints/proteus/proteus_60/galbot_et1/policy.yaml` | Galbot ET1 (`--robot et1`) with ET1 Motions; contract built from the R1's, see [Proteus on Galbot ET1](./proteus-et1.md). |
 | BFM-Zero | `checkpoints/bfm-zero/exp_lafan40-100style_update_z10/policy.yaml` | Requires the checkpoint-specific MJCF override for ZMQ publishers. |
 | TeleopIT | `checkpoints/teleopit/policy.yaml` | Normal G1 motion stream. |
 | Humanoid-GPT | `checkpoints/humanoid-gpt/policy.yaml` | Normal G1 motion stream. |
@@ -112,6 +113,9 @@ HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run sim2real/rl_policy/tracking.p
   --policy-config checkpoints/proteus/proteus_60/unitree_g1/policy.yaml \
   --motion-path hf://elijahgalahad/any4hdmi-g1-lafan/motions/walk1_subject1.npz
 ```
+
+A robot outside the 60 needs its own contract. For the Galbot ET1, derived from
+the Unitree R1, see [Proteus on Galbot ET1](./proteus-et1.md).
 
 ### HoloMotion v1.4.0
 

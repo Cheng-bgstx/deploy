@@ -64,6 +64,7 @@ Currently supported adapted / distributed checkpoint families:
 | GRIT v0.0.1 | `checkpoints/grit/v0_0_1/policy.yaml` | Nine-frame reference context and ten-frame proprioceptive history. |
 | ScaleBFM | `checkpoints/scalebfm` | ScaleBFM Humanoid Transformer XL and M ONNX exports from [WeishuaiZeng/ScaleBFM](https://huggingface.co/WeishuaiZeng/ScaleBFM). |
 | Proteus | `checkpoints/proteus/proteus_60/unitree_g1/policy.yaml` | The 60-robot Proteus actor from [ScaleBFM](https://github.com/zengweishuai/ScaleBFM), wrapped for the G1 by `scripts/export_proteus_onnx.py`; see [Run External Policies](./docs/tutorials/run-external-policies.md#proteus). |
+| Proteus ET1 | `checkpoints/proteus/proteus_60/galbot_et1/policy.yaml` | Proteus on the Galbot ET1 (`--robot et1`), with a contract built from the Unitree R1's by `scripts/build_proteus_contract.py`; see [Proteus on Galbot ET1](./docs/tutorials/proteus-et1.md). |
 | BFM-Zero | `checkpoints/bfm-zero/exp_lafan40-100style_update_z10/policy.yaml` | Latent-conditioned motion tracker. |
 | TeleopIT | `checkpoints/teleopit/policy.yaml` | TeleopIT policy wrapper. |
 | Humanoid-GPT | `checkpoints/humanoid-gpt/policy.yaml` | Humanoid-GPT policy wrapper. |
@@ -107,6 +108,7 @@ uses `uv sync --extra inference-cpu --extra robot-g1`. See
 - [Offline Motion Tracking Tutorial](./docs/tutorials/offline-motion-tracking.md)
 - [Pico Teleoperation Tutorial](./docs/tutorials/pico-teleoperation.md)
 - [Scalecar Vehicle Entry Tutorial](./docs/tutorials/scalecar-vehicle-entry.md)
+- [Proteus on Galbot ET1](./docs/tutorials/proteus-et1.md)
 
 ## Citation
 

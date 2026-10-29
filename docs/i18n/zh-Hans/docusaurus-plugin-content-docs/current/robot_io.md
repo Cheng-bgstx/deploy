@@ -60,6 +60,10 @@ uv run sim2real/rl_policy/tracking.py \
 只有机器人网卡不是默认 `eth0` 时，才在 bridge 命令里加
 `--interface <robot_network_interface>`。
 
+同一个 bridge 加 `--robot et1` 即可驱动 Galbot ET1（Unitree HG DDS，35 个电机槽位
+里用 26 个，`mode_machine` 从 `rt/lowstate` 复制）；见
+[Proteus 部署到 Galbot ET1](./tutorials/proteus-et1.md)。ET1 没有 inline 模式。
+
 ## ZMQ + `scripts/g1/real_bridge_cpp.py`
 
 这个模式和 `scripts/g1/real_bridge.py` 使用同一套 ZMQ 协议，但 bridge 里用 `unitree_interface`

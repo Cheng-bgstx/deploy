@@ -32,6 +32,7 @@ policy YAML。
 | ScaleBFM XL | `checkpoints/scalebfm/humanoid_transformer_xl/policy.yaml` | 正常 G1 motion stream。 |
 | ScaleBFM M | `checkpoints/scalebfm/humanoid_transformer_m/policy.yaml` | 正常 G1 motion stream。 |
 | Proteus G1 | `checkpoints/proteus/proteus_60/unitree_g1/policy.yaml` | 正常 G1 motion stream；从 Proteus checkout 生成，见 [Proteus](#proteus)。 |
+| Proteus ET1 | `checkpoints/proteus/proteus_60/galbot_et1/policy.yaml` | Galbot ET1（`--robot et1`），配 ET1 Motion；contract 由 R1 的推导而来，见 [Proteus 部署到 Galbot ET1](./proteus-et1.md)。 |
 | BFM-Zero | `checkpoints/bfm-zero/exp_lafan40-100style_update_z10/policy.yaml` | ZMQ publisher 需要传 checkpoint 对应的 MJCF override。 |
 | TeleopIT | `checkpoints/teleopit/policy.yaml` | 正常 G1 motion stream。 |
 | Humanoid-GPT | `checkpoints/humanoid-gpt/policy.yaml` | 正常 G1 motion stream。 |
@@ -104,6 +105,9 @@ HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run sim2real/rl_policy/tracking.p
   --policy-config checkpoints/proteus/proteus_60/unitree_g1/policy.yaml \
   --motion-path hf://elijahgalahad/any4hdmi-g1-lafan/motions/walk1_subject1.npz
 ```
+
+不在这 60 台里的机器人需要自己的 contract。源自 Unitree R1 的 Galbot ET1 见
+[Proteus 部署到 Galbot ET1](./proteus-et1.md)。
 
 ### HoloMotion v1.4.0
 

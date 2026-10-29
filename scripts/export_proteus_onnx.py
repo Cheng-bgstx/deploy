@@ -20,6 +20,12 @@ actor on random inputs. Output directory: ``policy.onnx``, ``policy.yaml``, ``co
 copy of the contract.
 
     uv run python scripts/export_proteus_onnx.py --proteus-root ../Proteus --contract unitree_g1 --robot g1
+
+A robot outside the release gets its contract from ``scripts/build_proteus_contract.py``; ``--contract-dir``
+reads it from there (the actor stays the released one):
+
+    uv run python scripts/export_proteus_onnx.py --contract galbot_et1 --robot et1 \\
+        --contract-dir checkpoints/proteus/contracts
 """
 
 from __future__ import annotations
@@ -241,7 +247,7 @@ def policy_yaml(contract: dict[str, Any], robot: str, far_offset: int) -> dict[s
             "length_scale": float(contract["length_scale"]),
             "body_names": list(contract["body_names"]),
             "future_offsets": offsets,
-            # Local tracking: the real G1 has no root position, the reference anchor stands in for it.
+            # Local tracking: a real robot has no root position, the reference anchor stands in for it.
             "reference_forcing": True,
             "joint_slots": {j["name"]: int(j["slot"]) for j in joints},
             "joint_signs": {j["name"]: float(j["sign"]) for j in joints},
@@ -269,10 +275,11 @@ def export_policy(
     output_dir: Path | None = None,
     num_samples: int = NUM_SAMPLES,
     seed: int = 0,
+    contract_dir: Path | None = None,
 ) -> Path:
     """Export one robot's policy; returns the output directory."""
     export_dir = Path(proteus_root) / EXPORT_SUBDIR
-    contract_path = export_dir / f"{contract_name}.json"
+    contract_path = Path(contract_dir or export_dir) / f"{contract_name}.json"
     contract_bytes = contract_path.read_bytes()
     contract = load_contract(contract_path)
     source_path = export_dir / contract["actor"]
@@ -335,6 +342,11 @@ def main() -> int:
     parser.add_argument("--proteus-root", type=Path, default=DEFAULT_PROTEUS_ROOT)
     parser.add_argument("--contract", nargs="+", default=["unitree_g1"], help="contract names in proteus_60/")
     parser.add_argument("--robot", default="g1", help="sim2real robot config of the contracts")
+    parser.add_argument(
+        "--contract-dir",
+        type=Path,
+        help="Directory of <contract>.json (default: the release, ScaleTrack/checkpoints/proteus_60)",
+    )
     parser.add_argument("--far-offset", type=int, default=DEFAULT_FAR_OFFSET)
     parser.add_argument(
         "--output-root",
@@ -355,6 +367,7 @@ def main() -> int:
             output_dir=args.output_root / name,
             num_samples=args.num_samples,
             seed=args.seed,
+            contract_dir=args.contract_dir,
         )
         comparison = json.loads((output_dir / "comparison.json").read_text(encoding="utf-8"))
         print(f"{name}: {output_dir} max|d|={comparison['max_abs_error']:.3g} over {comparison['num_samples']} samples")

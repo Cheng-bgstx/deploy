@@ -45,6 +45,10 @@ class RealBridge:
         self.rate_hz = rate_hz
         self.dt = 1.0 / rate_hz
         self.interface = interface
+        # DDS motor slot of each joint; the ET1 leaves slots of the G1 layout empty.
+        self.motor_indices = robot_cfg.resolve_unitree_motor_indices()
+        # None (ET1): echo the LowState's mode_machine, so no command goes out before a state.
+        self.mode_machine = robot_cfg.unitree_mode_machine
 
         self._init_unitree_channels()
         self._init_zmq()
@@ -128,7 +132,8 @@ class RealBridge:
 
         self.low_cmd.level_flag = UNITREE_LEGGED_CONST["LOWLEVEL"]
         self.low_cmd.gpio = 0
-        self.low_cmd.mode_machine = 5
+        if self.mode_machine is not None:
+            self.low_cmd.mode_machine = self.mode_machine
         self.low_cmd.mode_pr = 0
 
         for cmd in self.low_cmd.motor_cmd:
@@ -144,18 +149,23 @@ class RealBridge:
         with ScopedTimer("real_bridge.low_state") as total_timer:
             with ScopedTimer("real_bridge.low_state.read") as read_timer:
                 msg: LowState_hg | LowState_go = self.low_state_unitree_sub.Read()
+                if msg is None:
+                    return {"total_s": 0.0, "read_s": 0.0, "pack_s": 0.0, "publish_s": 0.0}
                 imu = msg.imu_state
                 motor_state = msg.motor_state
+                if self.robot_cfg.unitree_mode_machine is None:
+                    self.mode_machine = int(msg.mode_machine)
+                    self.low_cmd.mode_machine = self.mode_machine
 
             with ScopedTimer("real_bridge.low_state.pack") as pack_timer:
                 joint_count = len(self.robot_cfg.joint_names)
                 joint_pos = np.zeros(joint_count, dtype=np.float32)
                 joint_vel = np.zeros(joint_count, dtype=np.float32)
                 joint_tau = np.zeros(joint_count, dtype=np.float32)
-                for idx in range(joint_count):
-                    joint_pos[idx] = motor_state[idx].q
-                    joint_vel[idx] = motor_state[idx].dq
-                    joint_tau[idx] = motor_state[idx].tau_est
+                for idx, motor_idx in enumerate(self.motor_indices):
+                    joint_pos[idx] = motor_state[motor_idx].q
+                    joint_vel[idx] = motor_state[motor_idx].dq
+                    joint_tau[idx] = motor_state[motor_idx].tau_est
 
                 low_state_msg = LowStateMessage(
                     quaternion=np.array(imu.quaternion, dtype=np.float32),
@@ -217,11 +227,16 @@ class RealBridge:
                     )
                     continue
 
+                if self.mode_machine is None:
+                    logger.warning("Dropping low command: no LowState (mode_machine) received yet")
+                    continue
+
                 with ScopedTimer("real_bridge.low_cmd.apply") as apply_timer:
                     motor_cmd = self.low_cmd.motor_cmd
-                    count = min(len(self.robot_cfg.joint_names), len(motor_cmd))
-                    for i in range(count):
-                        cmd: "MotorCmd_" = motor_cmd[i]
+                    for i, motor_idx in enumerate(self.motor_indices):
+                        if motor_idx >= len(motor_cmd):
+                            break
+                        cmd: "MotorCmd_" = motor_cmd[motor_idx]
                         cmd.q = float(low_cmd.q_target[i])
                         cmd.dq = float(low_cmd.dq_target[i])
                         cmd.tau = float(low_cmd.tau_ff[i])
@@ -301,6 +316,7 @@ class Args:
     """Unitree <-> ZMQ real bridge."""
 
     robot: str = "g1"
+    """g1, or et1 (Galbot ET1: Unitree HG DDS with its own motor slots)."""
     rate: float = 100.0
     interface: str = UNITREE_INTERFACE
 

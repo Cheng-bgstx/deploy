@@ -16,6 +16,7 @@ checkpoints/
 third_party/
   wheels/
   prebuilt/
+  galbot_et1/
 ```
 
 `checkpoints/` contains exported policy YAML and ONNX files. Tutorial commands
@@ -43,6 +44,10 @@ The JetPack 5 Pico onboard setup expects:
 ```text
 third_party/prebuilt/jetpack5-aarch64/
 ```
+
+`third_party/galbot_et1/` holds the Galbot ET1 MJCF and meshes used by
+`--robot et1`. It can also be regenerated from an et1-dep checkout with
+`scripts/et1/prepare_mjcf.py`, see [Proteus on Galbot ET1](./tutorials/proteus-et1.md).
 
 Do not commit downloaded artifact contents. Keep refreshed artifacts in the
 Google Drive folder and keep local paths matching the layout above.

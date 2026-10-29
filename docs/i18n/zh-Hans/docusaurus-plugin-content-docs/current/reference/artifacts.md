@@ -16,6 +16,7 @@ checkpoints/
 third_party/
   wheels/
   prebuilt/
+  galbot_et1/
 ```
 
 `checkpoints/` 里放导出的 policy YAML 和 ONNX。教程里的命令默认这些路径已经存在，
@@ -43,6 +44,10 @@ setup 需要：
 ```text
 third_party/prebuilt/jetpack5-aarch64/
 ```
+
+`third_party/galbot_et1/` 里放 `--robot et1` 使用的 Galbot ET1 MJCF 和 mesh。也可以用
+`scripts/et1/prepare_mjcf.py` 从 et1-dep checkout 重新生成，见
+[Proteus 部署到 Galbot ET1](../tutorials/proteus-et1.md)。
 
 不要把下载下来的 artifact 内容提交进 git。更新 artifact 时，把新文件放回 Google Drive，
 本地保持上面的目录结构即可。

@@ -19,6 +19,7 @@ stubs
 !/tests/test_dh116s_keyboard_control.py
 !/tests/test_bfm_zero_observations.py
 !/tests/test_proteus_observations.py
+!/tests/test_et1_proteus.py
 !/tests/test_tracker_action_postprocess.py
 !/tests/test_scalecar_tracker_export.py
 !/tests/test_scalecar_motion_convert.py
