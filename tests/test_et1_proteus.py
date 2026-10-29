@@ -6,11 +6,10 @@ from types import ModuleType, SimpleNamespace
 
 import numpy as np
 import pytest
-import zmq
 
 from sim2real.config.robots import ET1_CFG, G1_CFG, get_robot_cfg
 from sim2real.config.robots.base import get_unitree_dds_family
-from sim2real.utils.common import LowCmdMessage, LowStateMessage, UNITREE_LEGGED_CONST
+from sim2real.utils.common import UNITREE_LEGGED_CONST
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PROTEUS_ROOT = REPO_ROOT.parent / "Proteus"
@@ -228,146 +227,95 @@ def test_et1_contract_follows_the_r1_template() -> None:
 # ---------------------------------------------------------------------------- Unitree HG bridge
 
 
-class _FakeSocket:
-    def __init__(self) -> None:
-        self.received: list[bytes] = []
-        self.sent: list[bytes] = []
+def _free_port() -> int:
+    import socket
 
-    def setsockopt(self, *_args) -> None:
-        pass
-
-    def bind(self, _endpoint: str) -> None:
-        pass
-
-    def connect(self, _endpoint: str) -> None:
-        pass
-
-    def recv(self, *, flags: int = 0) -> bytes:
-        if not self.received:
-            raise zmq.Again()
-        return self.received.pop(0)
-
-    def send(self, data: bytes, *, flags: int = 0) -> None:
-        self.sent.append(data)
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
 
 
-class _FakeContext:
-    def __init__(self) -> None:
-        self.sockets = {zmq.PUB: _FakeSocket(), zmq.SUB: _FakeSocket()}
+def _hg_state(tick: int, *, keys: int = 0, mode_machine: int = 7) -> SimpleNamespace:
+    import struct
 
-    def socket(self, socket_type: int) -> _FakeSocket:
-        return self.sockets[socket_type]
-
-
-class _FakeChannel:
-    published: list = []
-    state = None
-
-    def __init__(self, *_args) -> None:
-        pass
-
-    def Init(self, *_args, **_kwargs) -> None:
-        pass
-
-    def Read(self):
-        return _FakeChannel.state
-
-    def Write(self, msg) -> None:
-        _FakeChannel.published.append([(m.q, m.kp) for m in msg.motor_cmd])
+    payload = bytearray(40)
+    struct.pack_into("<H", payload, 2, keys)
+    # Slot s reports q = s / 100 (inside every ET1 limit), so the joint order shows which slot was read.
+    motors = [SimpleNamespace(q=0.01 * s, dq=0.0, tau_est=float(s)) for s in range(HG_MOTORS)]
+    imu = SimpleNamespace(quaternion=[1.0, 0.0, 0.0, 0.0], gyroscope=[0.0, 0.0, 0.0])
+    return SimpleNamespace(tick=tick, mode_machine=mode_machine, wireless_remote=payload, imu_state=imu,
+                           motor_state=motors)  # fmt: skip
 
 
-class _FakeMotionSwitcher:
-    def SetTimeout(self, _timeout: float) -> None:
-        pass
+def test_bridge_maps_et1_joints_to_hg_slots_and_keeps_the_lowstate_mode_machine(monkeypatch) -> None:
+    import time
+    from dataclasses import replace
 
-    def Init(self) -> None:
-        pass
+    from scripts.g1.real_bridge import RealBridge
+    from sim2real.rl_policy.robot_io.zmq import ZMQRobotIO
 
-    def CheckMode(self):
-        return 0, {"name": ""}
+    cfg = replace(ET1_CFG, low_state_port=_free_port(), low_cmd_port=_free_port(),
+                  low_state_bind_addr="127.0.0.1", low_cmd_bind_addr="127.0.0.1")  # fmt: skip
+    writes = []
 
+    def init_channels(self):
+        self.low_cmd = SimpleNamespace(mode_machine=0, motor_cmd=[
+            SimpleNamespace(q=UNITREE_LEGGED_CONST["PosStopF"], dq=0.0, tau=0.0, kp=0.0, kd=0.0) for _ in range(HG_MOTORS)
+        ])  # fmt: skip
+        self.crc = SimpleNamespace(Crc=lambda _cmd: 0)
 
-def _fake_low_cmd():
-    return SimpleNamespace(motor_cmd=[SimpleNamespace() for _ in range(HG_MOTORS)], mode_machine=0, mode_pr=1,
-                           level_flag=0, gpio=0, crc=0, head=[0, 0])  # fmt: skip
+        def write(cmd):
+            writes.append((cmd.mode_machine, [(m.q, m.kp) for m in cmd.motor_cmd]))
+            return True
 
+        self.low_cmd_unitree_pub = SimpleNamespace(Write=write)
 
-@pytest.fixture
-def real_bridge(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
-    modules = {
-        "unitree_sdk2py": {},
-        "unitree_sdk2py.core": {},
-        "unitree_sdk2py.core.channel": {"ChannelFactoryInitialize": lambda *_args: None,
-                                        "ChannelPublisher": _FakeChannel, "ChannelSubscriber": _FakeChannel},
-        "unitree_sdk2py.utils": {},
-        "unitree_sdk2py.utils.crc": {"CRC": lambda: SimpleNamespace(Crc=lambda _msg: 1234)},
-        "unitree_sdk2py.idl": {},
-        "unitree_sdk2py.idl.default": {"unitree_hg_msg_dds__LowCmd_": _fake_low_cmd,
-                                       "unitree_go_msg_dds__LowCmd_": _fake_low_cmd},
-        "unitree_sdk2py.idl.unitree_go": {},
-        "unitree_sdk2py.idl.unitree_go.msg": {},
-        "unitree_sdk2py.idl.unitree_go.msg.dds_": {"LowState_": object, "LowCmd_": object, "MotorCmd_": object},
-        "unitree_sdk2py.idl.unitree_hg": {},
-        "unitree_sdk2py.idl.unitree_hg.msg": {},
-        "unitree_sdk2py.idl.unitree_hg.msg.dds_": {"LowState_": object, "LowCmd_": object},
-        "unitree_sdk2py.comm": {},
-        "unitree_sdk2py.comm.motion_switcher": {},
-        "unitree_sdk2py.comm.motion_switcher.motion_switcher_client": {"MotionSwitcherClient": _FakeMotionSwitcher},
-    }  # fmt: skip
-    for name, attrs in modules.items():
-        module = ModuleType(name)
-        module.__dict__.update(attrs)
-        monkeypatch.setitem(sys.modules, name, module)
-    context = _FakeContext()
-    monkeypatch.setattr(zmq.Context, "instance", classmethod(lambda cls: context))
-    _FakeChannel.published, _FakeChannel.state = [], None
-    module = _load_script("g1_real_bridge_under_test", "scripts/g1/real_bridge.py")
-    module.fake_context = context
-    return module
+    def release(self):
+        with self.lock:
+            self._takeover_result = True
 
+    monkeypatch.setattr(RealBridge, "_init_channels", init_channels)
+    monkeypatch.setattr(RealBridge, "_release_mode", release)
+    bridge = RealBridge(cfg)
+    io = ZMQRobotIO(cfg)
+    indices = np.asarray(ET1_CFG.resolve_unitree_motor_indices())
+    measured = 0.01 * indices
+    tick = 0
 
-def _hg_state(mode_machine: int) -> SimpleNamespace:
-    motors = [SimpleNamespace(q=0.01 * i, dq=0.1 * i, tau_est=float(i)) for i in range(HG_MOTORS)]
-    imu = SimpleNamespace(quaternion=[1.0, 0.0, 0.0, 0.0], gyroscope=[0.1, 0.2, 0.3])
-    return SimpleNamespace(imu_state=imu, motor_state=motors, mode_machine=mode_machine, tick=42)
+    def pump(keys=0, mode="zero", generation=0, duration=0.04, mode_machine=7):
+        nonlocal tick
+        deadline = time.monotonic() + duration
+        while time.monotonic() < deadline:
+            tick += 1
+            bridge._on_low_state(_hg_state(tick, keys=keys, mode_machine=mode_machine))
+            io.set_control_mode(mode, generation)
+            q = measured + 0.001 * np.arange(26) * (mode != "zero")
+            io.write_command(q, np.zeros(26), np.zeros(26), np.full(26, 20.0), np.ones(26))
+            bridge._step()
+            time.sleep(0.005)
 
-
-def _command_bytes(joint_count: int) -> bytes:
-    q = np.arange(joint_count, dtype=np.float32) + 1.0
-    return LowCmdMessage(q, np.zeros(joint_count), np.zeros(joint_count), 10.0 * q, np.ones(joint_count)).to_bytes()
-
-
-def test_bridge_maps_et1_joints_to_hg_slots_and_echoes_mode_machine(real_bridge: ModuleType) -> None:
-    bridge = real_bridge.RealBridge(ET1_CFG, rate_hz=100, interface="lo")
-    pub, sub = real_bridge.fake_context.sockets[zmq.PUB], real_bridge.fake_context.sockets[zmq.SUB]
-    indices = ET1_CFG.resolve_unitree_motor_indices()
-
-    sub.received.append(_command_bytes(26))
-    bridge._step()  # no LowState yet: the mode_machine is unknown, nothing goes out
-    assert _FakeChannel.published == [] and pub.sent == []
-
-    _FakeChannel.state = _hg_state(mode_machine=7)
-    bridge._step()
-    state = LowStateMessage.from_bytes(pub.sent[-1])
-    assert state.joint_positions == pytest.approx(0.01 * np.asarray(indices, dtype=np.float32))
-    assert state.joint_torques == pytest.approx(np.asarray(indices, dtype=np.float32))
-    assert bridge.low_cmd.mode_machine == 7 and bridge.low_cmd.mode_pr == 0
-
-    sub.received.append(_command_bytes(26))
-    bridge._step()
-    motors = _FakeChannel.published[-1]
-    for joint, slot in enumerate(indices):
-        assert motors[slot] == pytest.approx((joint + 1.0, 10.0 * (joint + 1.0)))
-    for slot in (*EMPTY_ET1_SLOTS, *range(31, HG_MOTORS)):
-        assert motors[slot] == (UNITREE_LEGGED_CONST["PosStopF"], 0.0)  # unused motors stay passive
+    try:
+        pump(duration=0.3)
+        assert bridge.mode_machine == 7 and not writes  # standby: learnt, nothing written
+        state = io.read_state()
+        assert state.qpos[7:] == pytest.approx(measured)  # joint i reads its own HG slot
+        pump(1 << 8, mode="init", generation=1, duration=0.08)
+        assert bridge.guard.active and writes
+        mode_machine, motors = writes[-1]
+        assert mode_machine == 7
+        for joint, slot in enumerate(indices):
+            assert motors[slot] == pytest.approx((0.01 * slot + 0.001 * joint, 20.0))
+        for slot in (*EMPTY_ET1_SLOTS, *range(31, HG_MOTORS)):
+            assert motors[slot] == (UNITREE_LEGGED_CONST["PosStopF"], 0.0)  # unused motors stay passive
+        pump(mode="policy", generation=2, mode_machine=5)  # another robot model on the bus
+        assert bridge.guard.latched and bridge.guard.fault
+        assert "mode_machine" in bridge.guard.reason
+    finally:
+        io.close()
+        bridge.low_state_zmq_pub.close(linger=0)
+        bridge.low_cmd_zmq_sub.close(linger=0)
 
 
-def test_bridge_keeps_the_g1_identity_layout(real_bridge: ModuleType) -> None:
-    bridge = real_bridge.RealBridge(G1_CFG, rate_hz=100, interface="lo")
-    assert bridge.low_cmd.mode_machine == 5
-    _FakeChannel.state = _hg_state(mode_machine=9)
-    real_bridge.fake_context.sockets[zmq.SUB].received.append(_command_bytes(29))
-    bridge._step()
-    motors = _FakeChannel.published[-1]
-    assert [m[0] for m in motors[:29]] == pytest.approx(np.arange(29) + 1.0)
-    assert bridge.low_cmd.mode_machine == 5  # the G1 keeps its configured mode_machine
+def test_bridge_keeps_the_g1_slots_and_mode_machine() -> None:
+    assert G1_CFG.resolve_unitree_motor_indices() == tuple(range(29))
+    assert G1_CFG.unitree_mode_machine == 5

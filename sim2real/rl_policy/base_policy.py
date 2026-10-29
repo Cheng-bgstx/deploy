@@ -1,6 +1,6 @@
 import time
 import numpy as np
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Dict, Literal, Type
 import sched
@@ -135,6 +135,9 @@ class BasePolicy:
         )
 
         self.init_count = 0
+        self._init_start_pos = None
+        self._control_generation = time.monotonic_ns()
+        self._bridge_stop_epoch = 0
         # Perf metrics dict is reused; initialize early so background threads can record.
         self.perf_dict: Dict[str, float] = {}
         self.key_pressed: set[str] = set()
@@ -214,10 +217,14 @@ class BasePolicy:
         if controller_type == "joystick":
             print("Using joystick")
             self.joystick_controller = UnitreeJoystickController(
-                self.robot_cfg,
+                replace(self.robot_cfg, interface=self.args.robot_interface),
                 self.perf_dict,
             )
             print("Wireless Controller Initialized")
+            if getattr(self.joystick_controller, "_g1_controls", True):
+                logger.info("Joystick controls: A to shape, A again after completion for Hold, Start to run, Select to stop.")
+            else:
+                logger.info("Joystick controls: A to shape, R1 for Hold, B to run, R2 to stop.")
             return self.joystick_controller
 
         if controller_type == "pico":
@@ -327,29 +334,43 @@ class BasePolicy:
         )
 
     def get_init_target(self):
-        if self.init_count > 500:
-            self.init_count = 500
+        shaping_steps = round(10.0 / self.rl_dt)
+        if self.init_count == shaping_steps and self.joystick_controller is not None:
+            if getattr(self.joystick_controller, "_g1_controls", True):
+                logger.info("Joystick: Shaping complete; press A for Hold, then Start to run.")
+            else:
+                logger.info("Joystick: Shaping complete; press R1 for Hold, then B to run.")
+        if self.init_count > shaping_steps:
+            self.init_count = shaping_steps
 
         # interpolate from current dof_pos to the Shaping target
         shaping_target = (
             self.default_dof_angles if self.shaping_target is None else self.shaping_target
         )
-        dof_pos = self.state_processor.joint_pos
-        progress = self.init_count / 500
+        if self._init_start_pos is None:
+            self._init_start_pos = self.state_processor.joint_pos.copy()
+        dof_pos = self._init_start_pos
+        progress = self.init_count / shaping_steps
         q_target = dof_pos + (shaping_target - dof_pos) * progress
         self.init_count += 1
         return q_target
 
     def set_init_mode(self, *, source: str) -> None:
         self.init_count = 0
+        self._init_start_pos = None
+        self._control_generation = time.monotonic_ns()
+        self.state_dict["paused"] = True
         self.state_dict["control_mode"] = "init"
         logger.info(f"Control mode set to init via {source}")
 
     def set_zero_mode(self, *, source: str) -> None:
+        self._control_generation = time.monotonic_ns()
+        self.state_dict["paused"] = True
         self.state_dict["control_mode"] = "zero"
         logger.info(f"Control mode set to zero via {source}")
 
     def set_policy_mode(self, *, source: str) -> None:
+        self._control_generation = time.monotonic_ns()
         self.reset()
         self.state_dict["control_mode"] = "policy"
         logger.info(f"Control mode set to policy via {source}")
@@ -359,6 +380,21 @@ class BasePolicy:
             self.wc_msg = self.joystick_controller.state
 
         mode = self.controller.get_control_mode()
+        if (
+            self.joystick_controller is not None
+            and self.controller is self.joystick_controller
+            and getattr(self.controller, "_g1_controls", True)
+            and mode == "init"
+            and self.state_dict.get("control_mode") == "init"
+        ):
+            # The second A takes over only after the shaping interpolation.
+            # A during Hold/Go starts a fresh shaping sequence; Select returns
+            # to zero, so the next A is always the first press again.
+            if self.init_count <= round(10.0 / self.rl_dt):
+                logger.warning("Joystick: A ignored; Shaping is still in progress. Press A again when complete.")
+                mode = None
+            else:
+                mode = "policy"
         if mode == "policy":
             self.set_policy_mode(source=self.controller.name)
         elif mode == "zero":
@@ -570,18 +606,21 @@ class BasePolicy:
             with ScopedTimer("rl_policy.step.prepare_low_state") as prepare_low_state_timer:
                 with Timer(self.perf_dict, "prepare_low_state"):
                     with ScopedTimer(
-                        "rl_policy.step.prepare_low_state.process_controllers"
-                    ) as process_controllers_timer:
-                        with Timer(self.perf_dict, "process_controllers"):
-                            self.process_controllers()
-
-                    with ScopedTimer(
                         "rl_policy.step.prepare_low_state.get_low_state"
                     ) as get_low_state_timer:
                         with Timer(self.perf_dict, "get_low_state"):
                             if not self.state_processor._prepare_low_state():
                                 print("low state not ready.")
                                 return
+                    epoch = self.state_processor.latest_state.stop_epoch
+                    if epoch is not None and epoch != self._bridge_stop_epoch:
+                        self._bridge_stop_epoch = epoch
+                        self.set_zero_mode(source="bridge stop/fault")
+                    with ScopedTimer(
+                        "rl_policy.step.prepare_low_state.process_controllers"
+                    ) as process_controllers_timer:
+                        with Timer(self.perf_dict, "process_controllers"):
+                            self.process_controllers()
 
             try:
                 with ScopedTimer("rl_policy.step.prepare_obs") as prepare_obs_timer:
@@ -642,6 +681,7 @@ class BasePolicy:
                     with ScopedTimer(
                         "rl_policy.step.rule_based_control_flow.send_command"
                     ) as send_command_timer:
+                        self.robot_io.set_control_mode(control_mode, self._control_generation)
                         self.action_manager.send_command(cmd_q, cmd_dq, cmd_tau)
                         self._append_record_frame(
                             obs_dict=obs_dict,

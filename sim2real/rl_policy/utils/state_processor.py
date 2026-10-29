@@ -110,4 +110,5 @@ class StateProcessor:
             qvel=qvel.copy(),
             joint_torque=joint_torque.copy(),
             tick=int(state.tick),
+            stop_epoch=state.stop_epoch,
         )
