@@ -525,20 +525,80 @@ def test_taking_over_again_or_shaping_while_planning_also_returns_to_hold(operat
     assert rig.reference.holding and rig.reference.go_time is None and mode(rig) == "init"
 
 
-def test_the_g1_joystick_requires_shaping_then_a_and_start_select_stops(operator_rig):
+def test_the_joystick_a_a_start_select_sequence_and_restart(operator_rig, messages):
     rig = operator_rig(controller="joystick")
     rig.tick(2)
+    rig.key("Start")  # no Go before shaping/takeover
+    assert mode(rig) == "zero" and rig.reference.go_time is None
     rig.key("A", ticks=5)
-    rig.key("A")  # Early second A cannot take over during shaping.
     assert mode(rig) == "init"
-    rig.tick(501)
+    rig.key("A")  # a premature second press neither resets nor takes over
+    assert mode(rig) == "init" and rig.tracker.init_count == 6
+    assert said(messages, "Shaping is still in progress") == 1
+    rig.key("Start")
+    assert rig.reference.go_time is None and mode(rig) == "init"
+    rig.tick(495)
     rig.key("A")
     assert mode(rig) == "policy" and rig.reference.holding
 
+    for old_key in ("R1", "B", "R2"):
+        rig.key(old_key)
+        assert mode(rig) == "policy" and rig.reference.go_time is None
+
     rig.key("Start", ticks=4)
     assert rig.reference.go_time is not None and rig.reference.phase == "running"
+    go_time = rig.reference.go_time
+    rig.key("Start")
+    assert rig.reference.go_time == go_time
     rig.key("Select")
     assert mode(rig) == "zero" and rig.reference.holding and rig.reference.go_time is None
+    rig.key("Start")
+    assert rig.reference.go_time is None
+    rig.key("A", ticks=501)
+    rig.key("A")
+    rig.key("Start", ticks=4)
+    assert mode(rig) == "policy" and rig.reference.phase == "running"
+
+
+def test_select_wins_over_simultaneous_a_and_start(operator_rig):
+    rig = operator_rig(controller="joystick")
+    rig.key("A", ticks=501)
+    rig.key("A")
+    rig.tracker.controller._wc_msg = UnitreeJoystickState(A=True, Start=True, Select=True)
+    rig.tick()
+    assert mode(rig) == "zero" and rig.reference.holding
+    assert rig.reference.go_time is None and not rig.reference.go_requested
+
+
+def test_second_a_waits_for_final_shaping_target_and_select_resets_sequence(operator_rig, messages):
+    rig = operator_rig(controller="joystick")
+    rig.key("A", ticks=500)
+    assert rig.tracker.init_count == 500 and mode(rig) == "init"
+    assert not said(messages, "Shaping complete")
+    rig.key("A")  # the last shaping command must still run
+    assert rig.tracker.init_count == 501 and mode(rig) == "init"
+    assert said(messages, "Shaping complete") == 1
+    rig.tick(2)  # release A; the completion log must not repeat
+    assert said(messages, "Shaping complete") == 1
+    rig.key("A")
+    assert mode(rig) == "policy"
+    rig.key("Select")
+    rig.key("A", ticks=3)
+    assert mode(rig) == "init" and rig.tracker.init_count == 3
+    rig.key("Select")  # stop during shaping too
+    rig.key("A")
+    assert mode(rig) == "init" and rig.tracker.init_count == 1
+
+
+def test_joystick_a_during_go_drops_plan_and_begins_new_shaping(operator_rig):
+    rig = operator_rig(controller="joystick")
+    rig.key("A", ticks=501)
+    rig.key("A")
+    rig.key("Start", ticks=4)
+    assert rig.reference.phase == "running"
+    rig.key("A")
+    assert mode(rig) == "init" and rig.reference.go_time is None
+    assert rig.reference.holding and rig.tracker.init_count == 1
 
 
 @pytest.mark.parametrize("controller", ["keyboard", "joystick"])
@@ -594,6 +654,21 @@ def test_file_playback_space_only_toggles_play_and_pause_in_hold(operator_rig):
     rig.key(R2)
     rig.key(B, ticks=2)  # Software stop cannot be bypassed by play.
     assert tracker.state_dict["paused"] is True
+
+
+def test_file_playback_joystick_start_replaces_b(operator_rig):
+    rig = operator_rig(backend="npz", controller="joystick")
+    rig.key("A", ticks=501)
+    rig.key("A")
+    assert mode(rig) == "policy" and rig.tracker.state_dict["paused"]
+    rig.key("B")
+    assert rig.tracker.state_dict["paused"]
+    rig.key("Start", ticks=4)
+    assert not rig.tracker.state_dict["paused"]
+    rig.key("Start")
+    assert rig.tracker.state_dict["paused"]
+    rig.key("Select")
+    assert mode(rig) == "zero"
 
 
 # ---------------------------------------------------------------------------
