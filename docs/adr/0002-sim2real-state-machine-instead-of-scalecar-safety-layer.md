@@ -6,3 +6,13 @@ Scalecar_v2 deploys behind a C++ 200 Hz controller that adds a state machine (St
 
 - Soft-limit clipping and the 15 rad/s target rate limit are kept, because training applied them; they are part of the Tracker, not of the dropped safety layer.
 - Shaping targets the Motion's first-frame pose (within soft limits) rather than the policy default pose, since the Tracker was only trained from that start state.
+
+## Operator binding update (2026-10-26)
+
+At the operator's request, Unitree bindings now use A for Shaping, a second A
+after the shaping interpolation completes for Tracker Hold, Start for Go, and
+Select for `zero`. Select takes priority over simultaneous start inputs.
+The runtime modes and Planner Go checks remain the same. This binding change
+does not port the C++ watchdog or latched-fault layer. Keyboard bindings remain
+`i`, `]`, space, and `o`. See the paired vehicle-entry tutorials for the current
+operator sequence.

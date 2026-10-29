@@ -423,7 +423,7 @@ class Tracking(BasePolicy):
 
     def _reset_motion(self) -> None:
         if self.motion_backend == "planner":
-            # R1 always starts a Hold at the Motion's frame 0. Entering the Tracker
+            # Taking over always starts a Hold at the Motion's frame 0. Entering the Tracker
             # does not run a Planner cycle; the next tick does.
             self._drop_planner_go("the Tracker took over again")
             self.motion_data = self.motion_buffer.motion_data
@@ -456,18 +456,24 @@ class Tracking(BasePolicy):
             self.motion_buffer.abort(reason)
 
     def planner_go(self, *, source: str) -> None:
-        """B with the Planner: the first press in Hold is Go (attempted at the next tick:
+        """Start/space with the Planner: the first press in Hold is Go (attempted at the next tick:
         height check, new generation, go clock). Later presses have no effect."""
         mode = self.state_dict.get("control_mode")
+        sequence = (
+            "A -> A -> Start" if isinstance(self.controller, UnitreeJoystickController)
+            else "i -> ] -> Space"
+        )
+        stop_key = "Select" if isinstance(self.controller, UnitreeJoystickController) else "o"
         if mode != "policy":
             logger.warning(
-                "Planner: Go ignored (via {}): Go needs the Tracker in Hold (A, then R1); control mode is {}",
-                source, mode,
+                "Planner: Go ignored (via {}): Go needs the Tracker in Hold ({}); control mode is {}",
+                source, sequence, mode,
             )
             return
         if self.motion_buffer.go_active:
             logger.info(
-                "Planner: B ignored (via {}): Go was already accepted; R2 then A -> R1 -> B restarts", source
+                "Planner: Go ignored (via {}): Go was already accepted; {} then {} restarts",
+                source, stop_key, sequence,
             )
             return
         logger.info("Planner: Go requested via {}", source)
@@ -519,14 +525,14 @@ class Tracking(BasePolicy):
         if not extra_keys:
             return
 
-        # B: Go with the Planner, play/pause with File Playback.
+        # Space/Start: Go with the Planner, play/pause with File Playback.
         b_pressed = self.planner_go if self.motion_backend == "planner" else self.toggle_paused
         if isinstance(self.controller, KeyboardController) and (
             "space" in extra_keys or " " in extra_keys
         ):
             b_pressed(source="keyboard:space")
-        elif isinstance(self.controller, UnitreeJoystickController) and "B" in extra_keys:
-            b_pressed(source="joystick:B")
+        elif isinstance(self.controller, UnitreeJoystickController) and "Start" in extra_keys:
+            b_pressed(source="joystick:Start")
 
 
 @dataclass

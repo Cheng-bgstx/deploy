@@ -26,6 +26,7 @@ stubs
 !/tests/test_planner_reference.py
 !/tests/test_planner_depth.py
 !/tests/test_planner_real_robot.py
+!/tests/test_unitree_joystick_transport.py
 /third_party/*
 !/third_party/dh116s_sdk/
 /third_party/dh116s_sdk/*

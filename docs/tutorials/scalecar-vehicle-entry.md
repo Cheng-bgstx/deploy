@@ -453,23 +453,52 @@ HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run sim2real/rl_policy/tracking.p
 - The Reference Source is fixed for the whole run (`--motion-backend`).
 - `--motion-path` is required in both modes. Its first frame is the Shaping
   target and the Hold Reference.
-- `--controller joystick` reads the Unitree joystick on the hard-coded
-  interface `eth0`. If the Host's robot interface has another name, use the
-  keyboard.
+- To use the Unitree joystick, pass `--controller joystick --robot-interface
+  <host_ethernet_interface>`. The joystick subscriber uses that interface;
+  the default is `eth0`. G1 reads the embedded `wireless_remote` payload from
+  `rt/lowstate`, so it does not require a separate `rt/wirelesscontroller` publisher.
 - Ctrl+C stops `tracking.py`. With the Planner, the worker subprocess prints a
   `KeyboardInterrupt` traceback; it is harmless.
 
-### Operator Keys: A → R1 → B → R2 {#operator-keys}
+### Operator Keys: A → A → Start; Select to Stop {#operator-keys}
 
-| key | keyboard / joystick | stage | File Playback | Planner |
+After preparing the root Python environment, converted ft500ema/take1512 assets,
+DP checkpoint, and onboard depth executable as above, the deployment launchers
+can be run from any working directory. From the repository root, use:
+
+```bash
+# Terminal 1: releases native motion control and starts the Bridge.
+bash scripts/g1/scalecar/start_bridge.sh
+# Terminal 2: starts the real Tracker with the Unitree joystick.
+bash scripts/g1/scalecar/start_tracker.sh
+```
+
+Defaults: `.venv/bin/python`, Host `enp5s0`, Onboard `unitree@192.168.123.164`,
+ft500ema and take1512. Override with `SCALECAR_PYTHON`, `G1_INTERFACE`,
+`G1_SSH_HOST`, `G1_DEPTH_EXECUTABLE`, `SCALECAR_POLICY_CONFIG`, or
+`SCALECAR_MOTION_PATH`; extra CLI arguments are passed through. Tracker output
+is logged to `outputs/real_runs/<timestamp>/tracker.log`, and a normal exit saves
+`tracking.npz` in that directory. `SCALECAR_RUN_DIR` overrides the output directory.
+These scripts set the HF offline variables explicitly and use the prepared root
+environment without installing packages. Model files, environments, and run
+outputs are external assets, excluded from Git.
+
+| stage | keyboard | Unitree joystick | File Playback | Planner |
 | --- | --- | --- | --- | --- |
-| A | `i` / A | Shaping | Moves to the Motion's first-frame pose, clipped to the soft joint limits. | Same. Also drops an active Go. |
-| R1 | `]` / R1 | Tracker takes over: Hold | The Reference is frozen at the Motion's frame 0. | Same. Also drops an active Go, so R1 always means Hold. |
-| B | space / B | Go | Toggles play/pause. The first press plays the Motion; at its end the Tracker stays in Final Hold. | Only in Hold. The first press requests Go, which is checked at the next tick (pelvis height, depth age, Planner warmup). If refused, the robot stays in Hold and you can press B again. If accepted, Hold lasts until the first Chunk, then the Planner drives the Reference. Further presses are ignored. During Shaping or E-stop, B is ignored with a warning. |
-| R2 | `o` / R2 | E-stop | Every joint target follows its measured position. | Same. Also drops the Go. Restart with A → R1 → B. |
+| Shaping | `i` | first A | Moves to the Motion's first-frame pose, clipped to the soft joint limits. | Same. Also drops an active Go. |
+| Tracker takes over: Hold | `]` | second A, after Shaping completes | The Reference is frozen at the Motion's frame 0. | Same. Also drops an active Go. |
+| Go | space | Start | Toggles play/pause. The first press plays the Motion; at its end the Tracker stays in Final Hold. | Only in Hold. The first press requests Go, checked at the next tick (pelvis height, depth age, Planner warmup). If refused, the robot stays in Hold and you can press Start/space again. If accepted, Hold lasts until the first Chunk, then the Planner drives the Reference. Further presses are ignored. Go during Shaping or E-stop is ignored with a warning. |
+| E-stop | `o` | Select | Every joint target follows its measured position. | Same. Also drops the Go. Restart with A → A → Start. |
 
-The Pico Controller has no B (its B is E-stop), so with the Planner, Go comes
-from the keyboard or the Unitree joystick only.
+The two A presses are separate presses, each released before the next. Shaping
+takes about 10 s at 50 Hz. Wait for `Joystick: Shaping complete` before the second
+A; an early second A is ignored and must be pressed again after completion.
+Holding A counts once. A from Hold/Go starts a fresh Shaping sequence.
+Select takes priority over simultaneous A/Start and resets the sequence; a held Start
+must be released and pressed again. R1/B/R2 no longer control these stages.
+While suspended, use only A → A for Shaping/Hold and Select to stop; do not press Start.
+
+The Pico Controller cannot request Planner Go; use keyboard space or Unitree Start.
 
 ### Terminal Messages with the Planner {#terminal-messages-with-the-planner}
 
@@ -494,14 +523,14 @@ Planner: first Chunk applied 0.060 s after Go
 or `Planner: Go refused, staying in Hold: <reason>`, where the reason is the
 pelvis height check, an unfinished Planner warmup, stale depth (`depth is
 0.350 s old (limit 0.2 s)`), or a depth or worker error. Standing pelvis height
-at Go is about 0.79 m in the vehicle sim2sim. An E-stop, Shaping or a new R1
+at Go is about 0.79 m in the vehicle sim2sim. An E-stop, Shaping or a new takeover
 prints `Planner: Go dropped (...)`; the Planner then runs a fresh warmup plan,
 which the next Go waits for. If the worker crashed, that warmup is answered once
 it has restarted.
 
 If the worker fails in Hold before the first Go, the Planner also warms it up
 again automatically. Warmup retries if a request or reply is lost. The robot
-stays in Hold during recovery; press B again after recovery to request Go.
+stays in Hold during recovery; press Start/space again after recovery to request Go.
 
 Every 5 s after Go, a stats line reports the plan count, latency p50/p95, late
 Chunks, coverage exhaustion, depth age and the Planner phase.

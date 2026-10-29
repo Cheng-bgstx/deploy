@@ -1,6 +1,6 @@
 import time
 import numpy as np
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Dict, Literal, Type
 import sched
@@ -214,10 +214,11 @@ class BasePolicy:
         if controller_type == "joystick":
             print("Using joystick")
             self.joystick_controller = UnitreeJoystickController(
-                self.robot_cfg,
+                replace(self.robot_cfg, interface=self.args.robot_interface),
                 self.perf_dict,
             )
             print("Wireless Controller Initialized")
+            logger.info("Joystick controls: A to shape, A again after completion for Hold, Start to run, Select to stop.")
             return self.joystick_controller
 
         if controller_type == "pico":
@@ -327,6 +328,8 @@ class BasePolicy:
         )
 
     def get_init_target(self):
+        if self.init_count == 500 and self.joystick_controller is not None:
+            logger.info("Joystick: Shaping complete; press A for Hold, then Start to run.")
         if self.init_count > 500:
             self.init_count = 500
 
@@ -359,6 +362,20 @@ class BasePolicy:
             self.wc_msg = self.joystick_controller.state
 
         mode = self.controller.get_control_mode()
+        if (
+            self.joystick_controller is not None
+            and self.controller is self.joystick_controller
+            and mode == "init"
+            and self.state_dict.get("control_mode") == "init"
+        ):
+            # The second A takes over only after the shaping interpolation.
+            # A during Hold/Go starts a fresh shaping sequence; Select returns
+            # to zero, so the next A is always the first press again.
+            if self.init_count <= 500:
+                logger.warning("Joystick: A ignored; Shaping is still in progress. Press A again when complete.")
+                mode = None
+            else:
+                mode = "policy"
         if mode == "policy":
             self.set_policy_mode(source=self.controller.name)
         elif mode == "zero":

@@ -5,8 +5,8 @@ and the Controller's input device are the system boundaries, replaced by fakes):
 - ``PlannerReference.tick``: the terminal messages for stale depth, recovery, and a
   camera disconnect and reconnect (edge-triggered, at most once per second while the
   condition lasts, one message when it ends);
-- ``Tracking.step()`` with ``motion_backend: planner``: A / R1 / B / R2 from the keyboard
-  and the Unitree joystick (Go and its height check, B having no effect after Go, R2
+- ``Tracking.step()`` with ``motion_backend: planner``: i / ] / space / o from the keyboard
+  and A / A / Start / Select from the Unitree joystick (Go and its height check, repeated Go having no effect, stop
   dropping the plan), and File Playback's B left unchanged;
 - ``Tracking._planner_io`` on the robot: the depth transport options from YAML and CLI.
 
@@ -468,7 +468,7 @@ def test_keys_follow_the_planner_table_from_shaping_to_e_stop_and_back(operator_
     rig.tick(2)
     assert reference.go_time == go_tick and provider.generation == generation
     assert reference.phase == "running" and len(rig.planner.submitted) >= requests
-    assert said(messages, "B ignored") == 1 and not said(messages, "Go refused")
+    assert said(messages, "Go was already accepted") == 1 and not said(messages, "Go refused")
 
     rig.key(R2)  # R2: E-stop drops the plan
     assert mode(rig) == "zero"
@@ -524,26 +524,89 @@ def test_taking_over_again_or_shaping_while_planning_also_returns_to_hold(operat
     assert rig.reference.holding and rig.reference.go_time is None and mode(rig) == "init"
 
 
-def test_the_joystick_b_is_go_and_r2_drops_it(operator_rig):
+def test_the_joystick_a_a_start_select_sequence_and_restart(operator_rig, messages):
     rig = operator_rig(controller="joystick")
     rig.tick(2)
+    rig.key("Start")  # no Go before shaping/takeover
+    assert mode(rig) == "zero" and rig.reference.go_time is None
     rig.key("A", ticks=5)
-    rig.key("R1")
+    assert mode(rig) == "init"
+    rig.key("A")  # a premature second press neither resets nor takes over
+    assert mode(rig) == "init" and rig.tracker.init_count == 6
+    assert said(messages, "Shaping is still in progress") == 1
+    rig.key("Start")
+    assert rig.reference.go_time is None and mode(rig) == "init"
+    rig.tick(495)
+    rig.key("A")
     assert mode(rig) == "policy" and rig.reference.holding
 
-    rig.key("B", ticks=4)
+    for old_key in ("R1", "B", "R2"):
+        rig.key(old_key)
+        assert mode(rig) == "policy" and rig.reference.go_time is None
+
+    rig.key("Start", ticks=4)
     assert rig.reference.go_time is not None and rig.reference.phase == "running"
-    rig.key("R2")
+    go_time = rig.reference.go_time
+    rig.key("Start")
+    assert rig.reference.go_time == go_time
+    rig.key("Select")
     assert mode(rig) == "zero" and rig.reference.holding and rig.reference.go_time is None
+    rig.key("Start")
+    assert rig.reference.go_time is None
+    rig.key("A", ticks=501)
+    rig.key("A")
+    rig.key("Start", ticks=4)
+    assert mode(rig) == "policy" and rig.reference.phase == "running"
+
+
+def test_select_wins_over_simultaneous_a_and_start(operator_rig):
+    rig = operator_rig(controller="joystick")
+    rig.key("A", ticks=501)
+    rig.key("A")
+    rig.tracker.controller._wc_msg = UnitreeJoystickState(A=True, Start=True, Select=True)
+    rig.tick()
+    assert mode(rig) == "zero" and rig.reference.holding
+    assert rig.reference.go_time is None and not rig.reference.go_requested
+
+
+def test_second_a_waits_for_final_shaping_target_and_select_resets_sequence(operator_rig, messages):
+    rig = operator_rig(controller="joystick")
+    rig.key("A", ticks=500)
+    assert rig.tracker.init_count == 500 and mode(rig) == "init"
+    assert not said(messages, "Shaping complete")
+    rig.key("A")  # the last shaping command must still run
+    assert rig.tracker.init_count == 501 and mode(rig) == "init"
+    assert said(messages, "Shaping complete") == 1
+    rig.tick(2)  # release A; the completion log must not repeat
+    assert said(messages, "Shaping complete") == 1
+    rig.key("A")
+    assert mode(rig) == "policy"
+    rig.key("Select")
+    rig.key("A", ticks=3)
+    assert mode(rig) == "init" and rig.tracker.init_count == 3
+    rig.key("Select")  # stop during shaping too
+    rig.key("A")
+    assert mode(rig) == "init" and rig.tracker.init_count == 1
+
+
+def test_joystick_a_during_go_drops_plan_and_begins_new_shaping(operator_rig):
+    rig = operator_rig(controller="joystick")
+    rig.key("A", ticks=501)
+    rig.key("A")
+    rig.key("Start", ticks=4)
+    assert rig.reference.phase == "running"
+    rig.key("A")
+    assert mode(rig) == "init" and rig.reference.go_time is None
+    assert rig.reference.holding and rig.tracker.init_count == 1
 
 
 @pytest.mark.parametrize("controller", ["keyboard", "joystick"])
 def test_a_worker_crash_before_go_recovers_through_the_operator_keys(operator_rig, monkeypatch, controller):
     rig = operator_rig(controller=controller)
-    keys = (A, R1, B, R2) if controller == "keyboard" else ("A", "R1", "B", "R2")
+    keys = (A, R1, B, R2) if controller == "keyboard" else ("A", "A", "Start", "Select")
     shaping, take_over, go, e_stop = keys
     rig.tick(2)
-    rig.key(shaping, ticks=5)
+    rig.key(shaping, ticks=5 if controller == "keyboard" else 501)
     rig.key(take_over)
     assert mode(rig) == "policy" and rig.reference.holding
     old_reply = rig.planner.last
@@ -554,7 +617,7 @@ def test_a_worker_crash_before_go_recovers_through_the_operator_keys(operator_ri
     rig.planner.last = dict(status="error", error="GPU planner exited; restarting on CUDA")
     rig.tick(3)
     rig.key(e_stop)
-    rig.key(shaping)
+    rig.key(shaping, ticks=1 if controller == "keyboard" else 501)
     rig.key(take_over)
     rig.key(go)
     assert rig.reference.go_time is None and rig.reference.holding
@@ -589,6 +652,21 @@ def test_file_playback_b_still_toggles_play_and_pause(operator_rig):
     rig.key(R2)
     rig.key(B, ticks=2)  # unchanged: B still toggles under E-stop
     assert tracker.state_dict["paused"] is False
+
+
+def test_file_playback_joystick_start_replaces_b(operator_rig):
+    rig = operator_rig(backend="npz", controller="joystick")
+    rig.key("A", ticks=501)
+    rig.key("A")
+    assert mode(rig) == "policy" and rig.tracker.state_dict["paused"]
+    rig.key("B")
+    assert rig.tracker.state_dict["paused"]
+    rig.key("Start", ticks=4)
+    assert not rig.tracker.state_dict["paused"]
+    rig.key("Start")
+    assert rig.tracker.state_dict["paused"]
+    rig.key("Select")
+    assert mode(rig) == "zero"
 
 
 # ---------------------------------------------------------------------------

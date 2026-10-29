@@ -24,8 +24,7 @@ def resolve_keyboard_control_mode(keycode: str) -> ControlMode | None:
 def resolve_unitree_joystick_control_mode(cur_key: str) -> ControlMode | None:
     return {
         "A": "init",
-        "R2": "zero",
-        "R1": "policy",
+        "Select": "zero",
     }.get(cur_key)
 
 
