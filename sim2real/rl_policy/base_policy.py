@@ -227,6 +227,14 @@ class BasePolicy:
                 logger.info("Joystick controls: A to shape, R1 for Hold, B to run, R2 to stop.")
             return self.joystick_controller
 
+        if controller_type == "bridge_joystick":
+            from sim2real.rl_policy.controllers.bridge_joystick import BridgeJoystickController
+
+            self.joystick_controller = BridgeJoystickController(self.perf_dict)
+            logger.info("Bridge joystick controls: A to shape, A again after completion for Hold, Start to run, "
+                        "Select (or L1 + Down) to stop.")
+            return self.joystick_controller
+
         if controller_type == "pico":
             self.pico_controller = PicoController(connect=self.args.pico_zmq_connect)
             return self.pico_controller
@@ -727,7 +735,7 @@ class BasePolicyArgs:
     inference_backend: Literal["onnx-gpu", "onnx-cpu", "tensorrt"] = "onnx-cpu"
     robot_io: Literal["inline", "zmq"] = "zmq"
     robot_interface: str = "eth0"
-    controller: Literal["keyboard", "joystick", "pico"] = "keyboard"
+    controller: Literal["keyboard", "joystick", "bridge_joystick", "pico"] = "keyboard"
     pico_zmq_connect: str = f"tcp://127.0.0.1:{PORTS['pico_controller']}"
     record: bool = False
     record_output: str | None = None

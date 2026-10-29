@@ -20,6 +20,8 @@ stubs
 !/tests/test_bfm_zero_observations.py
 !/tests/test_proteus_observations.py
 !/tests/test_g1_bridge_safety.py
+!/tests/test_et1_config.py
+!/tests/test_et1_bridge.py
 !/tests/test_tracker_action_postprocess.py
 !/tests/test_scalecar_tracker_export.py
 !/tests/test_scalecar_motion_convert.py

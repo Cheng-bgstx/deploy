@@ -91,9 +91,15 @@ class BridgeSafety:
         follows_measured = (cmd.control_mode == "zero" and self.state is not None
                             and cmd.q_target.shape == (self.count,)
                             and np.all(np.abs(cmd.q_target - self.state.joint_positions) <= 0.05))
+        lower, upper = self.lower, self.upper
+        if cmd.control_mode == "init" and self.state is not None and self.state.joint_positions.shape == (self.count,):
+            # Shaping starts wherever the robot is: a joint already past a limit may be held
+            # there or brought back, never commanded further out than it is.
+            lower = np.minimum(lower, self.state.joint_positions)
+            upper = np.maximum(upper, self.state.joint_positions)
         valid = (all(a.shape == (self.count,) and np.isfinite(a).all() for a in arrays)
-                 and (follows_measured or (np.all(cmd.q_target >= self.lower - 0.02)
-                                          and np.all(cmd.q_target <= self.upper + 0.02)))
+                 and (follows_measured or (np.all(cmd.q_target >= lower - 0.02)
+                                          and np.all(cmd.q_target <= upper + 0.02)))
                  and np.all(np.abs(cmd.dq_target) <= self.velocity)
                  and np.all(np.abs(cmd.tau_ff) <= self.effort)
                  and np.all((cmd.kp >= 0) & (cmd.kp <= 400))

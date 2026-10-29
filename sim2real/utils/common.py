@@ -49,6 +49,8 @@ PORTS = {
     "low_cmd": 5591,
     "pico_controller": 5592,
     "hand_grip": 5593,
+    "gamepad": 5594,  # ET1 bridge handset, Unitree key layout
+    "operator": 5595,  # ET1 keyboard operator -> bridge
 }
 
 

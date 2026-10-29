@@ -200,9 +200,35 @@ def test_zero_following_measured_can_acknowledge_stop_at_a_mechanical_limit():
     cmd.q_target[:] = s.joint_positions
     assert g.accept_command(cmd, 1_040_000_000)
     assert g.latched and not g.fault
+    # Shaping may start at the mechanical limit (hold there or move inward) ...
     cmd = command(1_050_000_000, 4, "init", 3)
     cmd.q_target[4] = s.joint_positions[4]
-    assert not g.accept_command(cmd, 1_050_000_000)
+    assert g.accept_command(cmd, 1_050_000_000)
+    # ... but never command further out than the joint already is.
+    cmd = command(1_060_000_000, 5, "init", 3)
+    cmd.q_target[4] = s.joint_positions[4] - .05
+    assert not g.accept_command(cmd, 1_060_000_000)
+    assert g.fault
+
+
+def test_shaping_starts_from_any_pose_past_the_limits():
+    # An unpowered robot can rest beyond the model limits (ET1 waist yaw / wrist); A must still
+    # bring it back. Each joint may move inward or hold, and the policy stays inside the limits.
+    g = BridgeSafety(G1_CFG)
+    s = state()
+    j = G1_CFG.joint_names.index("waist_yaw_joint")
+    past = G1_CFG.joint_pos_upper_limit["waist_yaw_joint"] + 0.5
+    s.joint_positions[j] = past
+    g.observe_state(s, 0, 1_000_000_000)
+    hold = command(1_000_000_000, 1, "init", 1)
+    hold.q_target[j] = past
+    assert g.accept_command(hold, 1_000_000_000)
+    inward = command(1_010_000_000, 2, "init", 1)
+    inward.q_target[j] = past - 0.3
+    assert g.accept_command(inward, 1_010_000_000) and not g.latched
+    policy = command(1_020_000_000, 3, "policy", 2)
+    policy.q_target[j] = past
+    assert not g.accept_command(policy, 1_020_000_000) and g.fault
 
 
 def test_actual_zmq_bridge_arms_on_a_and_detects_tracker_exit(monkeypatch):
