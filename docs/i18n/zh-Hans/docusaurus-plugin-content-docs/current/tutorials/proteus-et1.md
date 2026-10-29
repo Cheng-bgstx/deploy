@@ -31,7 +31,9 @@ Unitree HG DDS：et1-dep 的 `libhdep_bridge_galbot_et1` 发布 `rt/lowcmd`、�
 | Proteus contract | `checkpoints/proteus/contracts/galbot_et1.json` | 由 `scripts/build_proteus_contract.py` 以 R1 为模板生成，见下文。 |
 | Policy | `checkpoints/proteus/proteus_60/galbot_et1/` | 和 G1 policy 一样，由 `scripts/export_proteus_onnx.py` 包装发布的 actor。 |
 | Motion | `checkpoints/galbot_et1/motions/` | 由 `scripts/et1/convert_motions.py` 把 et1-dep 的 Motion 转成 any4hdmi 数据集。 |
-| Bridge | `scripts/g1/real_bridge.py --robot et1` | 把 26 个关节映射到 HG 电机槽位，并从 `rt/lowstate` 复制 `mode_machine`。 |
+| Bridge | `scripts/g1/real_bridge.py --robot et1` | G1 的安全 Bridge，把 26 个关节映射到各自的 HG 电机槽位；`mode_machine` 取自第一帧 `rt/lowstate`，之后若变化则锁存阻尼。 |
+| 部署 overlay | `checkpoints/proteus/proteus_60/galbot_et1/policy-pc.yaml` | 由 `scripts/g1/prepare_proteus_deployment.py --robot et1 --limit-inset 0.01` 生成，见[上真机运行](#上真机运行)。 |
+| 启动脚本 | `scripts/et1/start_proteus.sh` | 和 G1 的 `scripts/g1/start_proteus_pc.sh` 一样，在同一台机器上启动 Bridge 和 Tracking。 |
 
 contract 直接在 ET1 MJCF 上运行 Proteus 自己的描述生成代码
 （`ScaleTrack/scripts/multi_robot/build_robot_spec.py`）和形态描述子
@@ -125,6 +127,49 @@ Reference 的 body。也可以用分进程方式：`sim2real/sim_env/base_sim.py
 
 ## 上真机运行
 
+机器人侧沿用 [Proteus G1 PC 部署](../reference/proteus-g1-pc.md)：在 Tracker 就绪
+且机器人遥控器上有一次实际的 A 按下之前，Bridge 不发出任何电机指令；超出关节限位
+（±0.02 rad）的指令一律拒绝；出现故障，或状态、指令中断超过 I/O 窗口时，锁存阻尼。
+G1 上得到的经验同样适用于 ET1。
+
+### 部署 overlay
+
+```bash
+uv run python scripts/g1/prepare_proteus_deployment.py --robot et1 --limit-inset 0.01 \
+  --policy-config checkpoints/proteus/proteus_60/galbot_et1/policy.yaml
+```
+
+它在 policy 旁边写出 `policy-pc.yaml`，导出的 actor contract 保持不变。它把腰 roll 的
+PD 设为 100/2.5（yaw 不变），Shaping 到 contract 的默认姿态，进入 Hold 前用 2 s 过渡到
+Motion 第一帧。它把目标裁剪到关节限位以内 1%，并把目标变化率限制在 15 rad/s。ET1 的
+踝 roll 范围只有 ±0.26 rad，所以用 1% 而不是 G1 的 5%。
+
+### 演练
+
+演练在 MuJoCo 中运行真实的 Tracking 控制器和 Bridge 的 `BridgeSafety`，不经过 DDS。
+Shaping 期间根节点像理想吊架一样被固定，随后下放。演练依次按 A、A、Start、Start
+（暂停）、Start 和 Select：
+
+```bash
+PYTHONPATH=$PWD SIM2REAL_ORT_NUM_THREADS=1 uv run python scripts/g1/validate_proteus_deployment.py \
+  --robot et1 --policy-config checkpoints/proteus/proteus_60/galbot_et1/policy-pc.yaml \
+  --motion-path checkpoints/galbot_et1/motions/motions/taichi.npz --walking-s 30
+```
+
+`taichi` 上的演练结果：
+
+| Policy | 结果 |
+| --- | --- |
+| `policy.yaml`（不加 overlay） | 吊架在 Hold 中下放时，踝的目标超出关节限位（pitch 0.63 > 0.576，roll −0.45 < −0.26）；Bridge 锁存阻尼，机器人摔倒。 |
+| overlay 使用 G1 的 5% 余量 | Bridge 没有故障，但深蹲姿态下踝的目标一直贴在软限位上，机器人在 Motion 第 24 秒摔倒。 |
+| 5% 余量加 `policy.yaml` 的腰部 PD | 在 Motion 第 16 秒摔倒。 |
+| `policy-pc.yaml`（1% 余量），Motion 60 s | 通过：无故障，无被拒指令，最大倾角 19°，相对 body 误差 8.6 cm，漂移 2.4 m。 |
+| 在关节限位处裁剪，完整 Motion | 132 s 全程通过。 |
+
+吊架模型不含绳索动力学；演练不能证明真机安全。
+
+### 机器与安全
+
 policy 和 Bridge 可以跑在 ET1 的机载计算机上，也可以跑在机器人网络
 （`192.168.123.x`）里的另一台机器上。把 `third_party/galbot_et1/`、
 `checkpoints/proteus/proteus_60/galbot_et1/` 和 `checkpoints/galbot_et1/` 拷到那台
@@ -134,42 +179,55 @@ policy 和 Bridge 可以跑在 ET1 的机载计算机上，也可以跑在机器
 uv sync --extra inference-cpu --extra robot-g1
 ```
 
-开始前：
+- 把机器人挂在吊架上，硬件急停随时在手边。
+- 在机器人上停掉 Loco 和所有 et1-dep 的 Controller
+  （`./dist/cpp/loco/aarch64/tmux.sh stop`）。同一时间只能有一个进程发布
+  `rt/lowcmd`；启动脚本在本机看到它们时会拒绝启动。
+- 用 ET1 遥控器操作。Bridge 只认从 `rt/lowstate`（`wireless_remote`）读到的 A，
+  所以键盘无法开始一次会话。
 
-- 把机器人挂在吊架上。
-- 停掉 Loco 和所有 et1-dep 的 Controller（`./dist/cpp/loco/aarch64/tmux.sh stop`）。
-  同一时间只能有一个进程发布 `rt/lowcmd`。
-- Bridge 会像 Loco 一样，通过 MotionSwitcher 释放内置控制器。
-
-终端 1，Bridge（`--interface` 设为连接机器人网络的网卡）：
-
-```bash
-HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run scripts/g1/real_bridge.py \
-  --robot et1 --interface eth0
-```
-
-终端 2，policy：
+### 只读启动
 
 ```bash
-HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run sim2real/rl_policy/tracking.py \
-  --robot et1 \
-  --policy-config checkpoints/proteus/proteus_60/galbot_et1/policy.yaml \
-  --motion-path checkpoints/galbot_et1/motions/motions/taichi.npz
+ET1_INTERFACE=<nic> PROTEUS_READ_ONLY=1 scripts/et1/start_proteus.sh
 ```
 
-policy 进程一启动，所有关节就以 policy 的增益保持在实测位置（E-stop）。然后在
-键盘上：
+Bridge 读取 `rt/lowstate` 并运行 Tracker，但不写任何电机指令，也不释放内置控制器
+（30 s，`PROTEUS_READ_ONLY_S`）。在 `outputs/proteus-et1/<run>/bridge.log` 中检查：
 
-1. `i`：Shaping，10 s 内过渡到 contract 的默认姿态。
-2. 放低吊架，直到双脚承重，绳子留有余量。
-3. `]`：Tracker 接管，进入 Hold，停在 Motion 第一帧。
-4. `Space`：Go。再按一次 `Space` 暂停；Motion 结束后 Tracker 保持最后一帧。
-5. `o`：随时 E-stop。关节跟随各自的实测位置，机器人变柔顺，所以吊架要随时待命。
+- 先出现 `et1 mode_machine <n> from LowState`，再出现 `Tracker and LowState ready`；
+- 按 A 出现 `Bridge state: arming`，按 Select 出现 `Bridge state: Select`。这说明遥控器
+  的数据布局就是 Bridge 解码的 Unitree 布局（按键位于第 2 字节，A 是 bit 8，Select 是
+  bit 3，Start 是 bit 2）；
+- `bridge-state.json`（退出时写出）里的关节位置，按 `sim2real/config/robots/et1.py` 的
+  关节顺序与机器人当前姿态一致。
+
+### 受保护的会话
+
+```bash
+ET1_INTERFACE=<nic> scripts/et1/start_proteus.sh
+```
+
+启动脚本把 ONNX 限制为单线程，两个进程共用 250 ms 的 I/O 窗口
+（`PROTEUS_IO_TIMEOUT_S`），并把记录写到 `outputs/proteus-et1/<run>/`。默认播放 `taichi`
+的前 8 s（`PROTEUS_MOTION_PATH`、`PROTEUS_PLAYBACK_LIMIT_S`）。等出现
+`Tracker and LowState ready` 后：
+
+| 遥控器 | 行为 |
+| --- | --- |
+| 第一次 A | 释放内置控制器，在吊架上用 10 s Shaping 到默认姿态。 |
+| Shaping 完成后第二次 A | 用 2 s 过渡到 Motion 第一帧，重置历史并进入 Hold。等出现 `Hold ready`。 |
+| 放低吊架 | 这时才让双脚承重，保护仍然保留。G1 上在 Hold 之前下放失败过。 |
+| Start | 播放 / 暂停 Motion。到达播放上限后 Tracker 保持最后一帧。 |
+| Select | 优先级最高的软件停止：目标跟随实测关节角，增益保持不变；机器人不再主动平衡。 |
+
+Select 或故障之后，用 A、A、Start 重新开始。Ctrl+C 或 SIGTERM 会停止两个进程，Bridge
+会发送一小段阻尼。进程被杀、网线断开或 PC 死机都不是急停：机器人侧的通信超时和硬件
+急停必须在现场验证。
 
 这条路径的限制：
 
-- ET1 不支持 `--robot-io inline`：`unitree_interface` 只认识 G1。请用 Bridge。
-- et1-dep 从 `rt/lowstate`（`wireless_remote`）读取 ET1 遥控器。
-  `--controller joystick` 读的是 `rt/wirelesscontroller`，尚未在 ET1 上确认。
-  请用键盘。
+- 尚未在真机上测试。
+- ET1 不支持 `--robot-io inline`：`unitree_interface` 只认识 G1。
+- 局部跟踪会漂移（演练中 60 s 漂移 2.4 m），头部保持锁定。
 - policy 使用 `rt/lowstate` 里的骨盆 IMU（MJCF 的 `imu` site 在 `pelvis_link` 上）。

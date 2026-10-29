@@ -19,7 +19,7 @@ import numpy as np
 import tyro
 from loguru import logger
 
-from sim2real.config.robots import G1_CFG
+from sim2real.config.robots import get_robot_cfg
 from sim2real.rl_policy.controllers.unitree_joystick import UnitreeJoystickController, UnitreeJoystickState
 from sim2real.rl_policy.robot_io.base import RobotIO, RobotState
 from sim2real.rl_policy.robot_io.bridge_safety import BridgeSafety
@@ -40,17 +40,18 @@ class SimJoystick(UnitreeJoystickController):
 
 
 class SimIO(RobotIO):
-    def __init__(self, sim, guard):
-        self.sim, self.guard = sim, guard
+    def __init__(self, sim, guard, robot_cfg):
+        self.sim, self.guard, self.robot_cfg = sim, guard, robot_cfg
         self.now_ns = 1_000_000_000
         self.sequence = 0
         self.mode, self.generation = "zero", 0
         self.rejected = []
 
     def read_state(self):
+        n = len(self.robot_cfg.joint_names)
         state = SimpleNamespace(
             root_pos_w=np.zeros(3), root_quat_w=np.zeros(4), root_lin_vel_w=np.zeros(3),
-            root_ang_vel_b=np.zeros(3), joint_pos=np.zeros(29), joint_vel=np.zeros(29), joint_torque=np.zeros(29))
+            root_ang_vel_b=np.zeros(3), joint_pos=np.zeros(n), joint_vel=np.zeros(n), joint_torque=np.zeros(n))
         self.sim.sync_policy_state(state)
         return RobotState(np.concatenate([np.zeros(3), state.root_quat_w, state.joint_pos]),
                           np.concatenate([np.zeros(3), state.root_ang_vel_b, state.joint_vel]),
@@ -67,7 +68,7 @@ class SimIO(RobotIO):
         if not accepted and len(self.rejected) < 3:
             invalid = np.where((cmd.q_target < self.guard.lower - .02) | (cmd.q_target > self.guard.upper + .02))[0]
             self.rejected.append(dict(time_s=(self.now_ns - 1_000_000_000) / 1e9, mode=self.mode,
-                                      out_of_range={G1_CFG.joint_names[i]: float(cmd.q_target[i]) for i in invalid}))
+                                      out_of_range={self.robot_cfg.joint_names[i]: float(cmd.q_target[i]) for i in invalid}))
 
 
 class SimTracking(Tracking):
@@ -93,21 +94,27 @@ class Args:
     seed: int = 0
     walking_s: float = 3.0
     npz_playback_limit_s: float | None = None
+    robot: str = "g1"
+    """g1, or et1 with the galbot_et1 policy and an ET1 Motion."""
 
 
 def main(args):
     logger.remove()
     logger.add(lambda message: print(message, end=""), level="WARNING")
     np.random.seed(args.seed)
-    sim = IntegratedSimRuntime(G1_CFG, sim_dt=0.002, headless=True, key_callback=None)
-    guard = BridgeSafety(G1_CFG)
-    io = SimIO(sim, guard)
+    robot_cfg = get_robot_cfg(args.robot)
+    sim = IntegratedSimRuntime(robot_cfg, sim_dt=0.002, headless=True, key_callback=None)
+    guard = BridgeSafety(robot_cfg)
+    io = SimIO(sim, guard, robot_cfg)
     tracking = SimTracking(TrackingArgs(policy_config=args.policy_config, motion_path=args.motion_path,
                                        npz_playback_limit_s=args.npz_playback_limit_s,
-                                       robot_io="zmq", controller="joystick", inference_backend="onnx-cpu"), io)
+                                       robot=args.robot, robot_io="zmq", controller="joystick",
+                                       inference_backend="onnx-cpu"), io)
     tracking.total_inference_cnt = 0
-    sim.mj_data.qpos[:] = np.array(G1_CFG.default_qpos)
-    sim.mj_data.qpos[2] = 0.95
+    # The gantry holds the root 0.15 m above the standing height, then lowers it by 0.17 m.
+    hang_height = robot_cfg.default_qpos[2] + 0.15
+    sim.mj_data.qpos[:] = np.array(robot_cfg.default_qpos)
+    sim.mj_data.qpos[2] = hang_height
     mujoco.mj_forward(sim.mj_model, sim.mj_data)
     # Early Start and early second A must be ignored. Then shape, Hold, play,
     # pause, resume, Select, and an attempted Start after stop.
@@ -152,7 +159,7 @@ def main(args):
                 if t < 12.1 + entry_delay:
                     # Ideal gantry: fixed horizontal position/orientation and
                     # Enter Hold first, then lower over one second.
-                    height = 0.95 - 0.17 * np.clip((t - 11.0 - entry_delay) / 1.0, 0, 1)
+                    height = hang_height - 0.17 * np.clip((t - 11.0 - entry_delay) / 1.0, 0, 1)
                     sim.mj_data.qpos[:7] = [0, 0, height, 1, 0, 0, 0]
                     sim.mj_data.qvel[:6] = 0
                     mujoco.mj_forward(sim.mj_model, sim.mj_data)
@@ -165,7 +172,7 @@ def main(args):
                                qpos=sim.mj_data.qpos.copy(),
                                joint_pos=sim.mj_data.qpos[sim.qpos_adrs].copy(),
                                joint_vel=sim.mj_data.qvel[sim.qvel_adrs].copy(),
-                               cmd_q=cmd.q_target.copy() if cmd is not None else np.full(29, np.nan),
+                               cmd_q=cmd.q_target.copy() if cmd is not None else np.full(len(robot_cfg.joint_names), np.nan),
                                reference_root=aligned_ref[0][0, 0].copy(),
                                motion_t=int(tracking.motion_t[0]), mode=mode[0], paused=mode[1], relative_error=rel_err,
                                root_xy_error=np.linalg.norm(actual[0, :2] - ref[0, :2]),

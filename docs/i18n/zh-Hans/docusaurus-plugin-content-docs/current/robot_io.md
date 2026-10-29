@@ -61,7 +61,7 @@ uv run sim2real/rl_policy/tracking.py \
 `--interface <robot_network_interface>`。
 
 同一个 bridge 加 `--robot et1` 即可驱动 Galbot ET1（Unitree HG DDS，35 个电机槽位
-里用 26 个，`mode_machine` 从 `rt/lowstate` 复制）；见
+里用 26 个，`mode_machine` 取自第一帧 `rt/lowstate`）；见
 [Proteus 部署到 Galbot ET1](./tutorials/proteus-et1.md)。ET1 没有 inline 模式。
 
 ## ZMQ + `scripts/g1/real_bridge_cpp.py`

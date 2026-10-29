@@ -319,3 +319,23 @@ def test_bridge_maps_et1_joints_to_hg_slots_and_keeps_the_lowstate_mode_machine(
 def test_bridge_keeps_the_g1_slots_and_mode_machine() -> None:
     assert G1_CFG.resolve_unitree_motor_indices() == tuple(range(29))
     assert G1_CFG.unitree_mode_machine == 5
+
+
+def test_deployment_overlay_for_et1_uses_its_waist_and_limit_inset(tmp_path: Path) -> None:
+    import yaml
+
+    prepare = _load_script("prepare_proteus_deployment", "scripts/g1/prepare_proteus_deployment.py")
+    names = list(ET1_CFG.joint_names)
+    policy = {"proteus": {"reference_forcing": True}, "joint_names_simulation": names,
+              "joint_kp": {n: 50.0 for n in names}, "joint_kd": {n: 1.0 for n in names}}  # fmt: skip
+    (tmp_path / "policy.yaml").write_text(yaml.safe_dump(policy))
+    prepare.main(prepare.Args(policy_config=str(tmp_path / "policy.yaml"), robot="et1", limit_inset=0.01))
+    overlay = yaml.safe_load((tmp_path / "policy-pc.yaml").read_text())
+    assert (overlay["joint_kp"]["waist_roll_joint"], overlay["joint_kd"]["waist_roll_joint"]) == (100.0, 2.5)
+    assert overlay["joint_kp"]["waist_yaw_joint"] == 50.0 and "waist_pitch_joint" not in overlay["joint_kp"]
+    lo, hi = ET1_CFG.joint_pos_lower_limit["left_ankle_roll_joint"], ET1_CFG.joint_pos_upper_limit["left_ankle_roll_joint"]
+    assert overlay["soft_joint_pos_limits"]["left_ankle_roll_joint"] == pytest.approx([lo + 0.01 * (hi - lo), hi - 0.01 * (hi - lo)])
+    assert overlay["reference_entry_s"] == 2.0 and overlay["max_target_velocity_rad_s"] == 15.0
+
+    with pytest.raises(ValueError, match="joint order"):
+        prepare.main(prepare.Args(policy_config=str(tmp_path / "policy.yaml"), robot="g1"))

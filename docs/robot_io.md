@@ -67,7 +67,7 @@ Add `--interface <robot_network_interface>` to the bridge command only when the
 robot network interface is not the default `eth0`.
 
 The same bridge drives the Galbot ET1 with `--robot et1` (Unitree HG DDS, 26 of
-the 35 motor slots, `mode_machine` copied from `rt/lowstate`); see
+the 35 motor slots, `mode_machine` taken from the first `rt/lowstate`); see
 [Proteus on Galbot ET1](./tutorials/proteus-et1.md). The ET1 has no inline mode.
 
 ## ZMQ With `scripts/g1/real_bridge_cpp.py`
