@@ -312,6 +312,8 @@ class LowCmdMessage:
         *,
         source_time_ns: int | None = None,
         sequence: int = 0,
+        control_mode: str | None = None,
+        control_generation: int = 0,
     ):
         arrays = [
             np.asarray(q_target, dtype=np.float32),
@@ -332,6 +334,8 @@ class LowCmdMessage:
         self.kd = arrays[4]
         self.source_time_ns = source_time_ns
         self.sequence = int(sequence)
+        self.control_mode = control_mode
+        self.control_generation = int(control_generation)
 
     def to_bytes(self) -> bytes:
         count = self.q_target.size
@@ -342,9 +346,12 @@ class LowCmdMessage:
         )
         if self.source_time_ns is None:
             return header + payload
-        return header + payload + struct.pack(
+        result = header + payload + struct.pack(
             '<QQ', int(self.source_time_ns), self.sequence
         )
+        if self.control_mode is not None:
+            result += struct.pack('<BQ', {'zero': 0, 'init': 1, 'policy': 2}[self.control_mode], self.control_generation)
+        return result
 
     @classmethod
     def from_bytes(cls, data: bytes) -> 'LowCmdMessage':
@@ -365,13 +372,19 @@ class LowCmdMessage:
         remaining = len(data) - offset
         if remaining == 0:
             return cls(*arrays)
-        if remaining != struct.calcsize('<QQ'):
+        if remaining not in (16, 25):
             raise ValueError("LowCmdMessage has an invalid metadata footer")
-        source_time_ns, sequence = struct.unpack('<QQ', data[offset:])
+        source_time_ns, sequence = struct.unpack('<QQ', data[offset:offset + 16])
+        control_mode, generation = None, 0
+        if remaining == 25:
+            mode, generation = struct.unpack('<BQ', data[offset + 16:])
+            control_mode = {0: 'zero', 1: 'init', 2: 'policy'}[mode]
         return cls(
             *arrays,
             source_time_ns=source_time_ns,
             sequence=sequence,
+            control_mode=control_mode,
+            control_generation=generation,
         )
 
 
@@ -386,6 +399,7 @@ class LowStateMessage:
         joint_velocities: np.ndarray,
         joint_torques: np.ndarray | None = None,
         tick: int = 0,
+        stop_epoch: int | None = None,
     ):
         self.quaternion = np.asarray(quaternion, dtype=np.float32)
         if self.quaternion.size != 4:
@@ -406,6 +420,7 @@ class LowStateMessage:
                 raise ValueError("Joint torque array must match joint positions length")
         self.joint_torques = joint_torques
         self.tick = int(tick)
+        self.stop_epoch = stop_epoch
 
     def to_bytes(self) -> bytes:
         count = self.joint_positions.size
@@ -422,7 +437,10 @@ class LowStateMessage:
         if self.joint_torques is not None:
             payload_parts.append(self.joint_torques.astype(np.float32, copy=False).tobytes())
 
-        return header + b''.join(payload_parts)
+        result = header + b''.join(payload_parts)
+        if self.stop_epoch is not None:
+            result += struct.pack('<Q', self.stop_epoch)
+        return result
 
     @classmethod
     def from_bytes(cls, data: bytes) -> 'LowStateMessage':
@@ -448,11 +466,17 @@ class LowStateMessage:
         joint_velocities = np.frombuffer(data[pos_end:vel_end], dtype=np.float32).copy()
 
         joint_torques = None
+        payload_end = vel_end
         if has_torque:
             torque_end = vel_end + segment_size
             if torque_end > len(data):
                 raise ValueError("LowStateMessage torque data is incomplete")
             joint_torques = np.frombuffer(data[vel_end:torque_end], dtype=np.float32).copy()
+            payload_end = torque_end
+        remaining = len(data) - payload_end
+        if remaining not in (0, 8):
+            raise ValueError("LowStateMessage has an invalid metadata footer")
+        stop_epoch = struct.unpack('<Q', data[payload_end:])[0] if remaining else None
 
         return cls(
             quaternion=quaternion,
@@ -461,4 +485,5 @@ class LowStateMessage:
             joint_velocities=joint_velocities,
             joint_torques=joint_torques,
             tick=tick,
+            stop_epoch=stop_epoch,
         )

@@ -14,6 +14,7 @@ class RobotState:
     qvel: np.ndarray
     joint_torque: np.ndarray
     tick: int
+    stop_epoch: int | None = None
 
 
 class RobotIO(ABC):
@@ -36,3 +37,6 @@ class RobotIO(ABC):
 
     def close(self) -> None:
         """Release backend resources, if any."""
+
+    def set_control_mode(self, mode: str, generation: int) -> None:
+        """Attach operator control state when the transport supports it."""

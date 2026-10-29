@@ -5,9 +5,10 @@ and the Controller's input device are the system boundaries, replaced by fakes):
 - ``PlannerReference.tick``: the terminal messages for stale depth, recovery, and a
   camera disconnect and reconnect (edge-triggered, at most once per second while the
   condition lasts, one message when it ends);
-- ``Tracking.step()`` with ``motion_backend: planner``: A / R1 / B / R2 from the keyboard
-  and the Unitree joystick (Go and its height check, B having no effect after Go, R2
-  dropping the plan), and File Playback's B left unchanged;
+- ``Tracking.step()`` with ``motion_backend: planner``: i / ] / Space / o on the
+  keyboard and A / A / Start / Select on the G1 remote (Go and its height check,
+  repeated Go having no effect, software stop dropping the plan), and File Playback
+  accepting play/pause only after Hold;
 - ``Tracking._planner_io`` on the robot: the depth transport options from YAML and CLI.
 
     env -u PYTHONPATH HF_HUB_OFFLINE=1 UV_FROZEN=1 uv run --with pytest python -m pytest tests/test_planner_real_robot.py
@@ -468,7 +469,7 @@ def test_keys_follow_the_planner_table_from_shaping_to_e_stop_and_back(operator_
     rig.tick(2)
     assert reference.go_time == go_tick and provider.generation == generation
     assert reference.phase == "running" and len(rig.planner.submitted) >= requests
-    assert said(messages, "B ignored") == 1 and not said(messages, "Go refused")
+    assert said(messages, "Go was already accepted") == 1 and not said(messages, "Go refused")
 
     rig.key(R2)  # R2: E-stop drops the plan
     assert mode(rig) == "zero"
@@ -524,26 +525,29 @@ def test_taking_over_again_or_shaping_while_planning_also_returns_to_hold(operat
     assert rig.reference.holding and rig.reference.go_time is None and mode(rig) == "init"
 
 
-def test_the_joystick_b_is_go_and_r2_drops_it(operator_rig):
+def test_the_g1_joystick_requires_shaping_then_a_and_start_select_stops(operator_rig):
     rig = operator_rig(controller="joystick")
     rig.tick(2)
     rig.key("A", ticks=5)
-    rig.key("R1")
+    rig.key("A")  # Early second A cannot take over during shaping.
+    assert mode(rig) == "init"
+    rig.tick(501)
+    rig.key("A")
     assert mode(rig) == "policy" and rig.reference.holding
 
-    rig.key("B", ticks=4)
+    rig.key("Start", ticks=4)
     assert rig.reference.go_time is not None and rig.reference.phase == "running"
-    rig.key("R2")
+    rig.key("Select")
     assert mode(rig) == "zero" and rig.reference.holding and rig.reference.go_time is None
 
 
 @pytest.mark.parametrize("controller", ["keyboard", "joystick"])
 def test_a_worker_crash_before_go_recovers_through_the_operator_keys(operator_rig, monkeypatch, controller):
     rig = operator_rig(controller=controller)
-    keys = (A, R1, B, R2) if controller == "keyboard" else ("A", "R1", "B", "R2")
+    keys = (A, R1, B, R2) if controller == "keyboard" else ("A", "A", "Start", "Select")
     shaping, take_over, go, e_stop = keys
     rig.tick(2)
-    rig.key(shaping, ticks=5)
+    rig.key(shaping, ticks=501 if controller == "joystick" else 5)
     rig.key(take_over)
     assert mode(rig) == "policy" and rig.reference.holding
     old_reply = rig.planner.last
@@ -554,7 +558,7 @@ def test_a_worker_crash_before_go_recovers_through_the_operator_keys(operator_ri
     rig.planner.last = dict(status="error", error="GPU planner exited; restarting on CUDA")
     rig.tick(3)
     rig.key(e_stop)
-    rig.key(shaping)
+    rig.key(shaping, ticks=501 if controller == "joystick" else 1)
     rig.key(take_over)
     rig.key(go)
     assert rig.reference.go_time is None and rig.reference.holding
@@ -573,11 +577,12 @@ def test_a_worker_crash_before_go_recovers_through_the_operator_keys(operator_ri
     assert rig.reference.phase == "running" and rig.reference.go_time is not None
 
 
-def test_file_playback_b_still_toggles_play_and_pause(operator_rig):
+def test_file_playback_space_only_toggles_play_and_pause_in_hold(operator_rig):
     rig = operator_rig(backend="npz")
     tracker = rig.tracker
-    rig.key(B)  # unchanged: B toggles even before the Tracker takes over
-    assert tracker.state_dict["paused"] is False
+    rig.key(B)  # Play is rejected until Hold is active.
+    assert tracker.state_dict["paused"] is True
+    assert int(tracker.motion_t[0]) == 0
     rig.key(A, ticks=3)
     rig.key(R1)  # taking over pauses at frame 0
     assert tracker.state_dict["paused"] is True and int(tracker.motion_t[0]) == 0
@@ -587,8 +592,8 @@ def test_file_playback_b_still_toggles_play_and_pause(operator_rig):
     rig.key(B, ticks=5)  # pause
     assert tracker.state_dict["paused"] is True and int(tracker.motion_t[0]) == 5
     rig.key(R2)
-    rig.key(B, ticks=2)  # unchanged: B still toggles under E-stop
-    assert tracker.state_dict["paused"] is False
+    rig.key(B, ticks=2)  # Software stop cannot be bypassed by play.
+    assert tracker.state_dict["paused"] is True
 
 
 # ---------------------------------------------------------------------------

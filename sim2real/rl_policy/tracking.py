@@ -1,4 +1,5 @@
 import numpy as np
+import time
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Literal, Optional
@@ -135,6 +136,10 @@ class Tracking(BasePolicy):
     args: "TrackingArgs"
 
     def __init__(self, args: "TrackingArgs"):
+        self._reference_entry_target = None
+        self._reference_entry_start = None
+        self._reference_entry_count = 0
+        self._reference_entry_steps = 0
         super().__init__(args)
         if self.motion_backend == "planner":
             # The depth source and the Planner worker are child processes: they start only
@@ -143,6 +148,9 @@ class Tracking(BasePolicy):
 
     def prepare_policy_config(self, policy_config):
         policy_config = super().prepare_policy_config(policy_config)
+        entry_s = float(policy_config.get("reference_entry_s", 0.0))
+        if not np.isfinite(entry_s) or entry_s < 0:
+            raise ValueError("reference_entry_s must be finite and non-negative")
         policy_config = _apply_runtime_motion_config(
             policy_config=policy_config,
             motion_backend=self.args.motion_backend,
@@ -201,6 +209,11 @@ class Tracking(BasePolicy):
             self.motion_ids = np.asarray([0], dtype=int)
             self.motion_t = np.asarray([0], dtype=int)
             self.motion_length = self.motion_dataset.num_steps
+            playback_limit = getattr(self.args, "npz_playback_limit_s", None)
+            if playback_limit is not None:
+                if not np.isfinite(playback_limit) or playback_limit <= 0:
+                    raise ValueError("npz_playback_limit_s must be finite and positive")
+                self.motion_length = min(self.motion_length, round(playback_limit / self.rl_dt) + 1)
             self.motion_joint_names = list(self.motion_dataset.joint_names)
             self.motion_body_names = list(self.motion_dataset.body_names)
             return
@@ -423,7 +436,7 @@ class Tracking(BasePolicy):
 
     def _reset_motion(self) -> None:
         if self.motion_backend == "planner":
-            # R1 always starts a Hold at the Motion's frame 0. Entering the Tracker
+            # Taking over always starts a Hold at the Motion's frame 0. Entering the Tracker
             # does not run a Planner cycle; the next tick does.
             self._drop_planner_go("the Tracker took over again")
             self.motion_data = self.motion_buffer.motion_data
@@ -443,12 +456,50 @@ class Tracking(BasePolicy):
         super().reset()
 
     def set_init_mode(self, *, source: str) -> None:
+        self._reference_entry_target = None
         self._drop_planner_go("Shaping")
         super().set_init_mode(source=source)
+        if self.motion_backend == "npz":
+            self._reset_motion()
 
     def set_zero_mode(self, *, source: str) -> None:
-        self._drop_planner_go("E-stop")
+        self._reference_entry_target = None
+        self._drop_planner_go("Software stop")
         super().set_zero_mode(source=source)
+
+    def set_policy_mode(self, *, source: str) -> None:
+        duration = float(self.policy_config.get("reference_entry_s", 0.0))
+        if duration <= 0 or self.motion_backend != "npz":
+            super().set_policy_mode(source=source)
+            return
+        if self._reference_entry_target is not None:
+            logger.warning("Reference pose transition is still running; wait for Hold ready.")
+            return
+        target = self.motion_first_frame_joint_pos()
+        if self.target_postprocessor is not None:
+            target = self.target_postprocessor.clip(target)
+        self._reference_entry_target = target.copy()
+        self._reference_entry_start = self.state_processor.joint_pos.copy()
+        self._reference_entry_count = 0
+        self._reference_entry_steps = max(1, round(duration / self.rl_dt))
+        self._control_generation = time.monotonic_ns()
+        self.state_dict["paused"] = True
+        self.state_dict["control_mode"] = "init"
+        logger.info("Transitioning from standing to the reference pose over {}s; keep gantry support until Hold ready.", duration)
+
+    def get_init_target(self):
+        if self._reference_entry_target is None:
+            return super().get_init_target()
+        # Use the last quarter of the interval to settle at the reference pose
+        # before resetting the policy histories and entering Hold.
+        progress = min(self._reference_entry_count / max(1, .75 * self._reference_entry_steps), 1.0)
+        q = self._reference_entry_start + progress * (self._reference_entry_target - self._reference_entry_start)
+        self._reference_entry_count += 1
+        if self._reference_entry_count > self._reference_entry_steps:
+            self._reference_entry_target = None
+            super().set_policy_mode(source="reference pose transition complete")
+            logger.info("Hold ready. Operator may lower the gantry while retaining protection.")
+        return q
 
     def _drop_planner_go(self, reason: str) -> None:
         """A Go lives within one Tracker session: E-stop, Shaping and a new take-over drop it."""
@@ -456,24 +507,35 @@ class Tracking(BasePolicy):
             self.motion_buffer.abort(reason)
 
     def planner_go(self, *, source: str) -> None:
-        """B with the Planner: the first press in Hold is Go (attempted at the next tick:
+        """Start/space with the Planner: the first press in Hold is Go (attempted at the next tick:
         height check, new generation, go clock). Later presses have no effect."""
         mode = self.state_dict.get("control_mode")
+        joystick = isinstance(self.controller, UnitreeJoystickController)
+        g1_joystick = joystick and getattr(self.controller, "_g1_controls", True)
+        sequence = "A -> A -> Start" if g1_joystick else "A -> R1 -> B" if joystick else "i -> ] -> Space"
+        stop_key = "Select" if g1_joystick else "R2" if joystick else "o"
         if mode != "policy":
             logger.warning(
-                "Planner: Go ignored (via {}): Go needs the Tracker in Hold (A, then R1); control mode is {}",
-                source, mode,
+                "Planner: Go ignored (via {}): Go needs the Tracker in Hold ({}); control mode is {}",
+                source, sequence, mode,
             )
             return
         if self.motion_buffer.go_active:
             logger.info(
-                "Planner: B ignored (via {}): Go was already accepted; R2 then A -> R1 -> B restarts", source
+                "Planner: Go ignored (via {}): Go was already accepted; {} then {} restarts",
+                source, stop_key, sequence,
             )
             return
         logger.info("Planner: Go requested via {}", source)
         self.motion_buffer.request_go()
 
     def toggle_paused(self, *, source: str) -> None:
+        if self.state_dict.get("control_mode") != "policy":
+            logger.warning("Start ignored: enter Hold before playing motion (A -> A -> Start).")
+            return
+        if self.motion_backend == "npz" and self.motion_t[0] >= self.motion_length - 1:
+            logger.info("Playback reached its configured limit; A -> A starts a new session.")
+            return
         paused = not bool(self.state_dict.get("paused", False))
         self.state_dict["paused"] = paused
         logger.info(f"Paused state toggled to {paused} via {source}")
@@ -494,6 +556,7 @@ class Tracking(BasePolicy):
                 self.motion_t[:] = self.motion_length - 1
                 state["paused"] = True
                 self.state_dict["paused"] = True
+                paused = True
         self._update_motion_data(paused=paused)
         for obs_group in self.observations.values():
             for obs_func in obs_group.funcs.values():
@@ -510,6 +573,7 @@ class Tracking(BasePolicy):
         return {
             "motion_backend": self.motion_backend,
             "motion_path": str(self.motion_config.get("motion_path", "")),
+            "npz_playback_limit_s": getattr(self.args, "npz_playback_limit_s", None),
         }
 
     def process_controllers(self) -> None:
@@ -519,14 +583,16 @@ class Tracking(BasePolicy):
         if not extra_keys:
             return
 
-        # B: Go with the Planner, play/pause with File Playback.
+        # Space/Start: Go with the Planner, play/pause with File Playback.
         b_pressed = self.planner_go if self.motion_backend == "planner" else self.toggle_paused
         if isinstance(self.controller, KeyboardController) and (
             "space" in extra_keys or " " in extra_keys
         ):
             b_pressed(source="keyboard:space")
-        elif isinstance(self.controller, UnitreeJoystickController) and "B" in extra_keys:
-            b_pressed(source="joystick:B")
+        elif isinstance(self.controller, UnitreeJoystickController):
+            play_key = "Start" if getattr(self.controller, "_g1_controls", True) else "B"
+            if play_key in extra_keys:
+                b_pressed(source=f"joystick:{play_key}")
 
 
 @dataclass
@@ -535,6 +601,8 @@ class TrackingArgs(BasePolicyArgs):
 
     motion_backend: Optional[Literal["npz", "zmq", "smpl_zmq", "planner"]] = None
     motion_path: Optional[str] = None
+    npz_playback_limit_s: Optional[float] = None
+    """Bound the NPZ reference clock; at the limit remain in Hold until a fresh shaping session."""
     planner_checkpoint: Optional[str] = None
     """motion_backend=planner: checkpoint path (default: the pinned ModelScope d1146 file)."""
     depth_ssh_host: Optional[str] = None
@@ -549,6 +617,14 @@ class TrackingArgs(BasePolicyArgs):
 
 
 if __name__ == "__main__":
+    import signal
+
+    def stop_on_signal(_signum, _frame):
+        raise KeyboardInterrupt
+
+    signal.signal(signal.SIGTERM, stop_on_signal)
     args = tyro.cli(TrackingArgs)
     policy = Tracking(args=args)
     policy.run()
+    from sim2real.utils.sdk_shutdown import exit_after_sdk_timeout
+    exit_after_sdk_timeout(getattr(policy.controller, "_close_timed_out", False))

@@ -1,0 +1,70 @@
+# Proteus G1 from an external PC
+
+Run CPU ONNX Tracking at 50 Hz and the Python SDK2 Bridge at 200 Hz on the PC. Tracking reads the cached NPZ reference; the G1 receives joint position/velocity targets, feedforward torque and PD gains over DDS. This route uses the existing Python 3.10 environment, SDK2, CycloneDDS and ZMQ. It does not require the aarch64 inline `unitree_interface` module.
+
+The launcher defaults ONNX, OpenMP and BLAS to one CPU thread. Unbounded ONNX thread pools can consume many cores between 50 Hz inference calls and compete with DDS callbacks. A prior log also recorded a 174 ms command-send delay. The launcher now uses a shared 250 ms I/O timeout instead of the former 100 ms limit, so brief gaps do not latch a stop. Both settings apply when new processes start. Existing processes do not pick up launcher edits. Do not run policy benchmarks or simulation alongside a hardware test.
+
+The exported artifact stays in `checkpoints/proteus/proteus_60/unitree_g1/`. Keep its generated `policy.yaml` unchanged. Generate the separate deployment overlay once:
+
+```bash
+export HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1
+export PYTHONPATH="$PWD"
+export SIM2REAL_PYTHON=/absolute/path/to/existing/.venv/bin/python
+"$SIM2REAL_PYTHON" scripts/g1/prepare_proteus_deployment.py
+```
+
+Model and motion artifacts remain outside Git. With the exported actor present and the pinned source motion plus G1 MJCF cached, generate the forward clip once:
+
+```bash
+"$SIM2REAL_PYTHON" scripts/g1/prepare_proteus_motion.py
+```
+
+The script copies source frames 90–330 inclusively at 30 Hz, without resampling or modifying qpos, and refuses to overwrite existing artifacts. The launcher also prepares it offline if the default clip directory is absent. Cache the source motion and MJCF before deployment; an incomplete existing directory must be inspected rather than silently overwritten.
+
+`policy-pc.yaml` retains `proteus.reference_forcing: true`, shapes to the arms-down default standing pose, sets waist roll/pitch gains to kp=100, kd=2.5 (yaw remains 100/2), adds 5% joint-limit margins, and limits target changes to 15 rad/s. These limits change actuator targets; the original actor and observation contract are unchanged. The initial arm targets match the previous deployed default pose. A second A interpolates to the reference starting pose over 2 seconds (including settling), then resets histories and enters Hold. Direct policy takeover from the standing pose and lowering before Hold failed rehearsals, so wait for Hold ready before lowering.
+
+Rehearse the actual Tracking controller without DDS or hardware:
+
+```bash
+"$SIM2REAL_PYTHON" scripts/g1/validate_proteus_deployment.py \
+  --policy-config checkpoints/proteus/proteus_60/unitree_g1/policy-pc.yaml \
+  --npz-playback-limit-s 3
+```
+
+The rehearsal includes early button rejection, shaping, Hold, ideal gantry lowering, reference playback and a latched Select stop. The root constraint approximates support and does not model cable forces. Select does not maintain standing; stability metrics end before Select. The tests in `tests/test_g1_bridge_safety.py` cover real local ZMQ transport with mocked SDK channels, malformed/out-of-order commands, repeated state ticks, timeouts and stop priority.
+
+Read-only bring-up using real G1 feedback and ONNX inference:
+
+```bash
+G1_INTERFACE=enp5s0 PROTEUS_READ_ONLY=1 scripts/g1/start_proteus_pc.sh
+```
+
+Then launch the protected hardware session:
+
+```bash
+G1_INTERFACE=enp5s0 scripts/g1/start_proteus_pc.sh
+```
+
+Wait for `Tracker and LowState ready` in the bridge log. Startup emits no DDS motor command and does not release high-level mode. Only a fresh physical A press with a ready Tracker, followed by its new init command, requests takeover. Keep the robot supported and an operator on the remote and hardware stop.
+
+| Remote | Behavior |
+| --- | --- |
+| First A | Release high-level mode and shape over 10 seconds to the arms-down default standing posture, with gantry support. |
+| Second A, after shaping completes | Smoothly transition to the reference pose over 2 seconds, then reset histories and heading and enter Hold. Wait for Hold ready while still supported. |
+| Lower the gantry | Place the feet on the floor while Hold is already active; retain protective support. |
+| Start | Play/pause the reference. The launcher defaults to eight seconds of original-speed forward walking, then holds with policy control active. |
+| Select | Priority latched software stop. Follow measured joint angles with PD gains retained; active posture support is lost. |
+
+After Select or a fault, restart with A → A → Start. At the configured playback limit, Start cannot extend the segment; a new shaping session resets the reference. `PROTEUS_PLAYBACK_LIMIT_S` changes the limit for a new session, but cannot extend beyond the selected motion's length.
+
+The launcher now defaults to `checkpoints/proteus/proteus_60/unitree_g1/motions/walk_forward_original/` and `PROTEUS_PLAYBACK_LIMIT_S=8`, including when launched through `/home/galbot/Documents/Proteus-g1/start-pc.sh`. The clip retains seconds 3–11 of `walk1_subject1` at original speed, skipping the initial preparation segment. `PROTEUS_MOTION_PATH` can override the reference for both preflight and Tracking. Its eight-second rehearsal advanced 2.51 m with 0.29 m rightward displacement; the next eight seconds of Hold drifted backward by 0.68 m. Its earlier hardware test became unstable before LowState timed out. It remains a protected test candidate and has not passed stable straight walking and stopping validation. Keep gantry protection through playback and Hold. Changes apply at the next launch and do not change a running session.
+
+The launcher defaults `PROTEUS_IO_TIMEOUT_S=0.25` and passes the same window to Bridge (`--timeout-s`) and Tracking (`SIM2REAL_IO_TIMEOUT_S`). Within this window, Tracking keeps using the latest valid feedback for normal inference and reference playback, and Bridge keeps resending the latest valid command at 200 Hz through command gaps. A fresh update continues immediately without freezing targets, latching a stop epoch, or requiring A. Repeated LowState ticks do not reset the freshness clock. This is bounded runtime tolerance; it does not establish physical gait stability with 250 ms delayed observations or commands.
+
+Feedback or command loss longer than this window still triggers latched pure damping (`kp=0`, robot-configured damping gains). Invalid state/commands, mode or DDS write faults, and orderly shutdown retain their existing fault response. Select retains its higher-priority software stop behavior. Standby never emits motor commands before takeover. For another window, set `PROTEUS_IO_TIMEOUT_S` before a new launcher session; the accepted range is greater than zero and at most one second. Standalone Bridge and ZMQ I/O retain the 100 ms default, and manual launches must configure both together. Zero commands following measured angles within 0.05 rad are allowed at mechanical limits so they can acknowledge a stop. Updated Python Bridge and Tracking use optional control-generation / stop-epoch ZMQ metadata; deploy both together.
+
+Local forcing lacks global root localization and permits drift. One 60-second diagnostic remained upright but reached 3.16 m root XY error. The revised two-10-second playback rehearsal reached 1.35 m; the latest bounded three-second rehearsal with waist roll/pitch PD=100/2.5 and the arms-down-to-reference transition reached 0.138 m (relative body error mean 0.042 m). Simulation does not certify hardware safety. A PC watchdog cannot deliver a stop after cable or PC failure: the robot-side communication timeout and independent hardware stop still require on-site validation.
+
+Logs, PIDs and `tracking.npz` are saved under `outputs/proteus-pc/<timestamp>/`. Ctrl+C or SIGTERM stops both processes; the bridge sends a brief damping sequence on orderly shutdown. A killed process, lost network, or Python shutdown is not a hardware emergency stop.
+
+Native SDK channel destruction is bounded during shutdown; recordings and motor fallback finish before any forced process exit caused by a destructor timeout.
