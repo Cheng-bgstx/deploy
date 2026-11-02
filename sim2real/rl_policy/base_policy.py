@@ -200,6 +200,7 @@ class BasePolicy:
             robot_name=self.args.robot,
             robot_cfg=self.robot_cfg,
             interface=self.args.robot_interface,
+            robot_ip=getattr(self.args, "robot_ip", "127.0.0.1"),
         )
 
     def _build_controller(self) -> ControllerBase:
@@ -727,6 +728,7 @@ class BasePolicyArgs:
     inference_backend: Literal["onnx-gpu", "onnx-cpu", "tensorrt"] = "onnx-cpu"
     robot_io: Literal["inline", "zmq"] = "zmq"
     robot_interface: str = "eth0"
+    robot_ip: str = "127.0.0.1"
     controller: Literal["keyboard", "joystick", "pico"] = "keyboard"
     pico_zmq_connect: str = f"tcp://127.0.0.1:{PORTS['pico_controller']}"
     record: bool = False

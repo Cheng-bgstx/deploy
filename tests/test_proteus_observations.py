@@ -209,3 +209,35 @@ def test_forcing_needs_offset_zero_first(tmp_path):
     env.policy_config["proteus"]["future_offsets"] = [1, 2]
     with pytest.raises(ValueError, match="offset 0"):
         _observations(env)
+
+
+def test_wamseq_window_masks_startup_and_resets_once_per_step(tmp_path):
+    env = _env(tmp_path)
+    env.policy_config['proteus'].update(actor_kind='wam_seq', seq_window=3)
+    groups = {**GROUPS, 'history_valid': ['history_valid']}
+    obs = {g: [Observation.resolve(f'proteus.proteus_{n}')(env=env) for n in names]
+           for g, names in groups.items()}
+    _reset(obs)
+    _update(obs, {'slot_action': np.full(4, 99)})  # reset discards stale output
+    first = _compute(obs)
+    np.testing.assert_array_equal(first['history_valid'], [0, 0, 1])
+    np.testing.assert_array_equal(first['proprioception'][:2], 0)
+    np.testing.assert_array_equal(first['action_history'], 0)
+    prop0 = first['proprioception'][-1].copy()
+    env.state_processor.joint_pos += 0.01
+    _update(obs, {'slot_action': np.arange(4) + 1})
+    second = _compute(obs)
+    np.testing.assert_array_equal(second['history_valid'], [0, 1, 1])
+    np.testing.assert_array_equal(second['proprioception'][1], prop0)
+    np.testing.assert_array_equal(second['action_history'][:2], 0)
+    np.testing.assert_array_equal(second['action_history'][-1], np.arange(4) + 1)
+    _update(obs, {'slot_action': np.arange(4) + 10})
+    _update(obs, {'slot_action': np.arange(4) + 20})
+    full = _compute(obs)
+    np.testing.assert_array_equal(full['history_valid'], 1)
+    np.testing.assert_array_equal(full['action_history'], np.array([np.arange(4) + i for i in (1, 10, 20)]))
+    _reset(obs)
+    _update(obs, {'slot_action': np.full(4, 42)})
+    restarted = _compute(obs)
+    np.testing.assert_array_equal(restarted['history_valid'], [0, 0, 1])
+    np.testing.assert_array_equal(restarted['action_history'], 0)

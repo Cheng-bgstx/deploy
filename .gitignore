@@ -93,3 +93,5 @@ MANIFEST
 !/third_party/wheels/README.md
 /third_party/wheels/*.whl
 .scratch/
+
+!/tests/test_oli.py

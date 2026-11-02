@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Specialize the Proteus multi-robot ONNX actor to one robot for sim2real.
+"""Specialize a Proteus separate or WAMSeq multi-robot ONNX actor to one robot for sim2real.
 
 Proteus (``ScaleTrack/checkpoints/proteus_60`` in the Proteus repo) ships one ONNX actor for 60 robots and one
 contract ``<robot>.json`` per robot. The actor is batched and robot-agnostic: a morphology input and 31 canonical
@@ -13,6 +13,10 @@ joint slots. sim2real's BasePolicy feeds unbatched observation groups and reads 
 - outputs ``action[J]``, the slot actions of the robot's driven joints in ``policy_joint_names`` order, and
   ``next_slot_action[S]``, every slot action (the action history holds the unmasked actor output, as IsaacLab's
   ``last_action`` does in training).
+
+For ``--release proteus_wamseq_62`` (or ``proteus_wamseq_62_full``), the contract selects WAMSeq:
+``proprioception[W, 6+2S]``, ``action_history[W, S]``, ``history_valid[W]`` and the same ``task``.
+The window is oldest first, invalid steps are zero, and its previous action precedes the observation.
 
 The joint target is ``default + action_scale * action`` with the contract's signed ``action_scale``, as in Proteus.
 The wrapper keeps the actor's ONNX IR and opset (ORT 1.16 on the G1 loads them) and is compared with the released
@@ -54,6 +58,8 @@ TOLERANCE = 1.0e-6
 
 # released actor I/O -> wrapper I/O
 SOURCE_INPUTS = {"policy": "proprioception", "policy_task": "task", "action": "action_history"}
+SEQ_INPUTS = {"obs_window": "proprioception", "policy_task": "task", "prev_actions": "action_history",
+              "valid": "history_valid"}
 SOURCE_MORPH = "morph"
 SOURCE_OUTPUT = "actions"
 INTERNAL_PREFIX = "proteus_actor/"
@@ -70,7 +76,15 @@ def load_contract(path: Path) -> dict[str, Any]:
     offsets = list(contract["future_offsets"])
     if offsets[-1] != -1 or any(o < 0 for o in offsets[:-1]):
         raise ValueError(f"Expected near offsets and a far placeholder -1, got future_offsets={offsets}")
+    if contract.get("actor_kind", "separate") not in {"separate", "wam_seq"}:
+        raise ValueError(f"Unsupported actor_kind: {contract['actor_kind']}")
+    if contract.get("actor_kind") == "wam_seq" and int(contract.get("seq_window", 0)) < 1:
+        raise ValueError("wam_seq requires a positive seq_window")
     return contract
+
+
+def source_inputs(contract: dict[str, Any]) -> dict[str, str]:
+    return SEQ_INPUTS if contract.get("actor_kind") == "wam_seq" else SOURCE_INPUTS
 
 
 def resolved_offsets(contract: dict[str, Any], far_offset: int) -> list[int]:
@@ -86,9 +100,13 @@ def driven_joints(contract: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def input_shapes(contract: dict[str, Any], far_offset: int) -> dict[str, tuple[int, ...]]:
-    H, S = int(contract["history"]), int(contract["num_slots"])
+    H = int(contract["seq_window"] if contract.get("actor_kind") == "wam_seq" else contract["history"])
+    S = int(contract["num_slots"])
     F, B = len(resolved_offsets(contract, far_offset)), len(contract["body_names"])
-    return {"proprioception": (H, 6 + 2 * S), "task": (F, 18 * B + 1), "action_history": (H, S)}
+    shapes = {"proprioception": (H, 6 + 2 * S), "task": (F, 18 * B + 1), "action_history": (H, S)}
+    if contract.get("actor_kind") == "wam_seq":
+        shapes["history_valid"] = (H,)
+    return shapes
 
 
 # ---------------------------------------------------------------------------
@@ -107,22 +125,22 @@ def wrap_actor(source: onnx.ModelProto, contract: dict[str, Any], far_offset: in
     S = int(contract["num_slots"])
     shapes = input_shapes(contract, far_offset)
     morph = np.asarray(contract["morph"], dtype=np.float32)[None]
+    bindings = source_inputs(contract)
 
     inputs = {i.name: i for i in graph.input}
-    expected = {"policy": shapes["proprioception"], "policy_task": shapes["task"], "action": shapes["action_history"],
-                SOURCE_MORPH: morph.shape[1:]}  # fmt: skip
+    expected = {old: shapes[new] for old, new in bindings.items()} | {SOURCE_MORPH: morph.shape[1:]}
     for name, shape in expected.items():
         if name not in inputs or tuple(_shape(inputs[name])[1:]) != tuple(shape):
             raise ValueError(f"Proteus actor input {name} != [batch, {shape}]: {[(i.name, _shape(i)) for i in graph.input]}")
     if [o.name for o in graph.output] != [SOURCE_OUTPUT] or _shape(graph.output[0])[1:] != [S]:
         raise ValueError(f"Proteus actor output != {SOURCE_OUTPUT}[batch, {S}]")
     tensor_names = {t for n in graph.node for t in (*n.input, *n.output)} | {i.name for i in graph.initializer}
-    clashes = sorted(tensor_names & {*SOURCE_INPUTS.values(), "action", "next_slot_action"} - set(SOURCE_INPUTS))
+    clashes = sorted(tensor_names & {*bindings.values(), "action", "next_slot_action"} - set(bindings))
     if clashes or any(n.op_type in {"If", "Loop", "Scan"} for n in graph.node):
         raise ValueError(f"Cannot rename the actor's inputs safely (clashes: {clashes})")
 
     # the released inputs become internal tensors
-    rename = {name: INTERNAL_PREFIX + name for name in (*SOURCE_INPUTS, SOURCE_MORPH)}
+    rename = {name: INTERNAL_PREFIX + name for name in (*bindings, SOURCE_MORPH)}
     for node in graph.node:
         node.input[:] = [rename.get(name, name) for name in node.input]
     for value_info in graph.value_info:
@@ -137,7 +155,7 @@ def wrap_actor(source: onnx.ModelProto, contract: dict[str, Any], far_offset: in
     ])  # fmt: skip
     unsqueeze = [
         helper.make_node("Unsqueeze", [new, INTERNAL_PREFIX + "batch_axis"], [rename[old]], name=f"unsqueeze_{new}")
-        for old, new in SOURCE_INPUTS.items()
+        for old, new in bindings.items()
     ]
     nodes = unsqueeze + list(graph.node) + [
         helper.make_node("Squeeze", [SOURCE_OUTPUT, INTERNAL_PREFIX + "batch_axis"], ["next_slot_action"],
@@ -147,7 +165,7 @@ def wrap_actor(source: onnx.ModelProto, contract: dict[str, Any], far_offset: in
     ]  # fmt: skip
     del graph.node[:]
     graph.node.extend(nodes)
-    graph.input.extend(helper.make_tensor_value_info(name, TensorProto.FLOAT, shapes[name]) for name in SOURCE_INPUTS.values())
+    graph.input.extend(helper.make_tensor_value_info(name, TensorProto.FLOAT, shapes[name]) for name in bindings.values())
     del graph.output[:]
     graph.output.extend([
         helper.make_tensor_value_info("action", TensorProto.FLOAT, [len(slots)]),
@@ -166,7 +184,12 @@ def compare_with_source(
     wrapped: onnx.ModelProto, source_path: Path, contract: dict[str, Any], far_offset: int, num_samples: int, seed: int
 ) -> float:
     """Max |wrapper - released actor| over random inputs (the released actor gets the batch axis and the morph)."""
+    if num_samples < 1:
+        raise ValueError("num_samples must be positive")
+    bindings = source_inputs(contract)
     options = ort.SessionOptions()
+    options.intra_op_num_threads = 1
+    options.inter_op_num_threads = 1
     options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
     wrapper = ort.InferenceSession(wrapped.SerializeToString(), options, providers=["CPUExecutionProvider"])
     source = ort.InferenceSession(str(source_path), options, providers=["CPUExecutionProvider"])
@@ -176,9 +199,14 @@ def compare_with_source(
     max_err = 0.0
     for _ in range(num_samples):
         feeds = {name: rng.normal(size=shape).astype(np.float32) for name, shape in input_shapes(contract, far_offset).items()}
+        if "history_valid" in feeds:
+            feeds["history_valid"] = (rng.random(feeds["history_valid"].shape) > 0.5).astype(np.float32)
+            feeds["history_valid"][-1] = 1.0
         action, next_slot_action = wrapper.run(["action", "next_slot_action"], feeds)
-        source_feeds = {old: feeds[new][None] for old, new in SOURCE_INPUTS.items()} | {SOURCE_MORPH: morph}
+        source_feeds = {old: feeds[new][None] for old, new in bindings.items()} | {SOURCE_MORPH: morph}
         (actions,) = source.run([SOURCE_OUTPUT], source_feeds)
+        if not all(np.isfinite(x).all() for x in (action, next_slot_action, actions)):
+            raise RuntimeError("Non-finite actor output during numerical comparison")
         max_err = max(max_err, float(np.abs(next_slot_action - actions[0]).max()),
                       float(np.abs(action - actions[0, slots]).max()))  # fmt: skip
     return max_err
@@ -213,7 +241,7 @@ def policy_yaml(contract: dict[str, Any], robot: str, far_offset: int) -> dict[s
     def term(name: str) -> dict[str, str]:
         return {"_target_": f"proteus.proteus_{name}"}
 
-    return {
+    cfg = {
         "model_path": "policy.onnx",
         "observation": {
             "proprioception": {
@@ -243,6 +271,8 @@ def policy_yaml(contract: dict[str, Any], robot: str, far_offset: int) -> dict[s
             "contract": f"{contract['robot']}.json",
             "num_slots": int(contract["num_slots"]),
             "history": int(contract["history"]),
+            "actor_kind": contract.get("actor_kind", "separate"),
+            "seq_window": int(contract.get("seq_window", 0)),
             "joint_vel_scale": float(contract["joint_vel_scale"]),
             "length_scale": float(contract["length_scale"]),
             "body_names": list(contract["body_names"]),
@@ -260,6 +290,12 @@ def policy_yaml(contract: dict[str, Any], robot: str, far_offset: int) -> dict[s
         },
     }
 
+    if contract.get("actor_kind") == "wam_seq":
+        cfg["observation"]["history_valid"] = {"valid": term("history_valid")}
+    if robot_cfg.name == "oli":
+        cfg["shaping_target"] = "motion_first_frame"
+    return cfg
+
 
 # ---------------------------------------------------------------------------
 # Export
@@ -276,14 +312,15 @@ def export_policy(
     num_samples: int = NUM_SAMPLES,
     seed: int = 0,
     contract_dir: Path | None = None,
+    release: str = "proteus_60",
 ) -> Path:
     """Export one robot's policy; returns the output directory."""
-    export_dir = Path(proteus_root) / EXPORT_SUBDIR
+    export_dir = Path(proteus_root) / "ScaleTrack" / "checkpoints" / release
     contract_path = Path(contract_dir or export_dir) / f"{contract_name}.json"
     contract_bytes = contract_path.read_bytes()
     contract = load_contract(contract_path)
     source_path = export_dir / contract["actor"]
-    output_dir = Path(output_dir) if output_dir is not None else DEFAULT_OUTPUT_ROOT / contract_name
+    output_dir = Path(output_dir) if output_dir is not None else DEFAULT_OUTPUT_ROOT.parent / release / contract_name
 
     source = onnx.load(str(source_path))
     wrapped = wrap_actor(source, contract, far_offset)
@@ -296,7 +333,7 @@ def export_policy(
     onnx_path = output_dir / cfg["model_path"]
     onnx.save(wrapped, str(onnx_path))
     header = (
-        f"# Proteus 60-robot actor for {contract_name} (sim2real robot {robot}), generated by\n"
+        f"# Proteus {release} actor for {contract_name} (sim2real robot {robot}), generated by\n"
         "# scripts/export_proteus_onnx.py. Regenerate instead of editing; comparison.json records the check\n"
         "# against the released actor. proteus.reference_forcing: false tracks the measured root position.\n"
     )
@@ -306,6 +343,8 @@ def export_policy(
     )
     (output_dir / cfg["proteus"]["contract"]).write_bytes(contract_bytes)
     comparison = {
+        "release": release,
+        "actor_kind": contract.get("actor_kind", "separate"),
         "contract": contract_name,
         "robot": robot,
         "far_offset": far_offset,
@@ -340,18 +379,19 @@ def export_policy(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--proteus-root", type=Path, default=DEFAULT_PROTEUS_ROOT)
-    parser.add_argument("--contract", nargs="+", default=["unitree_g1"], help="contract names in proteus_60/")
+    parser.add_argument("--release", default="proteus_60", help="Directory name under ScaleTrack/checkpoints")
+    parser.add_argument("--contract", nargs="+", default=["unitree_g1"], help="contract names in the selected release")
     parser.add_argument("--robot", default="g1", help="sim2real robot config of the contracts")
     parser.add_argument(
         "--contract-dir",
         type=Path,
-        help="Directory of <contract>.json (default: the release, ScaleTrack/checkpoints/proteus_60)",
+        help="Directory of <contract>.json (default: the selected release)",
     )
     parser.add_argument("--far-offset", type=int, default=DEFAULT_FAR_OFFSET)
     parser.add_argument(
         "--output-root",
         type=Path,
-        default=DEFAULT_OUTPUT_ROOT,
+        default=None,
         help="Each policy is written to <output-root>/<contract>/",
     )
     parser.add_argument("--num-samples", type=int, default=NUM_SAMPLES)
@@ -364,7 +404,8 @@ def main() -> int:
             proteus_root=args.proteus_root,
             robot=args.robot,
             far_offset=args.far_offset,
-            output_dir=args.output_root / name,
+            output_dir=(args.output_root or DEFAULT_OUTPUT_ROOT.parent / args.release) / name,
+            release=args.release,
             num_samples=args.num_samples,
             seed=args.seed,
             contract_dir=args.contract_dir,

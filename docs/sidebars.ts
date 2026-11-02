@@ -46,6 +46,7 @@ const sidebars: SidebarsConfig = {
         'tutorials/run-external-policies',
         'tutorials/scalecar-vehicle-entry',
         'tutorials/proteus-et1',
+        'tutorials/proteus-oli',
       ],
     },
     'faq',

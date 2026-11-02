@@ -13,6 +13,7 @@ def create_robot_io(
     robot_name: str,
     robot_cfg: RobotCfg,
     interface: str,
+    robot_ip: str = "127.0.0.1",
 ) -> RobotIO:
     if mode == "zmq":
         return ZMQRobotIO(robot_cfg)
@@ -21,6 +22,10 @@ def create_robot_io(
         raise ValueError(f"Unsupported robot_io: {mode}")
 
     normalized_name = normalize_robot_name(robot_name)
+    if robot_cfg.name == "oli":
+        from sim2real.rl_policy.robot_io.oli import OliRobotIO
+
+        return OliRobotIO(robot_cfg, robot_ip=robot_ip)
     if normalized_name == "g1":
         from sim2real.rl_policy.robot_io.g1 import G1RobotIO
 
