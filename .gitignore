@@ -16,6 +16,7 @@ stubs
 !/tests/test_sonic_dict_policy.py
 !/tests/test_hand_grip.py
 !/tests/test_pico_hand_grip.py
+!/tests/test_pico_retarget_profiles.py
 !/tests/test_dh116s_keyboard_control.py
 !/tests/test_bfm_zero_observations.py
 !/tests/test_proteus_observations.py

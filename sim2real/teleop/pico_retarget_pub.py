@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Live PICO/XRobot -> G1 ZMQ publisher.
+Live PICO/XRobot -> robot ZMQ publisher.
 
-This script reads XR body data from XRobotStreamer, retargets to Unitree G1 with
+This script reads XR body data from XRobotStreamer, retargets with robot-specific
 GMR, forward-kinematics the resulting MuJoCo qpos, and publishes a canonical
 motion payload over ZMQ.
 """
@@ -255,16 +255,18 @@ def _hand_grip_message_from_data(controller_data: object) -> HandGripMessage:
 
 def _resolve_gmr_target_robot(robot_cfg: RobotCfg) -> str:
     try:
-        return {"g1": "unitree_g1", "h2": "unitree_h2"}[robot_cfg.name]
+        return {"g1": "unitree_g1", "h2": "unitree_h2", "oli": "limx_oli_edu"}[robot_cfg.name]
     except KeyError as exc:
         raise ValueError(f"Pico retargeting does not support {robot_cfg.name}") from exc
 
 
 def _register_gmr_robot(robot_cfg: RobotCfg, target_robot: str) -> None:
-    if target_robot == "unitree_h2":
+    if robot_cfg.name in {"h2", "oli"}:
         from general_motion_retargeting.params import IK_CONFIG_DICT, ROBOT_XML_DICT
         ROBOT_XML_DICT[target_robot] = robot_cfg.resolve_mjcf_path()
-        IK_CONFIG_DICT["xrobot"][target_robot] = Path(__file__).with_name("configs") / "xrobot_to_h2.json"
+        IK_CONFIG_DICT.setdefault("xrobot", {})[target_robot] = (
+            Path(__file__).with_name("configs") / f"xrobot_to_{robot_cfg.name}.json"
+        )
 
 
 class LiveRetargetPublisher:

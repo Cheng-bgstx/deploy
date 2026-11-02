@@ -341,6 +341,11 @@ def export_policy(
         header + yaml.dump(cfg, Dumper=_PolicyYamlDumper, sort_keys=False, width=110),
         encoding="utf-8",
     )
+    cfg["proteus"]["reference_forcing"] = False
+    (output_dir / "policy-sim.yaml").write_text(
+        "# Simulation only: measured world root, matching the source Proteus MuJoCo rollout.\n"
+        + yaml.dump(cfg, Dumper=_PolicyYamlDumper, sort_keys=False, width=110), encoding="utf-8",
+    )
     (output_dir / cfg["proteus"]["contract"]).write_bytes(contract_bytes)
     comparison = {
         "release": release,
