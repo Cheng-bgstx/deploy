@@ -222,6 +222,7 @@ PC 开启 body 和 controller 数据流。
 内置 `xrobot_to_oli.json` 来自 LimX GMR `86e9546` 的 `smplx_to_oli_edu.json`：保留
 OLI 的任务权重、缩放和连杆位置偏移，把人体名称转换为 XRobot 名称，并对旋转偏移
 复合 `Ry(pi)`。该坐标转换由 G1 的 SMPL-X / XRobot 对应配置验证，不复制 G1 的关节角。
+实时发布器按“标定身高 / 操作者实测身高”归一化人体尺寸。
 IK 和 FK 均注册准备好的 **HU_D04_01** 模型，发布 31 个具名关节与模型刚体、WXYZ 四元数。
 重新生成配置和启动参考：
 
