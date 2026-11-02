@@ -108,3 +108,6 @@ the hands. Use `--hand-dir left` or `--hand-dir right` for staged bring-up.
 ## Next Steps
 
 - [Motion Recording](/tutorials/motion-recording)
+
+Lingxi X2 has its own [Proteus X2 PICO procedure](./proteus-x2.md#pico-whole-body-teleoperation),
+including the X2 IK profile and AimDK launcher.

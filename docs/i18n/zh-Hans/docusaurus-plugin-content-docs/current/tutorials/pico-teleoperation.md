@@ -99,3 +99,6 @@ grip stream 断流后，进程会保持最后一次下发的手部姿态。停�
 ## Next Steps
 
 - [Motion Recording](./motion-recording.md)
+
+灵犀 X2 使用独立的 [Proteus X2 PICO 步骤](./proteus-x2.md#pico-全身遥操)，
+其中包含 X2 专用 IK 配置和 AimDK 启动器。

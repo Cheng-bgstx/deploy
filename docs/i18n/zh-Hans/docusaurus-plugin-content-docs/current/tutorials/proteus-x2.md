@@ -124,3 +124,124 @@ Hold，空格播放/暂停，`o` 阻尼，Ctrl+C 退出。首次真机测试需�
 tests/test_proteus_observations.py tests/test_et1_proteus.py tests/test_robot_io.py
 tests/test_command_sender.py -q`，并通过 Python 语法和 shell 参数检查。
 `third_party/`、`checkpoints/`、`outputs/` 下的运行资源不纳入 Git。
+
+
+## PICO 全身遥操
+
+发布端使用 **`venv/pico`**，策略与仿真使用 **根项目**。发布 PC 和策略计算机均按上文
+准备 X2 模型。按 [PC 遥操安装](../getting-started/teleop-x86-64.md)安装 XRoboToolkit
+PC Service，佩戴腿部追踪器，完成 PICO 全身标定并开启 body/controller 数据流。首次安装
+先克隆两个 SDK 仓库，再执行 `uv sync --project venv/pico --no-install-package xrobotoolkit-sdk`，
+随后运行 `bash scripts/setup/setup_xrobot_pybind.sh`。
+
+内置配置来自社区 [TaiE64/AgibotX2-Retargeter](https://github.com/TaiE64/AgibotX2-Retargeter)
+的 `bb582d9`（Apache-2.0），不是智元官方提供的 PICO 标定。SMPL-X 刚体偏移复合
+`Ry(pi)` 转为 XRobot 坐标；源配置中的 `*_toe_link` 辅助连杆在厂商模型中不存在，因此改用
+已标定的 LAFAN 踝关节任务，位置来自 XR Ankle、朝向来自 XR Foot。IK/FK 均使用准备好的
+31 关节模型，不复制 G1 关节角。求解器加入肩部/腰部中立姿态约束，分别使用两阶段 IK 的
+偏移，以关键字传入 Mink 限位，并按发布频率把连续关节目标限制在 **12 rad/s**。
+实时人体尺寸按“标定身高 / 操作者实测身高”归一化。
+
+配置已提交 Git；生成器记录输入配置 SHA256。可选的重新生成步骤：
+
+```bash
+gh repo clone TaiE64/AgibotX2-Retargeter ../AgibotX2-Retargeter -- --depth 1
+# 必须使用原版 GMR 的源坐标配置，不能混入 LimX 新版 BVH 基变换。
+uv run --no-sync python scripts/x2/build_pico_profile.py \
+  --retarget-root ../AgibotX2-Retargeter \
+  --gmr-configs ../GMR/general_motion_retargeting/ik_configs
+```
+
+在策略计算机上生成一次中立启动参考。流式 tracking 的
+`shaping_target: motion_first_frame` 仍然需要一个动作文件：
+
+```bash
+uv run --no-sync python scripts/make_hold_motion.py --robot x2 --output outputs/x2/pico_hold
+```
+
+本地 sim2sim 开 **三个终端**：
+
+```bash
+# 1：发布 PC，实测身高，单位米
+bash scripts/x2/start_pico.sh publisher --actual-human-height 1.70
+# 2：根项目 MuJoCo / mjviser
+bash scripts/x2/start_pico.sh sim
+# 3：根项目 tracking，policy-sim.yaml 使用测得的仿真根位置
+bash scripts/x2/start_pico.sh policy-sim 127.0.0.1
+```
+
+先检查发布器中的重定向。**A** 用 10 秒整形到中立姿态，松开后 **A+B** 启用策略 Hold。
+**X** 开始实时参考，X 再次按下回到当前 XY/朝向的中立 Hold。**单独 B** 切换阻尼。
+自由平衡测试前在仿真 GUI 关闭弹力带。X 暂停参考时策略继续运行。头部目标保持中立，
+真机 head pitch 仍按默认设置禁用。
+
+真机测试时，在 X2 策略计算机上将终端 3 替换为：
+
+```bash
+source /opt/ros/humble/setup.bash
+source /path/to/aimdk/install/setup.bash
+# 接管 HAL 前按上文释放原生 mc 控制权。
+# aima em stop-app mc
+bash scripts/x2/start_pico.sh robot PUBLISHER_IP
+```
+
+脚本设置 HF 离线参数、CPU 推理、50 Hz 策略、`robot=x2`、`robot_io=inline` 和真机
+`policy.yaml`；`policy-sim` 使用 ZMQ RobotIO 与 `policy-sim.yaml`。两者均连接发布 PC 的
+动作 **TCP 28701** 和手柄 **TCP 5592**，两端需放通。位置参数后可追加 tracking 参数，
+覆盖策略或中立 `--motion-path`。同一组端口只运行一个发布器/仿真，OLI 与 X2 默认端口
+不能在同一主机并行占用。扳机流仍在 5593，此适配未加入 X2 灵巧手驱动。
+
+body 断流时接收端保持最后参考，**不会自动切换阻尼**；重连时重新对齐动作段。
+手柄链路正常时可按 B，网络/进程失败则使用机器人独立停止路径。AimDK 控制权、IMU
+标定和 HAL watchdog 限制仍按上文处理。实时 PICO 没有未来动作样本，现有 buffer 使用
+已收到的姿态填充不可用的未来参考，因此下文文件 tracking 结果不代表实时遥操性能。
+
+本地离线 XR 测试已覆盖 OLI/X2、1.6/1.8/2.0 米操作者身高：源坐标变换、IK/FK 关节顺序、
+动作和手柄消息、X 暂停/恢复、重连、具名 ZMQ 接收、X2 目标速度限制。SDK 在这台 x86 PC
+已编译且可导入；本次未连接物理 PICO 头显或 X2 真机。
+
+```bash
+# 测试时在 Pico 环境中导入根项目 motion buffer 所需的依赖：
+uv pip install --python venv/pico/.venv/bin/python pytest \
+  'any4hdmi @ git+https://github.com/EGalahad/any4hdmi.git@5d0ae1915c904c64f2480a055aa1693523b9e4b4'
+HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --project venv/pico --no-sync python -m pytest \
+  tests/test_pico_retarget_profiles.py tests/test_pico_hand_grip.py -q
+```
+
+## 新增 LAFAN tracking 动作
+
+公共配方 `scripts/lafan_tracking_suite.json` 新增 **walk 步行、aiming 瞄准、dance2 舞蹈**，
+均取 subject 1 前 8 秒，BVH 原始 30 Hz，策略重采样为 50 Hz。可复用本地数据，或从
+[Ubisoft 源仓库](https://github.com/ubisoft/ubisoft-laforge-animation-dataset)取得
+`lafan1/lafan1.zip`，解压到 `lafan1/data` 并保留数据许可。
+
+```bash
+gh repo clone limxdynamics/GMR ../GMR-limx -- --depth 1
+uv run --no-sync python scripts/lafan_tracking_suite.py --robot x2 \
+  --lafan-data ../ubisoft-laforge-animation-dataset/lafan1/data --gmr-root ../GMR-limx --render
+# 原键盘启动器可播放生成的真机参考：
+# bash scripts/x2/start_proteus.sh outputs/x2/lafan_suite/walk
+```
+
+已有 GMR 仓库可直接复用。脚本使用内置社区 LAFAN 标定和准备好的 X2 模型、中立姿态
+约束、12 rad/s 关节目标限速、逐帧脚底接触点贴地。明确复现该标定使用的 **原版 Rx(90)
+左乘、不对四元数做共轭** 的坐标约定，避免混用 LimX 新版 loader 的不同基变换。
+不需要给外部 GMR 打 X2 补丁，也不在 X2 上回放 G1 qpos。两个头部关节保持中立。
+
+数据集位于 `outputs/x2/lafan_suite/{walk,aiming,dance2}`，保存 BVH SHA256、截取区间、
+标定/GMR 版本、qpos 名称和贴地信息。修改转换参数后指定新的 `--output`，已有数据会被
+复用。视频 `x2_wamseq_lafan_<name>.mp4` 含 1 秒初始策略 Hold 和末帧 Hold，并保存
+实际轨迹及 `.metrics.json`。seed=0，物理步长 0.005 秒，策略 50 Hz，测得的世界根位置，
+没有弹力带。
+
+2026-11-02 播放阶段、14 个合约跟踪刚体上的结果：
+
+| LAFAN 片段 | 平均世界 / 骨盆局部刚体误差 | 世界根位置末端误差 |
+| --- | --- | --- |
+| walk1_subject1 | 4.49 / 3.38 cm | 3.72 cm |
+| aiming1_subject1 | 3.75 / 3.64 cm | 1.34 cm |
+| dance2_subject1 | 4.23 / 3.59 cm | 1.59 cm |
+
+三条 10 秒视频均完整保持站立，最低根高度分别为 0.620 / 0.641 / 0.620 m。加上已有的
+relaxed walk 和 Gangnam dance，目前有五类参考。这些结果只验证了相应短片段的仿真；
+模型仍保留厂商惯性与训练质量的差异，真机和实时 PICO 效果需另行验证。

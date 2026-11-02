@@ -139,3 +139,144 @@ Regression: `uv run --no-sync python -m pytest tests/test_x2.py tests/test_oli.p
 tests/test_proteus_observations.py tests/test_et1_proteus.py tests/test_robot_io.py
 tests/test_command_sender.py -q`; syntax and shell argument checks also passed.
 Runtime assets under `third_party/`, `checkpoints/` and `outputs/` are ignored by Git.
+
+
+## PICO whole-body teleoperation
+
+Run the publisher in **`venv/pico`**, and the simulator / policy in the **root
+project**. Prepare the X2 model above on both the publisher and policy computers.
+Follow [PC teleop setup](../getting-started/teleop-x86-64.md) for XRoboToolkit PC
+Service, PICO body/leg-tracker calibration and whole-body streaming. Clone both
+SDK repos before bootstrapping `uv sync --project venv/pico --no-install-package
+xrobotoolkit-sdk`, then build `bash scripts/setup/setup_xrobot_pybind.sh`.
+
+The bundled X2 IK calibration comes from the community
+[TaiE64/AgibotX2-Retargeter](https://github.com/TaiE64/AgibotX2-Retargeter), commit
+`bb582d9` (Apache-2.0), rather than an AgiBot-supplied PICO profile. The source
+SMPL-X body offsets are converted to XRobot axes with `Ry(pi)`. Its auxiliary
+`*_toe_link` targets do not exist in the vendor model: the adapter instead uses
+the calibrated LAFAN ankle-roll tasks, with ankle position and foot orientation
+from the real XR skeleton. Both IK and FK use the prepared 31-joint model; no G1
+joint angles are copied. The X2 solver adds a neutral shoulder/waist posture task,
+uses separate offsets for the two IK stages, passes Mink limits explicitly, and
+bounds consecutive joint targets to **12 rad/s** at publisher frequency. Live
+positions are normalized by calibration height / measured operator height.
+
+The profile is included in Git; its generator records calibration-file SHA256s.
+To regenerate it (optional):
+
+```bash
+gh repo clone TaiE64/AgibotX2-Retargeter ../AgibotX2-Retargeter -- --depth 1
+# --gmr-configs must use the original upstream GMR source frames, not LimX's newer BVH basis.
+uv run --no-sync python scripts/x2/build_pico_profile.py \
+  --retarget-root ../AgibotX2-Retargeter \
+  --gmr-configs ../GMR/general_motion_retargeting/ik_configs
+```
+
+Generate the neutral startup reference once on the policy computer. Streaming
+tracking still needs a motion file for `shaping_target: motion_first_frame`:
+
+```bash
+uv run --no-sync python scripts/make_hold_motion.py --robot x2 --output outputs/x2/pico_hold
+```
+
+Open **three terminals** for local sim2sim:
+
+```bash
+# 1: publisher PC; set the operator's actual measured height in metres
+bash scripts/x2/start_pico.sh publisher --actual-human-height 1.70
+# 2: root project MuJoCo / mjviser
+bash scripts/x2/start_pico.sh sim
+# 3: root project tracking with policy-sim.yaml and measured root translation
+bash scripts/x2/start_pico.sh policy-sim 127.0.0.1
+```
+
+Inspect retargeting in the publisher viewer first. **A** shapes to neutral over
+10 s; release, then **A+B** enables policy Hold. **X** starts the live reference;
+X again returns to neutral Hold at the current XY/yaw. **B alone** selects damping.
+Disable the simulator elastic band in its GUI before testing free balance. X pauses
+the reference, while the policy remains active. Head targets remain neutral;
+hardware head pitch retains its default disabled setting.
+
+For hardware, replace terminal 3 with the following on the X2 policy computer:
+
+```bash
+source /opt/ros/humble/setup.bash
+source /path/to/aimdk/install/setup.bash
+# Release the native mc controller before taking HAL ownership, as above.
+# aima em stop-app mc
+bash scripts/x2/start_pico.sh robot PUBLISHER_IP
+```
+
+The launcher sets HF offline flags, CPU inference, 50 Hz policy, `robot=x2`,
+`robot_io=inline` and hardware `policy.yaml`. `policy-sim` uses ZMQ RobotIO and
+`policy-sim.yaml`. Both connect to **TCP 28701** for motion and **TCP 5592** for
+PICO buttons on `PUBLISHER_IP`; allow both ports. Trailing tracking CLI flags can
+override the policy or neutral `--motion-path`. Use one publisher / simulator per
+set of ports; OLI and X2 defaults cannot run concurrently on the same host. Hand
+triggers remain on 5593, without an X2 hand driver in this adapter.
+
+On body-stream loss the receiver holds the last reference; it does not automatically
+select damping. Reconnect starts an aligned segment. B still works if the button
+channel is alive; use the robot's independent stop path for a lost network/process.
+The AimDK ownership, IMU calibration and HAL watchdog limitations above still apply.
+PICO has no future motion samples: the existing realtime buffer fills unavailable
+future references from the received pose, so file-tracking results below do not
+establish live teleoperation performance.
+
+Local offline XR tests passed for OLI and X2 at operator heights 1.6, 1.8 and 2.0 m:
+source-frame conversion, IK/FK joint order, motion/button messages, X pause/resume,
+stream reconnection, named ZMQ reception and X2 target speed bounds. The SDK builds
+and imports on this x86 PC. No physical PICO headset or X2 was connected.
+
+```bash
+# Test-only dependencies for importing the root motion buffer in the Pico env:
+uv pip install --python venv/pico/.venv/bin/python pytest \
+  'any4hdmi @ git+https://github.com/EGalahad/any4hdmi.git@5d0ae1915c904c64f2480a055aa1693523b9e4b4'
+HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --project venv/pico --no-sync python -m pytest \
+  tests/test_pico_retarget_profiles.py tests/test_pico_hand_grip.py -q
+```
+
+## Additional LAFAN tracking motions
+
+The shared recipe `scripts/lafan_tracking_suite.json` adds **walk, aiming and
+dance2**, taking the first 8 s of subject 1, with original 30 Hz BVH timing and
+50 Hz policy resampling. Use the local dataset, or obtain `lafan1/lafan1.zip` from
+[Ubisoft's source](https://github.com/ubisoft/ubisoft-laforge-animation-dataset)
+and extract it into `lafan1/data`, keeping its license with the data.
+
+```bash
+gh repo clone limxdynamics/GMR ../GMR-limx -- --depth 1
+uv run --no-sync python scripts/lafan_tracking_suite.py --robot x2 \
+  --lafan-data ../ubisoft-laforge-animation-dataset/lafan1/data --gmr-root ../GMR-limx --render
+# Optional keyboard playback of a generated reference on X2:
+# bash scripts/x2/start_proteus.sh outputs/x2/lafan_suite/walk
+```
+
+Reuse an existing GMR checkout. The script uses the bundled community LAFAN
+calibration with the prepared X2 model, neutral posture task, 12 rad/s joint bound,
+and per-frame sole-contact grounding. It explicitly reproduces **upstream Rx(90)
+left multiplication without quaternion conjugation**, the convention used by this
+calibration; LimX's newer loader uses different frames. This avoids silently mixing
+those two BVH conventions. No external X2 retarget patch is needed. No G1 qpos is
+replayed on X2. The two head columns stay neutral.
+
+Datasets are `outputs/x2/lafan_suite/{walk,aiming,dance2}`. Each stores source BVH
+SHA256, interval, calibration/GMR revision, qpos names and grounding metadata.
+Select a new `--output` after changing conversion settings; existing datasets are
+reused. Videos `x2_wamseq_lafan_<name>.mp4` include 1 s initial policy Hold and a
+final-frame Hold, with exact trajectories and `.metrics.json`. Seed is 0, physics
+step 0.005 s, control 50 Hz, measured world root and no elastic band.
+
+Results on 2026-11-02, during playback over the 14 contract tracking bodies:
+
+| LAFAN clip | Mean world / pelvis-local body error | World root endpoint error |
+| --- | --- | --- |
+| walk1_subject1 | 4.49 / 3.38 cm | 3.72 cm |
+| aiming1_subject1 | 3.75 / 3.64 cm | 1.34 cm |
+| dance2_subject1 | 4.23 / 3.59 cm | 1.59 cm |
+
+All three 10 s videos finished upright (minimum root height 0.620 / 0.641 / 0.620 m).
+These add to the existing relaxed walk and Gangnam dance references. This validates
+these short retargeted motion intervals in simulation, with vendor inertia / training
+mass differences retained; hardware and live PICO quality still need separate tests.

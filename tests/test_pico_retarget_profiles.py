@@ -58,6 +58,7 @@ def test_pico_retarget_fk_and_named_zmq_buffer(path, human_height, monkeypatch):
     import zmq
     from general_motion_retargeting import XRobotStreamer
     from sim2real.teleop import pico_retarget_pub as pico
+    from sim2real.rl_policy.controllers.pico import PicoController
     from sim2real.rl_policy.utils.motion_buffer import RealtimeMotionBuffer
 
     cfg = get_robot_cfg(path.stem.removeprefix('xrobot_to_'))
@@ -83,16 +84,27 @@ def test_pico_retarget_fk_and_named_zmq_buffer(path, human_height, monkeypatch):
             human_height / profile['human_height_assumption'])
         human_rot = target_rot * R.from_quat(quat, scalar_first=True).inv()
         frames[human] = [human_pos, human_rot]
+    if cfg.name == 'x2':
+        # Real SDK packets have ankle and foot entries; the publisher constructs
+        # the calibrated virtual FootMod frame from those two real measurements.
+        for side in ('Left', 'Right'):
+            pos, rot = frames.pop(f'{side}FootMod')
+            frames[f'{side}_Ankle'] = [pos.copy(), rot]
+            frames[f'{side}_Foot'] = [pos + np.array([.1, 0, 0]), rot]
     unity_to_world = R.from_euler('x', 90, degrees=True)
 
     class Streamer:
         body_joint_names = list(frames)
         x = False
+        a = False
+        b = False
         connected = True
         coordinate_transform_unity_data = XRobotStreamer.coordinate_transform_unity_data
 
         def get_controller_data(self):
-            return {'LeftController': {'key_one': self.x}, 'timestamp': time.time_ns()}
+            return {'LeftController': {'key_one': self.x},
+                    'RightController': {'key_one': self.a, 'key_two': self.b},
+                    'timestamp': time.time_ns()}
 
         def get_raw_body_data(self):
             if not self.connected:
@@ -108,6 +120,7 @@ def test_pico_retarget_fk_and_named_zmq_buffer(path, human_height, monkeypatch):
         min_link_height_align_strategy='none', controller_bind='tcp://127.0.0.1:*',
         hand_grip_bind='tcp://127.0.0.1:*'))
     pub = zmq.Context.instance().socket(zmq.PUB)
+    controller = PicoController(connect=worker._controller_sock.getsockopt(zmq.LAST_ENDPOINT).decode())
     port = pub.bind_to_random_port('tcp://127.0.0.1')
     buffer = RealtimeMotionBuffer(robot_cfg=cfg, future_steps=[0, 1, 4, 16],
                                   root_body_name=cfg.body_names[0],
@@ -122,8 +135,14 @@ def test_pico_retarget_fk_and_named_zmq_buffer(path, human_height, monkeypatch):
         payload = worker.sample_and_retarget()
         assert not payload['paused'] and payload['motion_first_frame']
         worker.streamer.x = False
-        for _ in range(10):
+        for step in range(10):
+            if step == 3:
+                frames['Left_Wrist'][0] += np.array([0, 0, .25])
+            previous = worker.latest_qpos.copy()
             payload = worker.sample_and_retarget()
+            if cfg.name == 'x2':
+                indices = [model.joint(n).qposadr[0] for n in cfg.joint_names]
+                assert np.max(np.abs(np.asarray(payload['qpos'])[indices] - previous[indices])) <= .40001
         assert not payload['motion_first_frame']
         q = np.asarray(payload['qpos'])
         assert np.isfinite(q).all()
@@ -146,7 +165,26 @@ def test_pico_retarget_fk_and_named_zmq_buffer(path, human_height, monkeypatch):
         assert worker.sample_and_retarget()['motion_first_frame']
         worker.streamer.x = True
         assert worker.sample_and_retarget()['paused']
+        def buttons(a, b, expected):
+            worker.streamer.a, worker.streamer.b = a, b
+            deadline = time.monotonic() + 2
+            while time.monotonic() < deadline:
+                worker._poll_pause_toggle()
+                mode = controller.get_control_mode()
+                if mode is not None:
+                    assert mode == expected
+                    return
+                if expected is None and controller._pico_msg.A == a and controller._pico_msg.B == b:
+                    return
+                time.sleep(.01)
+            pytest.fail(f'PICO buttons {a, b} were not delivered')
+        buttons(True, False, 'init')
+        buttons(False, False, None)
+        buttons(True, True, 'policy')
+        buttons(False, False, None)
+        buttons(False, True, 'zero')
     finally:
+        controller.close()
         worker.close()
         buffer._motion_stream_stop.set()
         buffer._motion_stream_thread.join(timeout=1)
