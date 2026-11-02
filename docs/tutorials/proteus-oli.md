@@ -245,7 +245,8 @@ The bundled `xrobot_to_oli.json` is derived from LimX GMR's calibrated
 `smplx_to_oli_edu.json` at `86e9546`. It preserves OLI task weights, scales and link
 position offsets, changes source names to XRobot's names, and composes every
 orientation offset with `Ry(pi)`. This source-axis conversion follows the matching
-G1 SMPL-X / XRobot profiles; it does not copy G1 joints. The publisher registers
+G1 SMPL-X / XRobot profiles; it does not copy G1 joints. The live publisher normalizes source positions by calibration height / measured operator height.
+The publisher registers
 the prepared **HU_D04_01** model for both IK and FK, and publishes 31 named joints
 and all model bodies in WXYZ. To regenerate the profile:
 

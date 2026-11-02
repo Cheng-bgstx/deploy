@@ -50,7 +50,8 @@ def test_source_axis_conversion_preserves_world_targets():
 
 
 @pytest.mark.parametrize('path', PROFILES, ids=lambda p: p.stem)
-def test_pico_retarget_fk_and_named_zmq_buffer(path, monkeypatch):
+@pytest.mark.parametrize('human_height', [1.6, 1.8, 2.0])
+def test_pico_retarget_fk_and_named_zmq_buffer(path, human_height, monkeypatch):
     pytest.importorskip('general_motion_retargeting')
     pytest.importorskip('cv2')
     import mujoco
@@ -78,7 +79,8 @@ def test_pico_retarget_fk_and_named_zmq_buffer(path, monkeypatch):
         target_rot = R.from_quat(data.xquat[body], scalar_first=True)
         target_pos = data.xpos[body] - target_rot.apply(pos)
         scale = profile['human_scale_table'][human]
-        human_pos = root / root_scale + (target_pos - root) / scale
+        human_pos = (root / root_scale + (target_pos - root) / scale) * (
+            human_height / profile['human_height_assumption'])
         human_rot = target_rot * R.from_quat(quat, scalar_first=True).inv()
         frames[human] = [human_pos, human_rot]
     unity_to_world = R.from_euler('x', 90, degrees=True)
@@ -102,7 +104,7 @@ def test_pico_retarget_fk_and_named_zmq_buffer(path, monkeypatch):
 
     monkeypatch.setattr(pico, 'XRobotStreamer', Streamer)
     worker = pico.LiveRetargetPublisher(pico.PublisherArgs(
-        robot=cfg.name, viewer=False, actual_human_height=profile['human_height_assumption'],
+        robot=cfg.name, viewer=False, actual_human_height=human_height,
         min_link_height_align_strategy='none', controller_bind='tcp://127.0.0.1:*',
         hand_grip_bind='tcp://127.0.0.1:*'))
     pub = zmq.Context.instance().socket(zmq.PUB)
@@ -111,6 +113,9 @@ def test_pico_retarget_fk_and_named_zmq_buffer(path, monkeypatch):
                                   root_body_name=cfg.body_names[0],
                                   motion_zmq_connect=f'tcp://127.0.0.1:{port}')
     try:
+        for human, scale in worker.retarget.human_scale_table.items():
+            assert scale == pytest.approx(profile['human_scale_table'][human]
+                                          * profile['human_height_assumption'] / human_height)
         paused = worker.sample_and_retarget()
         assert paused['paused'] and not paused['motion_first_frame']
         worker.streamer.x = True

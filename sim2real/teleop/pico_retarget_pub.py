@@ -281,12 +281,26 @@ class LiveRetargetPublisher:
         self.streamer = XRobotStreamer()
         target_robot = _resolve_gmr_target_robot(self.robot_cfg)
         _register_gmr_robot(self.robot_cfg, target_robot)
+        human_height = float(args.actual_human_height)
+        if not np.isfinite(human_height) or human_height <= 0:
+            raise ValueError("actual_human_height must be finite and positive")
+        normalize_height = self.robot_cfg.name in {"oli"}
         self.retarget = GMR(
             src_human="xrobot",
             tgt_robot=target_robot,
-            actual_human_height=float(args.actual_human_height),
+            actual_human_height=None if normalize_height else human_height,
             verbose=bool(args.verbose),
         )
+        if normalize_height:
+            profile = json.loads((Path(__file__).with_name("configs")
+                                  / f"xrobot_to_{self.robot_cfg.name}.json").read_text())
+            # Live XR positions already have the operator's physical dimensions.
+            # Normalize them to the calibration stature, rather than applying
+            # GMR's legacy actual/assumed ratio a second time to a taller body.
+            ratio = float(profile["human_height_assumption"]) / human_height
+            self.retarget.human_scale_table = {
+                name: scale * ratio for name, scale in self.retarget.human_scale_table.items()
+            }
 
         self.mjcf_path = _resolve_publisher_mjcf_path(args.mjcf_path, self.robot_cfg)
         self.fk_model = mujoco.MjModel.from_xml_path(str(self.mjcf_path))
