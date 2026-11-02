@@ -201,6 +201,7 @@ class BasePolicy:
             robot_cfg=self.robot_cfg,
             interface=self.args.robot_interface,
             robot_ip=getattr(self.args, "robot_ip", "127.0.0.1"),
+            options=self.policy_config.get("robot_io_options"),
         )
 
     def _build_controller(self) -> ControllerBase:

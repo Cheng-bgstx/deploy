@@ -168,8 +168,8 @@ def load_sim_model(
         logger.warning("load_sim_model currently ignores non-default ground_rgb={}", ground_rgb)
     with _temp_scene_with_floor(mjcf_path) as scene_mjcf_path:
         spec = mujoco.MjSpec.from_file(str(scene_mjcf_path))
-        if robot_cfg.name == "oli":
-            # Proteus limx_oli_edu: floor contact only, no robot self-collisions
+        if robot_cfg.name in {"oli", "x2"}:
+            # Proteus OLI / X2: floor contact only, no robot self-collisions
             # and no passive joint damping (the controller supplies kd).
             for geom in spec.geoms:
                 if geom.type == mujoco.mjtGeom.mjGEOM_PLANE:

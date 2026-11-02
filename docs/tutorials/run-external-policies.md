@@ -36,6 +36,7 @@ value.
 | Proteus G1 | `checkpoints/proteus/proteus_60/unitree_g1/policy.yaml` | Normal G1 motion stream; generated from the Proteus checkout, see [Proteus](#proteus). |
 | Proteus ET1 | `checkpoints/proteus/proteus_60/galbot_et1/policy.yaml` | Galbot ET1 (`--robot et1`) with ET1 Motions; contract built from the R1's, see [Proteus on Galbot ET1](./proteus-et1.md). |
 | Proteus WAMSeq OLI | `checkpoints/proteus/proteus_wamseq_62/limx_oli_edu/policy.yaml` | LimX HU_D04_01 (`--robot oli`); see [Proteus on OLI](./proteus-oli.md). |
+| Proteus WAMSeq X2 | `checkpoints/proteus/proteus_wamseq_62/lingxi_x2/policy.yaml` | AgiBot Lingxi X2 Ultra (`--robot x2`); see [Proteus on X2](./proteus-x2.md). |
 | BFM-Zero | `checkpoints/bfm-zero/exp_lafan40-100style_update_z10/policy.yaml` | Requires the checkpoint-specific MJCF override for ZMQ publishers. |
 | TeleopIT | `checkpoints/teleopit/policy.yaml` | Normal G1 motion stream. |
 | Humanoid-GPT | `checkpoints/humanoid-gpt/policy.yaml` | Normal G1 motion stream. |

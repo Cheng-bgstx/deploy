@@ -18,11 +18,14 @@ import mujoco
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+from sim2real.config.robots import get_robot_cfg
 from sim2real.sim_env.integrated_sim2sim import IntegratedSim2Sim, IntegratedSim2SimArgs
 
 
 class VideoSim(IntegratedSim2Sim):
     def __init__(self, args, output: Path, fps: int, label: str):
+        args.root_trajectory_output = str(output.with_suffix('.root.npz'))
+        args.trajectory_output = str(output.with_suffix('.trajectory.npz'))
         super().__init__(args)
         self.output = output
         self.fps, self.label = fps, label
@@ -36,8 +39,9 @@ class VideoSim(IntegratedSim2Sim):
         self.renderer = mujoco.Renderer(self.sim.mj_model, height=600, width=640)
         self.reference = mujoco.MjData(self.sim.mj_model)
         self.camera = mujoco.MjvCamera()
-        self.camera.lookat[:] = [0, 0, .85]
-        self.camera.distance, self.camera.azimuth, self.camera.elevation = 3.1, 145, -12
+        scale = float(self.robot_cfg.default_qpos[2]) / .9282088749221369
+        self.camera.lookat[:] = [0, 0, .85 * scale]
+        self.camera.distance, self.camera.azimuth, self.camera.elevation = 3.1 * scale, 145, -12
         font = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
         self.font = ImageFont.truetype(font, 24) if Path(font).exists() else ImageFont.load_default()
         self.small = ImageFont.truetype(font, 18) if Path(font).exists() else ImageFont.load_default()
@@ -73,7 +77,8 @@ class VideoSim(IntegratedSim2Sim):
             self.renderer.update_scene(data, camera=self.camera)
             canvas.paste(Image.fromarray(self.renderer.render()), (x, 72))
         draw = ImageDraw.Draw(canvas)
-        draw.text((20, 8), 'LimX OLI HU_D04_01 | Proteus WAMSeq | sim2sim', font=self.font, fill='white')
+        robot_label = 'AgiBot Lingxi X2' if self.robot_cfg.name == 'x2' else 'LimX OLI HU_D04_01'
+        draw.text((20, 8), f'{robot_label} | Proteus WAMSeq | sim2sim', font=self.font, fill='white')
         draw.text((20, 42), self.label, font=self.small, fill='#9ecbdc')
         for x, text in [(16, 'REFERENCE'), (656, 'POLICY + MuJoCo physics')]:
             draw.rectangle((x - 4, 84, x + 335, 117), fill='#16222e')
@@ -101,21 +106,27 @@ class VideoSim(IntegratedSim2Sim):
                   'duration_s': self.frames / self.fps, 'motion': self.args.motion_path,
                   'policy': self.args.policy_config, 'label': self.label, 'seed': self.args.seed,
                   'final_root_height_m': float(self.sim.mj_data.qpos[self.sim.root_qpos_adr + 2])}
+        report['root_trajectory'] = self.args.root_trajectory_output
+        report['trajectory'] = self.args.trajectory_output
         self.output.with_suffix('.json').write_text(json.dumps(report, indent=2) + '\n')
         print(json.dumps(report, indent=2))
 
 
-def main():
+def main(default_robot='oli'):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--motion-path', required=True)
+    parser.add_argument('--robot', default=default_robot)
     parser.add_argument('--output', type=Path, default=Path('outputs/oli/sim2sim.mp4'))
-    parser.add_argument('--policy-config', default='checkpoints/proteus/proteus_wamseq_62/limx_oli_edu/policy.yaml')
+    parser.add_argument('--policy-config')
     parser.add_argument('--duration', type=float, default=6)
     parser.add_argument('--initial-pause-s', type=float, default=1)
     parser.add_argument('--fps', type=int, default=25)
     parser.add_argument('--label', default='OLI motion reference')
     args = parser.parse_args()
-    sim_args = IntegratedSim2SimArgs(robot='oli', policy_config=args.policy_config,
+    robot_name = get_robot_cfg(args.robot).name
+    default_policy = ('checkpoints/proteus/proteus_wamseq_62/lingxi_x2/policy-sim.yaml' if robot_name == 'x2'
+                      else 'checkpoints/proteus/proteus_wamseq_62/limx_oli_edu/policy.yaml')
+    sim_args = IntegratedSim2SimArgs(robot=args.robot, policy_config=args.policy_config or default_policy,
         motion_path=args.motion_path, headless=True, initial_pause_s=args.initial_pause_s,
         max_runtime_s=args.duration, seed=0)
     VideoSim(sim_args, args.output, args.fps, args.label).record_video()

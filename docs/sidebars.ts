@@ -47,6 +47,7 @@ const sidebars: SidebarsConfig = {
         'tutorials/scalecar-vehicle-entry',
         'tutorials/proteus-et1',
         'tutorials/proteus-oli',
+        'tutorials/proteus-x2',
       ],
     },
     'faq',

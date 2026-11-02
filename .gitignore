@@ -95,3 +95,5 @@ MANIFEST
 .scratch/
 
 !/tests/test_oli.py
+
+!/tests/test_x2.py

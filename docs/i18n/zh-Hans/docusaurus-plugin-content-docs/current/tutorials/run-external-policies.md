@@ -34,6 +34,7 @@ policy YAML。
 | Proteus G1 | `checkpoints/proteus/proteus_60/unitree_g1/policy.yaml` | 正常 G1 motion stream；从 Proteus checkout 生成，见 [Proteus](#proteus)。 |
 | Proteus ET1 | `checkpoints/proteus/proteus_60/galbot_et1/policy.yaml` | Galbot ET1（`--robot et1`），配 ET1 Motion；contract 由 R1 的推导而来，见 [Proteus 部署到 Galbot ET1](./proteus-et1.md)。 |
 | Proteus WAMSeq OLI | `checkpoints/proteus/proteus_wamseq_62/limx_oli_edu/policy.yaml` | LimX HU_D04_01（`--robot oli`）；参见 [OLI 上的 Proteus](./proteus-oli.md)。 |
+| Proteus WAMSeq X2 | `checkpoints/proteus/proteus_wamseq_62/lingxi_x2/policy.yaml` | 智元灵犀 X2 Ultra（`--robot x2`）；参见 [X2 上的 Proteus](./proteus-x2.md)。 |
 | BFM-Zero | `checkpoints/bfm-zero/exp_lafan40-100style_update_z10/policy.yaml` | ZMQ publisher 需要传 checkpoint 对应的 MJCF override。 |
 | TeleopIT | `checkpoints/teleopit/policy.yaml` | 正常 G1 motion stream。 |
 | Humanoid-GPT | `checkpoints/humanoid-gpt/policy.yaml` | 正常 G1 motion stream。 |
