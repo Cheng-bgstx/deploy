@@ -125,7 +125,7 @@ def main(default_robot='oli'):
     args = parser.parse_args()
     robot_name = get_robot_cfg(args.robot).name
     default_policy = ('checkpoints/proteus/proteus_wamseq_62/lingxi_x2/policy-sim.yaml' if robot_name == 'x2'
-                      else 'checkpoints/proteus/proteus_wamseq_62/limx_oli_edu/policy.yaml')
+                      else 'checkpoints/proteus/proteus_wamseq_62/limx_oli_edu/policy-sim.yaml')
     sim_args = IntegratedSim2SimArgs(robot=args.robot, policy_config=args.policy_config or default_policy,
         motion_path=args.motion_path, headless=True, initial_pause_s=args.initial_pause_s,
         max_runtime_s=args.duration, seed=0)

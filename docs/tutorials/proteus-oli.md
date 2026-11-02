@@ -228,3 +228,126 @@ bash -n scripts/oli/start_proteus.sh
 
 The extended SONIC artifact test was also attempted; its three release cases cannot
 run here because `checkpoints/sonic/{release/g1,release/smpl,v1_1/g1}` are absent.
+
+
+## PICO whole-body teleoperation
+
+Use the existing isolated `venv/pico` environment on the publisher PC, and the root
+project for the policy and simulator. Prepare the OLI model and actor above on
+both computers that need them. Install XRoboToolkit PC Service / Python SDK using
+[Teleop setup](../getting-started/teleop-x86-64.md). Clone the two SDK repos before
+`uv sync --project venv/pico`; on a fresh machine bootstrap with
+`uv sync --project venv/pico --no-install-package xrobotoolkit-sdk`, then run
+`bash scripts/setup/setup_xrobot_pybind.sh`. Wear the leg trackers, complete PICO
+whole-body calibration, and enable body + controller streaming to the publisher PC.
+
+The bundled `xrobot_to_oli.json` is derived from LimX GMR's calibrated
+`smplx_to_oli_edu.json` at `86e9546`. It preserves OLI task weights, scales and link
+position offsets, changes source names to XRobot's names, and composes every
+orientation offset with `Ry(pi)`. This source-axis conversion follows the matching
+G1 SMPL-X / XRobot profiles; it does not copy G1 joints. The publisher registers
+the prepared **HU_D04_01** model for both IK and FK, and publishes 31 named joints
+and all model bodies in WXYZ. To regenerate the profile:
+
+```bash
+uv run --no-sync python scripts/build_xrobot_profile.py \
+  --smplx-config ../GMR-limx/general_motion_retargeting/ik_configs/smplx_to_oli_edu.json \
+  --output sim2real/teleop/configs/xrobot_to_oli.json
+uv run --no-sync python scripts/make_hold_motion.py --robot oli --output outputs/oli/pico_hold
+```
+
+Generate the neutral reference once on the policy computer: streamed tracking
+still needs a file for startup shaping (`shaping_target: motion_first_frame`).
+The publisher initially sends this same RobotCfg default pose. Use **three terminals**
+for local sim2sim:
+
+```bash
+# 1: publisher PC; substitute the operator's measured height in metres
+bash scripts/oli/start_pico.sh publisher --actual-human-height 1.70
+# 2: root project simulation; open its mjviser URL
+bash scripts/oli/start_pico.sh sim
+# 3: root project tracking; use policy-sim.yaml / measured world root
+bash scripts/oli/start_pico.sh policy-sim 127.0.0.1
+```
+
+Inspect IK in the publisher viewer first. Press **A** to shape to neutral (10 s),
+release the buttons, then **A+B** together to enable policy Hold. Press **X** to
+start live reference updates; X again returns the publisher to neutral Hold at
+the current XY/yaw. **B alone** selects damping. Disable the simulator's elastic
+band in its GUI before evaluating free balance. X pauses reference generation;
+it does not disable the policy. A/B control is independent of the motion channel.
+
+For a separate publisher PC and OLI computer, replace the third command with:
+
+```bash
+# Policy / SDK computer: PUBLISHER_IP is the PC; ROBOT_IP is the LimX controller
+bash scripts/oli/start_pico.sh robot PUBLISHER_IP ROBOT_IP
+```
+
+The launcher sets `ROBOT_TYPE=HU_D04_01`, offline HF flags, CPU inference, 50 Hz
+policy, `robot_io=inline`, hardware `policy.yaml`, and both network endpoints:
+motion **TCP 28701** and PICO buttons **TCP 5592**. Allow both ports between the
+computers. `policy-sim` uses `robot_io=zmq` against BaseSimulator instead. Additional
+tracking CLI flags can follow the positional IP arguments, including a custom
+`--policy-config` or `--motion-path`. Run one publisher / simulator per set of ports.
+Hand triggers remain on 5593; no OLI hand driver is added here.
+
+If body streaming stops, the publisher stops sending live poses and the receiver
+holds its last reference; this is not an automatic fall-back to damping. Reconnect
+starts a new aligned segment. Use B while the button link works, or the SDK's
+independent stop path if the network/process fails. Hardware ownership and IMU
+requirements in the deployment section still apply.
+
+Local validation covers robot-specific IK, FK joint order, paused/live/reconnect
+markers, named ZMQ motion reception and existing button mapping with an offline XR
+fixture. The Python SDK also builds/imports on this x86 PC. No PICO headset or OLI
+hardware was connected for this validation; live tracking quality still needs
+operator calibration and a supported first test.
+
+## Additional LAFAN tracking motions
+
+The checked recipe `scripts/lafan_tracking_suite.json` adds **walk, aiming and
+dance2**, each the first 8 s of subject 1 at source 30 Hz. These are real human
+mocap, retargeted directly to OLI by official LimX GMR, then resampled to 50 Hz.
+Use the existing local LAFAN dataset or obtain `lafan1/lafan1.zip` from
+[Ubisoft's source repository](https://github.com/ubisoft/ubisoft-laforge-animation-dataset)
+and extract the BVHs into `lafan1/data`. Keep the dataset's license with the data.
+
+```bash
+# Export again to produce policy-sim.yaml as well as hardware policy.yaml
+HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --no-sync python scripts/export_proteus_onnx.py \
+  --proteus-root ../Proteus-wamseq --release proteus_wamseq_62 --contract limx_oli_edu --robot oli
+uv run --no-sync python scripts/lafan_tracking_suite.py --robot oli \
+  --lafan-data ../ubisoft-laforge-animation-dataset/lafan1/data --gmr-root ../GMR-limx --render
+# Play any generated reference on hardware through the existing keyboard launcher:
+# bash scripts/oli/start_proteus.sh outputs/oli/lafan_suite/walk ROBOT_IP
+```
+
+Datasets live at `outputs/oli/lafan_suite/{walk,aiming,dance2}`. Each has the BVH
+SHA256, interval, GMR commit / config hash, qpos names and sole-grounding metadata.
+The suite reuses existing datasets; select a new `--output` directory after changing
+retarget settings. Videos are `oli_wamseq_lafan_<name>.mp4` in the same parent,
+with root/whole-body trajectories, metrics JSON and exact policy/motion paths.
+Each 10 s clip includes 1 s initial policy Hold and a final-frame Hold. Simulation
+uses seed 0, 50 Hz control, 0.005 s physics, measured root position, no elastic band.
+
+Results on 2026-11-02 over the 14 contract tracking bodies during playback:
+
+| LAFAN clip | Mean world / pelvis-local body error | World root endpoint error |
+| --- | --- | --- |
+| walk1_subject1 | 13.29 / 16.61 cm | 13.26 cm |
+| aiming1_subject1 | 12.35 / 17.29 cm | 11.05 cm |
+| dance2_subject1 | 13.74 / 16.91 cm | 18.11 cm |
+
+All three completed upright (minimum root height 0.864 / 0.894 / 0.879 m).
+There is visible pose/yaw error; these clips are validation references, not a claim
+of hardware readiness. `policy-sim.yaml` disables reference forcing to match the
+training simulation; keep `policy.yaml` on hardware without world localization.
+
+```bash
+# The SDK-free integration test also imports root motion-buffer dependencies:
+uv pip install --python venv/pico/.venv/bin/python pytest \
+  'any4hdmi @ git+https://github.com/EGalahad/any4hdmi.git@5d0ae1915c904c64f2480a055aa1693523b9e4b4'
+HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --project venv/pico --no-sync python -m pytest \
+  tests/test_pico_retarget_profiles.py tests/test_pico_hand_grip.py -q
+```

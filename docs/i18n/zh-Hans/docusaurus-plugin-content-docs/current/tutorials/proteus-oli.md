@@ -208,3 +208,109 @@ bash -n scripts/oli/start_proteus.sh
 
 另外尝试了 SONIC 资源测试；本机缺少 `checkpoints/sonic/{release/g1,release/smpl,v1_1/g1}`，
 三个 release 用例因缺少这些文件无法执行。
+
+
+## PICO 全身遥操
+
+发布 PC 使用独立的 `venv/pico` 环境，策略和仿真使用根项目环境。需要模型的两端均先按
+上文准备 OLI 模型和 actor。按[遥操安装](../getting-started/teleop-x86-64.md)安装
+XRoboToolkit PC Service 与 Python SDK。首次安装先克隆两个 SDK 仓库，再执行
+`uv sync --project venv/pico --no-install-package xrobotoolkit-sdk`，随后运行
+`bash scripts/setup/setup_xrobot_pybind.sh`。佩戴腿部追踪器，完成 PICO 全身标定，向发布
+PC 开启 body 和 controller 数据流。
+
+内置 `xrobot_to_oli.json` 来自 LimX GMR `86e9546` 的 `smplx_to_oli_edu.json`：保留
+OLI 的任务权重、缩放和连杆位置偏移，把人体名称转换为 XRobot 名称，并对旋转偏移
+复合 `Ry(pi)`。该坐标转换由 G1 的 SMPL-X / XRobot 对应配置验证，不复制 G1 的关节角。
+IK 和 FK 均注册准备好的 **HU_D04_01** 模型，发布 31 个具名关节与模型刚体、WXYZ 四元数。
+重新生成配置和启动参考：
+
+```bash
+uv run --no-sync python scripts/build_xrobot_profile.py \
+  --smplx-config ../GMR-limx/general_motion_retargeting/ik_configs/smplx_to_oli_edu.json \
+  --output sim2real/teleop/configs/xrobot_to_oli.json
+uv run --no-sync python scripts/make_hold_motion.py --robot oli --output outputs/oli/pico_hold
+```
+
+在策略计算机上生成一次中立参考。流式 tracking 的启动整形仍需要动作文件
+（`shaping_target: motion_first_frame`）；发布器暂停时使用同一个 RobotCfg 默认姿态。
+本地 sim2sim 开 **三个终端**：
+
+```bash
+# 1：发布 PC，身高改成操作者的实测米数
+bash scripts/oli/start_pico.sh publisher --actual-human-height 1.70
+# 2：根项目仿真，打开其 mjviser 地址
+bash scripts/oli/start_pico.sh sim
+# 3：根项目 tracking，使用 policy-sim.yaml 和真实仿真根位置
+bash scripts/oli/start_pico.sh policy-sim 127.0.0.1
+```
+
+先在发布器查看 IK。按 **A** 用 10 秒整形至中立姿态，松开按键，再同时按 **A+B**
+启用策略 Hold。按 **X** 开始实时参考，X 再按一次回到当前 XY/朝向的中立 Hold。
+**单独 B** 切换阻尼。评估自由平衡前在仿真 GUI 关闭弹力带。X 控制参考生成的暂停，
+策略仍然运行；A/B 与动作数据走独立通道。
+
+发布 PC 和 OLI 计算机分开时，将第三条命令替换为：
+
+```bash
+# 策略 / SDK 计算机：PUBLISHER_IP 是 PC，ROBOT_IP 是 LimX 控制器
+bash scripts/oli/start_pico.sh robot PUBLISHER_IP ROBOT_IP
+```
+
+脚本设置 `ROBOT_TYPE=HU_D04_01`、HF 离线参数、CPU 推理、50 Hz 策略、
+`robot_io=inline`、真机 `policy.yaml`，并同时连接动作 **TCP 28701** 和手柄 **TCP 5592**。
+两端放通这两个端口。`policy-sim` 则使用 `robot_io=zmq` 连接 BaseSimulator。
+位置参数后可追加 tracking 参数，例如自定义 `--policy-config` 或 `--motion-path`。
+同一组端口同时只运行一个发布器/仿真实例。扳机流保持在 5593，此处没有新增 OLI 灵巧手驱动。
+
+body 断流时发布器停止发实时姿态，接收端保持最后参考，**不会自动切换阻尼**。
+重连后创建重新对齐的动作段。手柄链路正常时可按 B；网络或进程失效时使用 SDK 独立停止
+路径。真机控制权与 IMU 要求仍按上文部署章节处理。
+
+本地使用离线 XR 测试输入验证了各机器人 IK、FK 关节顺序、暂停/运行/重连标记、具名
+ZMQ 接收和原有按钮映射，Python SDK 在此 x86 PC 上也已编译并可导入。本次未连接
+PICO 头显或 OLI 真机；真实遥操质量仍需操作者标定及有支撑的首次验证。
+
+## 新增 LAFAN tracking 动作
+
+`scripts/lafan_tracking_suite.json` 新增 **步行 walk、瞄准 aiming、舞蹈 dance2**，均取
+subject 1 的前 8 秒、原始 30 Hz。这些是真实人体 mocap，经官方 LimX GMR 直接重定向到
+OLI，运行时重采样到 50 Hz。可复用本地 LAFAN 数据，也可从
+[Ubisoft 源仓库](https://github.com/ubisoft/ubisoft-laforge-animation-dataset)取得
+`lafan1/lafan1.zip`，将 BVH 解压至 `lafan1/data`，保留数据许可。
+
+```bash
+# 重新导出，同时生成仿真 policy-sim.yaml 和真机 policy.yaml
+HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --no-sync python scripts/export_proteus_onnx.py \
+  --proteus-root ../Proteus-wamseq --release proteus_wamseq_62 --contract limx_oli_edu --robot oli
+uv run --no-sync python scripts/lafan_tracking_suite.py --robot oli \
+  --lafan-data ../ubisoft-laforge-animation-dataset/lafan1/data --gmr-root ../GMR-limx --render
+# 使用原键盘启动器播放任一真机参考：
+# bash scripts/oli/start_proteus.sh outputs/oli/lafan_suite/walk ROBOT_IP
+```
+
+动作目录为 `outputs/oli/lafan_suite/{walk,aiming,dance2}`，各自保存 BVH SHA256、截取
+区间、GMR 提交和配置哈希、qpos 名称、脚底贴地信息。脚本会复用已有数据集，修改重定向
+设置后请指定新的 `--output`。同一父目录保存 `oli_wamseq_lafan_<name>.mp4`、根轨迹、
+全身轨迹、误差 JSON 以及实际策略/动作路径。每条视频 10 秒，包含 1 秒初始策略 Hold
+和末帧 Hold；seed=0，策略 50 Hz，物理步长 0.005 秒，使用测得的世界根位置、无弹力带。
+
+2026-11-02 在播放阶段、14 个合约跟踪刚体上的结果：
+
+| LAFAN 片段 | 平均世界 / 骨盆局部刚体误差 | 世界根位置末端误差 |
+| --- | --- | --- |
+| walk1_subject1 | 13.29 / 16.61 cm | 13.26 cm |
+| aiming1_subject1 | 12.35 / 17.29 cm | 11.05 cm |
+| dance2_subject1 | 13.74 / 16.91 cm | 18.11 cm |
+
+三条都完整保持站立，最低根高度分别为 0.864 / 0.894 / 0.879 m。姿态和朝向有可见偏差，
+这些是验证参考，不代表真机就绪。`policy-sim.yaml` 关闭 reference forcing 以匹配训练
+仿真；没有世界定位的真机仍使用 `policy.yaml`。
+
+```bash
+# 无需连接 SDK 的集成测试也会导入根项目的 motion buffer 依赖：
+uv pip install --python venv/pico/.venv/bin/python pytest \
+  'any4hdmi @ git+https://github.com/EGalahad/any4hdmi.git@5d0ae1915c904c64f2480a055aa1693523b9e4b4'
+HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --project venv/pico --no-sync python -m pytest \
+  tests/test_pico_retarget_profiles.py tests/test_pico_hand_grip.py -q
+```

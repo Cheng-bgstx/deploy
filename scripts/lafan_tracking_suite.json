@@ -1,0 +1,8 @@
+{
+  "source": "https://github.com/ubisoft/ubisoft-laforge-animation-dataset",
+  "clips": [
+    {"name": "walk", "bvh": "walk1_subject1.bvh", "start_s": 0, "duration_s": 8},
+    {"name": "aiming", "bvh": "aiming1_subject1.bvh", "start_s": 0, "duration_s": 8},
+    {"name": "dance2", "bvh": "dance2_subject1.bvh", "start_s": 0, "duration_s": 8}
+  ]
+}

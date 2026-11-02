@@ -1,5 +1,8 @@
 # Pico Teleoperation
 
+HU_D04_01 请参照 [Proteus OLI](./proteus-oli.md#pico-全身遥操)，其中提供专用 IK
+标定、中立启动参考，以及仿真和 LimX SDK 启动步骤。发布端和策略端均需选择对应机器人。
+
 这个教程使用 teleop publisher 提供实时 Pico / XR retarget，用它内置的 mjviser server 检查 retarget 结果，再用 root project 的 tracking policy 做执行。
 
 ## 1. 启动 Pico retarget publisher
