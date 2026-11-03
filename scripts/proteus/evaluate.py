@@ -18,11 +18,16 @@ os.environ.setdefault('SIM2REAL_ORT_NUM_THREADS', '1')
 import numpy as np
 import yaml
 
+from sim2real.config.robots import get_robot_cfg
 from sim2real.sim_env.integrated_sim2sim import IntegratedSim2Sim, IntegratedSim2SimArgs
 from sim2real.utils.math import quat_rotate_inverse_numpy
 
 
-def evaluate(robot, policy, dataset, output, seed=0):
+def evaluate(robot, policy, dataset, output, seed=0, sim_dt=None):
+    # The gains include stiff/light joints: a 5-ms external PD update can
+    # oscillate even with implicitfast physics. Use 32 updates per 20-ms policy tick.
+    if sim_dt is None:
+        sim_dt = .000625 if get_robot_cfg(robot).name in {'q1', 't800'} else .005
     cfg = yaml.safe_load(policy.read_text())
     if cfg['proteus']['reference_forcing']:
         raise ValueError('Use policy-sim.yaml with measured world root for evaluation')
@@ -41,7 +46,7 @@ def evaluate(robot, policy, dataset, output, seed=0):
         length = len(np.load(motion)['qpos'])
         prefix = output / motion.stem
         args = IntegratedSim2SimArgs(robot=robot, policy_config=str(policy.resolve()),
-            motion_path=str(motion.resolve()), headless=True, initial_pause_s=1.,
+            motion_path=str(motion.resolve()), headless=True, initial_pause_s=1., sim_dt=sim_dt,
             max_runtime_s=(length - 1) * dt + 2., seed=seed,
             root_trajectory_output=str(prefix.with_suffix('.root.npz')),
             trajectory_output=str(prefix.with_suffix('.trajectory.npz')))
@@ -94,5 +99,6 @@ if __name__ == '__main__':
     p.add_argument('--dataset', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--seed', type=int, default=0)
+    p.add_argument('--sim-dt', type=float, help='Physics timestep; Q1/T800 default to 0.000625 s')
     a = p.parse_args()
-    evaluate(a.robot, a.policy_config, a.dataset, a.output, a.seed)
+    evaluate(a.robot, a.policy_config, a.dataset, a.output, a.seed, a.sim_dt)
