@@ -352,3 +352,51 @@ uv pip install --python venv/pico/.venv/bin/python pytest \
 HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --project venv/pico --no-sync python -m pytest \
   tests/test_pico_retarget_profiles.py tests/test_pico_hand_grip.py -q
 ```
+
+## Original Proteus runtime audit (2026-11-03)
+
+After discovering the Q1/T800 simulation timestep issue, this branch was checked
+against the **unchanged** Proteus `wamseq` runner at `1e0e038`. Both runners use
+the same prepared robot model, shared WAMSeq weights and exact 50-Hz reference
+arrays; these arrays were packed into a native `MotionLibrary` without retargeting.
+Each original run was also invoked through its actual `deploy/sim2sim.py` CLI.
+This controls the model revision; it does not recreate unavailable training assets.
+
+Seed is 0, policy rate 50 Hz. Compare the first physical sample for each shared
+playback frame 1..T-1 over the contract's 14 tracking bodies. The local runner
+retains its 1-s initial policy Hold; the source retains its native start and
+reference velocities. The last column changes only the local physics timestep.
+These matched-frame diagnostics can differ slightly from historical video metrics
+because of sampling phase and, for older OLI experiments, root-reference forcing.
+All runs below use `policy-sim.yaml` with measured world-root translation.
+
+| Reference | Local 5 ms (cm) | Original 0.625 ms (cm) | Local 0.625 ms (cm) |
+| --- | ---: | ---: | ---: |
+| walk | 12.91 | 12.74 | 12.73 |
+| aiming | 12.27 | 12.21 | 12.23 |
+| dance2 | 13.55 | 12.78 | 12.51 |
+| dance1 | 12.09 | 11.56 | 12.25 |
+
+There is **no analogous timestep-induced oscillation or major runtime gap** on
+these references. The original runner also has 11.56–12.78 cm
+mean body error. A smaller local step changes position accuracy only modestly.
+Local/original walk joint-acceleration RMS is 17.07/18.40 rad/s², unlike Q1's
+87.11/33.83 rad/s² symptom. Keep the existing OLI simulation defaults. Remaining
+tracking quality cannot be assigned to weights, reference retargeting or model
+revision from this comparison alone.
+
+On 399 shared physical states, proprioception, action history and validity masks
+were checked against the original builder. After evaluating both on fresh FK and
+unit reference quaternions, maximum task/action differences are
+6.56e-07/9.54e-06; action history and masks match exactly.
+The unadjusted source body-transform cache lags qpos by one physics step; this
+small observation-timing difference is retained in the original rollout.
+
+The machine-readable record is `docs/experiments/proteus-oli-runtime-audit.json`:
+source/artifact hashes, exact commands, native CLI results, all three variants and
+observation diagnostics. Debug scripts and actual physical-pose traces/videos are
+archived under `outputs/proteus_oli_x2_audit/20261103_171600/`. The differential
+checker rejects the known bad Q1/T800 captures and accepts all nine OLI/X2
+references in both local resolutions. This detects the observed numerical
+regression; it is not an absolute tracking-quality threshold. Runtime code,
+policy weights and hardware/PICO behavior were not changed by this audit.

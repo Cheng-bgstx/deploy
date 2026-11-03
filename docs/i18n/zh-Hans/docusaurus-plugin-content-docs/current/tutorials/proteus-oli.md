@@ -315,3 +315,43 @@ uv pip install --python venv/pico/.venv/bin/python pytest \
 HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --project venv/pico --no-sync python -m pytest \
   tests/test_pico_retarget_profiles.py tests/test_pico_hand_grip.py -q
 ```
+
+## Proteus 原版仿真对照（2026-11-03）
+
+在发现 Q1/T800 的仿真步长问题后，已将本分支与 **未修改** 的 Proteus `wamseq`
+`1e0e038` 仿真器对照。两边使用相同的已准备本体模型、共享 WAMSeq 权重和完全相同的
+50 Hz 参考数组；参考只打包成原生 `MotionLibrary`，没有重新 retarget。
+每条原版动作也通过实际 `deploy/sim2sim.py` CLI 运行。
+这里控制了本体模型版本，并未重建缺失的原始训练资产。
+
+seed 为 0，策略 50 Hz。对双方共有的播放帧 1..T-1 各取首个物理采样，在 contract 的
+14 个 tracking body 上计算平均世界位置误差。本地保留启动时 1 s 策略 Hold，
+原版保留原生启动方式和参考速度；最后一列仅改变本地物理步长。
+该统一采样指标与历史视频指标可能因采样时相略有差异，较早 OLI 实验还使用了不同的
+根部参考强制设置。本次全部使用 `policy-sim.yaml` 和实测世界根部平移。
+
+| 参考动作 | 本地 5 ms（cm） | 原版 0.625 ms（cm） | 本地 0.625 ms（cm） |
+| --- | ---: | ---: | ---: |
+| walk | 12.91 | 12.74 | 12.73 |
+| aiming | 12.27 | 12.21 | 12.23 |
+| dance2 | 13.55 | 12.78 | 12.51 |
+| dance1 | 12.09 | 11.56 | 12.25 |
+
+这些参考上 **未发现类似的步长数值不稳定或明显运行时差距**。原版的平均 body 误差也为
+11.56–12.78 cm，减小本地步长仅带来有限的位置精度变化。
+步行动作的本地/原版关节加速度 RMS 为 17.07/18.40 rad/s²，未出现 Q1 的
+87.11/33.83 rad/s² 差距。因此保留 OLI 的现有仿真默认值。
+仅凭这组对照，还不能把剩余跟踪误差归因于权重、参考 retarget 或模型版本中的某一项。
+
+已在 399 个共同物理状态上对照原版的 proprioception、action history 和有效位。
+统一使用即时 FK 和单位参考四元数后，task/action 最大差分别为
+6.56e-07/9.54e-06，action history 和有效位完全一致。
+未经诊断调整的原版 body 变换缓存比 qpos 滞后一个物理步；实际原版 rollout 保留了
+这一小幅观测时序差异。
+
+机器可读记录为 `docs/experiments/proteus-oli-runtime-audit.json`，包含源/产物哈希、
+准确命令、原版 CLI 结果、三种运行设置和观测诊断。调试脚本及实际物理轨迹/视频归档于
+`outputs/proteus_oli_x2_audit/20261103_171600/`。差分检查器能够检出已知有问题的
+Q1/T800 轨迹，而 OLI/X2 的九条参考在两种本地步长下均未触发该差距检查。
+该检查针对已观测到的数值退化，不是绝对跟踪质量阈值。
+本次排查没有修改运行时代码、策略权重或真机/PICO 行为。
