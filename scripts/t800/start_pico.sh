@@ -10,7 +10,7 @@ case "$mode" in
     exec uv run --project venv/pico --no-sync python -m sim2real.teleop.pico_retarget_pub --robot t800 "$@"
     ;;
   sim)
-    exec uv run --no-sync python -m sim2real.sim_env.base_sim --robot t800 "$@"
+    exec uv run --no-sync python -m sim2real.sim_env.base_sim --robot t800 --sim-dt 0.000625 --decimation 32 "$@"
     ;;
   policy-sim|robot)
     publisher_ip="127.0.0.1"

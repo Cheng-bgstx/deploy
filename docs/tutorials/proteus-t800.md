@@ -37,16 +37,44 @@ uv run --no-sync python -m scripts.proteus.evaluate --robot t800 \
   --dataset checkpoints/engineai_t800/motions --output outputs/t800/eval-new
 ```
 
-Local validation (2026-11-03): seed 0, 50 Hz policy, 0.005 s physics, 1 s initial policy-active hold, each 8 s mocap excerpt to the final frame, then 1 s final hold. A run passes only when complete, finite and every playback frame’s mean error over the 14 contract bodies is at most 0.5 m. All default clips below passed. Metrics use recorded trajectories; root endpoint error here is in a common world frame. The NPZ also records displacements in separate initial root frames, which is a different measure.
+Local validation (2026-11-03): seed 0, 50 Hz policy, 0.000625 s physics, 1 s initial policy-active hold, each 8 s mocap excerpt to the final frame, then 1 s final hold. A run passes only when complete, finite and every playback frame’s mean error over the 14 contract bodies is at most 0.5 m. All default clips below passed. Metrics use recorded trajectories; root endpoint error here is in a common world frame. The NPZ also records displacements in separate initial root frames, which is a different measure.
 
 | Clip | Mean world body error (cm) | Mean local body error (cm) | World root endpoint error (cm) |
 | --- | ---: | ---: | ---: |
-| `aiming1_subject1` | 13.49 | 6.96 | 3.03 |
-| `dance2_subject1` | 12.73 | 5.04 | 24.71 |
-| `fightAndSports1_subject4` | 14.19 | 6.15 | 13.19 |
-| `walk1_subject1` | 12.63 | 7.12 | 10.70 |
+| `aiming1_subject1` | 5.13 | 5.69 | 1.49 |
+| `dance2_subject1` | 4.10 | 3.66 | 1.61 |
+| `fightAndSports1_subject4` | 3.61 | 2.44 | 6.16 |
+| `walk1_subject1` | 5.63 | 6.61 | 6.02 |
 
-The machine-readable record with source/artifact hashes and commands is `docs/experiments/proteus-t800.json`. Re-running requires a new output directory. A threshold pass is an offline tracking result, not a hardware/live teleop result. The first dance excerpt (`dance1_subject1`) fell with the standard actor and is excluded from the default library. The full actor passed that stress clip; `eval-full` and its comparison report are recorded separately. The default four-clip library uses the standard actor and `dance2_subject1`.
+The machine-readable record with source/artifact hashes and commands is `docs/experiments/proteus-t800.json`. Re-running requires a new output directory. A threshold pass is an offline tracking result, not a hardware/live teleop result. The historical `dance1_subject1` standard/full comparison used the old 5-ms loop. Those stress results are retained for audit and do not establish intrinsic policy quality. The corrected default four-clip library uses the standard actor and `dance2_subject1`.
+
+## Simulation timestep correction
+
+The original Proteus `deploy/sim2sim.py` was run unchanged on the same WAMSeq
+weights, verified robot model and exact 50-Hz reference arrays. Q1 and A3 have
+similar mean position errors across the runners; T800's old 5-ms external-PD
+simulation was materially worse. On matched 50-Hz playback samples, T800's body
+error was 12.72 cm locally versus 5.62 cm in the original runner. Q1's joint
+acceleration RMS was 87.11 versus 33.83 rad/s², despite similar position error.
+
+The original uses 0.625-ms physics steps and implicit joint servos. MuJoCo's
+`implicitfast` integrator does not make a velocity-feedback torque computed
+outside the integrator implicit. Changing only the local physics timestep to
+0.625 ms reduced T800's matched-sample error to 5.84 cm and Q1's acceleration RMS
+to 28.42 rad/s². Removing the initial Hold alone did not resolve the T800 gap;
+using implicit servos at 5 ms did. The experiment record preserves each probe.
+
+`evaluate.py` now defaults to **0.000625 s for Q1/T800** (override with `--sim-dt`).
+The PICO simulator launcher passes `--sim-dt 0.000625 --decimation 32`; policy
+inference and viewer updates remain 50 Hz. For direct integrated-simulation
+commands, pass `--sim-dt 0.000625` explicitly. Both the initial and final Hold are
+retained. The table above was re-run with the corrected timestep.
+
+The regression `tests/test_proteus_sim_resolution.py` exercises the actual
+checkpoint and walk reference. It failed before the correction and passes after
+it, catching Q1 acceleration RMS >=60 rad/s² or T800 mean body error >=8 cm.
+The source repository and ONNX weights were not changed. This correction concerns
+simulation numerical stability and does not establish physical-robot performance.
 
 ## Hardware entry
 

@@ -37,16 +37,40 @@ uv run --no-sync python -m scripts.proteus.evaluate --robot t800 \
   --dataset checkpoints/engineai_t800/motions --output outputs/t800/eval-new
 ```
 
-本地验证（2026-11-03）：seed 0，策略 50 Hz，物理步长 0.005 s；开始 1 s 策略激活保持，播放每条 8 s mocap 摘录至末帧，再保持 1 s。通过条件为播放完成、数值有限，且每个播放帧在 14 个 contract body 上的平均位置误差不超过 0.5 m。下列默认动作全部通过。指标由实际记录轨迹计算，表中根部终点误差采用同一世界坐标系；NPZ 还包含双方各自在初始根坐标系表达的位移误差，两者定义不同。
+本地验证（2026-11-03）：seed 0，策略 50 Hz，物理步长 0.000625 s；开始 1 s 策略激活保持，播放每条 8 s mocap 摘录至末帧，再保持 1 s。通过条件为播放完成、数值有限，且每个播放帧在 14 个 contract body 上的平均位置误差不超过 0.5 m。下列默认动作全部通过。指标由实际记录轨迹计算，表中根部终点误差采用同一世界坐标系；NPZ 还包含双方各自在初始根坐标系表达的位移误差，两者定义不同。
 
 | 动作 | 平均世界 body 误差（cm） | 平均局部 body 误差（cm） | 世界根部终点误差（cm） |
 | --- | ---: | ---: | ---: |
-| `aiming1_subject1` | 13.49 | 6.96 | 3.03 |
-| `dance2_subject1` | 12.73 | 5.04 | 24.71 |
-| `fightAndSports1_subject4` | 14.19 | 6.15 | 13.19 |
-| `walk1_subject1` | 12.63 | 7.12 | 10.70 |
+| `aiming1_subject1` | 5.13 | 5.69 | 1.49 |
+| `dance2_subject1` | 4.10 | 3.66 | 1.61 |
+| `fightAndSports1_subject4` | 3.61 | 2.44 | 6.16 |
+| `walk1_subject1` | 5.63 | 6.61 | 6.02 |
 
-包含源/产物哈希与准确命令的机器可读记录见 `docs/experiments/proteus-t800.json`。重跑需要新的输出目录。阈值通过仅表示离线 tracking 结果，不等于真机或实时遥操结果。第一条舞蹈 `dance1_subject1` 在标准 actor 下摔倒，因此不属于默认库；full actor 通过了该压力片段，`eval-full` 与对应比较报告另行记录。默认四条动作使用标准 actor，舞蹈为 `dance2_subject1`。
+包含源/产物哈希与准确命令的机器可读记录见 `docs/experiments/proteus-t800.json`。重跑需要新的输出目录。阈值通过仅表示离线 tracking 结果，不等于真机或实时遥操结果。此前 `dance1_subject1` 的标准/full 对比采用旧 5 ms 仿真，历史压力结果保留供审计，不能据此判断策略本身的质量。修正后的默认四条动作使用标准 actor，舞蹈为 `dance2_subject1`。
+
+## 仿真步长修正
+
+已使用同一份 WAMSeq 权重、验证过的本体模型和完全相同的 50 Hz 参考数组，
+直接运行未修改的 Proteus `deploy/sim2sim.py`。Q1、A3 的平均位置误差在两边接近，
+T800 原来的 5 ms 外部 PD 仿真则明显更差。统一按 50 Hz 播放帧采样时，
+T800 本地 body 误差为 12.72 cm，原版为 5.62 cm；Q1 虽然位置误差接近，
+关节加速度 RMS 却为 87.11，对应原版 33.83 rad/s²。
+
+原版使用 0.625 ms 物理步长和隐式关节伺服。MuJoCo 的 `implicitfast` 并不会让
+在积分器外按上一步速度计算的反馈力矩自动成为隐式反馈。仅将本地物理步长改为
+0.625 ms，T800 的统一采样误差就降至 5.84 cm，Q1 加速度 RMS 降至 28.42 rad/s²。
+单独去掉启动 Hold 不能解决 T800 差距；在 5 ms 下改用隐式伺服也能解决。
+实验记录保留了各项单变量对照。
+
+`evaluate.py` 现在对 **Q1/T800 默认使用 0.000625 s**，可用 `--sim-dt` 覆盖。
+PICO 仿真启动器传入 `--sim-dt 0.000625 --decimation 32`，策略推理和 viewer 更新
+仍为 50 Hz。直接使用 integrated 仿真命令时，也应显式加 `--sim-dt 0.000625`。
+开始和末帧 Hold 均保留。上表已按修正步长重新评测。
+
+回归测试 `tests/test_proteus_sim_resolution.py` 使用实际 checkpoint 和步行动作，
+修正前失败、修正后通过，可捕获 Q1 加速度 RMS >=60 rad/s² 或 T800 平均 body
+误差 >=8 cm。源仓库和 ONNX 权重均未修改。本修正针对仿真数值稳定性，
+不代表真机性能已验证。
 
 ## 真机入口
 
