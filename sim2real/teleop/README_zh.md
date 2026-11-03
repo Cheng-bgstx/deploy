@@ -15,3 +15,5 @@ Runtime artifacts，包括 JetPack 5 预编译包：
 - [Getting Started / Teleop Project (Onboard Orin)](../../docs/zh_CN/getting-started/teleop-onboard-orin.md)
 - [教程 / Pico Teleoperation](../../docs/zh_CN/tutorials/pico-teleoperation.md)
 - [教程 / Motion Recording](../../docs/zh_CN/tutorials/motion-recording.md)
+
+[Proteus 众擎 T800](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-t800.md): `--robot t800`; 包含全身 IK、ZMQ 动作/按钮、仿真与真机启动入口。

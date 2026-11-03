@@ -292,8 +292,11 @@ def policy_yaml(contract: dict[str, Any], robot: str, far_offset: int) -> dict[s
 
     if contract.get("actor_kind") == "wam_seq":
         cfg["observation"]["history_valid"] = {"valid": term("history_valid")}
-    if robot_cfg.name in {"oli", "x2"}:
+    if robot_cfg.name in {"oli", "x2", "t800"}:
         cfg["shaping_target"] = "motion_first_frame"
+    if robot_cfg.name == "t800":
+        cfg["robot_io_options"] = {"publish_hz": 500.0, "timeout_s": 0.25,
+            "imu_topic": "/hardware/imu_info", "imu_to_pelvis_wxyz": [1., 0., 0., 0.]}
     if robot_cfg.name == "x2":
         cfg["robot_io_options"] = {
             "publish_hz": 500.0, "timeout_s": 0.25, "head_pitch_enabled": False,

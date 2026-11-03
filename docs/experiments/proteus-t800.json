@@ -1,0 +1,439 @@
+{
+  "date": "2026-11-03",
+  "branch": "feat/proteus-wamseq-engineai-t800",
+  "proteus_source_commit": "1e0e0381bdec73652f8aa90b871f2980586bb52a",
+  "lafan_source_commit": "94084601bacdf9cc3764b5c73daaeccae6035fac",
+  "policy_comparison": {
+    "release": "proteus_wamseq_62",
+    "actor_kind": "wam_seq",
+    "contract": "engineai_t800",
+    "robot": "t800",
+    "far_offset": 16,
+    "passed": true,
+    "max_abs_error": 0.0,
+    "tolerance": 1e-06,
+    "num_samples": 64,
+    "seed": 0,
+    "method": "standard-normal inputs in sim2real layout; the released actor gets them with a batch axis and the contract's morph; action is compared with actions[driven slots], next_slot_action with actions",
+    "sources": {
+      "proteus_actor.onnx": "33bc2ff91f5322abb9e939e5f691e62c03897906161ba1ab2bee9b0533fb9df1",
+      "engineai_t800.json": "50892110948098ae52cf4fffd2071dd6e7b79be0f271dad08e163d7c76985ab1"
+    },
+    "artifact": {
+      "policy.onnx": {
+        "sha256": "ba8355d629c56c132b4283026599b860eb785ffc1b79dac0c4ec1d064e6103f5",
+        "ir_version": 8,
+        "opset": {
+          "ai.onnx": 17
+        },
+        "inputs": {
+          "proprioception": [
+            10,
+            68
+          ],
+          "task": [
+            6,
+            253
+          ],
+          "action_history": [
+            10,
+            31
+          ],
+          "history_valid": [
+            10
+          ]
+        },
+        "outputs": {
+          "action": [
+            25
+          ],
+          "next_slot_action": [
+            31
+          ]
+        }
+      }
+    },
+    "versions": {
+      "onnx": "1.17.0",
+      "onnxruntime": "1.23.2"
+    }
+  },
+  "model_validation": {
+    "robot": "t800",
+    "contract": "engineai_t800",
+    "source_xml": "/home/galbot/projects/GMR-engineai/assets/engineai_t800/t800_mocap.xml",
+    "source_xml_sha256": "be4968b91374ba9ac488dce9d2e1fe7e96fa9a9f03dcffb69a965a50ed52f402",
+    "spec_sha256": "aed8f3b48e5ca3c17435163c4b625bcbe6baf60a206d460d8a962d0f77c6669e",
+    "vendor_mass_kg": 84.917488,
+    "training_mass_kg": 84.91745999999999,
+    "mass_difference_kg": 2.8000000014571924e-05,
+    "max_joint_axis_error": 1.646936161892043e-07,
+    "joint_limit_overrides": {},
+    "joints_fixed_at_zero": [],
+    "prepared_xml_sha256": "e94ed349e4611d0c12620f2720600b322878564735360bdac9cd98a2e3598afe"
+  },
+  "motion_manifest": {
+    "format_version": 2,
+    "dataset_name": "t800_lafan",
+    "mjcf": "../../../third_party/engineai_t800/model/t800_mocap_tracking.xml",
+    "motions_subdir": "motions",
+    "timestep": 0.033333,
+    "qpos_dim": 32,
+    "qpos_names": [
+      "root_tx",
+      "root_ty",
+      "root_tz",
+      "root_qw",
+      "root_qx",
+      "root_qy",
+      "root_qz",
+      "J00_HIP_PITCH_L",
+      "J01_HIP_ROLL_L",
+      "J02_HIP_YAW_L",
+      "J03_KNEE_PITCH_L",
+      "J04_ANKLE_PITCH_L",
+      "J05_ANKLE_ROLL_L",
+      "J06_HIP_PITCH_R",
+      "J07_HIP_ROLL_R",
+      "J08_HIP_YAW_R",
+      "J09_KNEE_PITCH_R",
+      "J10_ANKLE_PITCH_R",
+      "J11_ANKLE_ROLL_R",
+      "J12_TORSO_YAW",
+      "J13_SHOULDER_PITCH_L",
+      "J14_SHOULDER_ROLL_L",
+      "J15_SHOULDER_YAW_L",
+      "J16_ELBOW_PITCH_L",
+      "J17_ELBOW_YAW_L",
+      "J18_SHOULDER_PITCH_R",
+      "J19_SHOULDER_ROLL_R",
+      "J20_SHOULDER_YAW_R",
+      "J21_ELBOW_PITCH_R",
+      "J22_ELBOW_YAW_R",
+      "J23_HEAD_PITCH",
+      "J24_HEAD_YAW"
+    ],
+    "num_motions": 4,
+    "source": {
+      "kind": "LAFAN1 human mocap solved by target-model IK",
+      "motions": [
+        {
+          "file": "motions/walk1_subject1.npz",
+          "frames": 240,
+          "bvh": "walk1_subject1.bvh",
+          "bvh_sha256": "4c9d591f323ffa660d9de6ef20c5d7077e66b2102a009feedf01afa22a6fbc73",
+          "start_s": 0.0,
+          "duration_s": 7.99992,
+          "ground_shift_range_m": [
+            0.006018434253938602,
+            0.04926039485557095
+          ]
+        },
+        {
+          "file": "motions/dance2_subject1.npz",
+          "frames": 240,
+          "bvh": "dance2_subject1.bvh",
+          "bvh_sha256": "8af02061322ac5fcc58930450523c8bbcb576987dcc25dde2438acd77c487efc",
+          "start_s": 0.0,
+          "duration_s": 7.99992,
+          "ground_shift_range_m": [
+            0.006130727119439882,
+            0.036031627026203425
+          ]
+        },
+        {
+          "file": "motions/fightAndSports1_subject4.npz",
+          "frames": 240,
+          "bvh": "fightAndSports1_subject4.bvh",
+          "bvh_sha256": "205396f5a212419b721c2d3b1f9072d625718567354ee623f89beacc84d5b98c",
+          "start_s": 0.0,
+          "duration_s": 7.99992,
+          "ground_shift_range_m": [
+            0.005075143375431024,
+            0.02644662112155225
+          ]
+        },
+        {
+          "file": "motions/aiming1_subject1.npz",
+          "frames": 240,
+          "bvh": "aiming1_subject1.bvh",
+          "bvh_sha256": "53c90d858221d02a623776b6bca9d4cfed17ea832fc7bd641b35549055af912c",
+          "start_s": 0.0,
+          "duration_s": 7.99992,
+          "ground_shift_range_m": [
+            0.013621158377703751,
+            0.03262818713813886
+          ]
+        }
+      ],
+      "profile_sha256": "0100ec55010dbd4ef0223289ddff79288e19406e4acf40c0346f3c14c21fab7c",
+      "max_joint_speed_rad_s": 12.0,
+      "root_xy": "recentered at first frame",
+      "quaternion": "wxyz"
+    },
+    "total_hours": 0.0088888
+  },
+  "pico_profile": {
+    "repository": "engineai-robotics/GMR",
+    "commit": "71e02c0598f6d6c6fe1514bf1d69bc24e82f801e",
+    "profile": "smplx_to_t800.json",
+    "sha256": "ae263bfaa3bbd6e7bcf434531715cefa76baba00f9805a3e0b4432b9f07e86cd",
+    "generator": "scripts/t800/prepare.py",
+    "source_axes": "R_smplx = R_xrobot * Ry(pi)"
+  },
+  "pico_profile_sha256": "00563491c49251e293a74658a17d37a880b3521ccd13a4d48c401bfa79090b43",
+  "commands": [
+    [
+      "uv",
+      "run",
+      "--no-sync",
+      "python",
+      "-m",
+      "scripts.t800.prepare"
+    ],
+    [
+      "uv",
+      "run",
+      "--no-sync",
+      "python",
+      "-m",
+      "scripts.proteus.evaluate",
+      "--robot",
+      "t800",
+      "--policy-config",
+      "checkpoints/proteus/proteus_wamseq_62/engineai_t800/policy-sim.yaml",
+      "--dataset",
+      "checkpoints/engineai_t800/motions",
+      "--output",
+      "outputs/t800/eval-verified"
+    ],
+    [
+      "uv",
+      "run",
+      "--no-sync",
+      "python",
+      "-m",
+      "pytest",
+      "tests/test_proteus_transport.py",
+      "tests/test_proteus_observations.py",
+      "tests/test_robot_io.py",
+      "tests/test_command_sender.py",
+      "tests/test_oli.py",
+      "tests/test_x2.py",
+      "-q"
+    ],
+    [
+      "uv",
+      "run",
+      "--project",
+      "venv/pico",
+      "--no-sync",
+      "python",
+      "-m",
+      "pytest",
+      "tests/test_pico_retarget_profiles.py",
+      "-q"
+    ]
+  ],
+  "evaluation": {
+    "robot": "t800",
+    "policy": "/home/galbot/projects/sim2real-wt/t800/checkpoints/proteus/proteus_wamseq_62/engineai_t800/policy-sim.yaml",
+    "dataset": "/home/galbot/projects/sim2real-wt/t800/checkpoints/engineai_t800/motions",
+    "passed": true,
+    "motions": [
+      {
+        "motion": "/home/galbot/projects/sim2real-wt/t800/checkpoints/engineai_t800/motions/motions/aiming1_subject1.npz",
+        "policy": "/home/galbot/projects/sim2real-wt/t800/checkpoints/proteus/proteus_wamseq_62/engineai_t800/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "da6cc8f9533e6cf8a951c4d24ae5597f2304b8b958bd2634fedcccc68f092197",
+        "policy_yaml_sha256": "4cc5de2d3fdc2235d8d5ef37648cd79e17f74a8da6feb4c40dea74d5e4c6041f",
+        "onnx_sha256": "ba8355d629c56c132b4283026599b860eb785ffc1b79dac0c4ec1d064e6103f5",
+        "manifest_sha256": "584e1c01a691542454ed5f2719bc78a334cf97c59ab66f30d16c54ac1da169dc",
+        "prepared_mjcf_sha256": "e94ed349e4611d0c12620f2720600b322878564735360bdac9cd98a2e3598afe",
+        "sim_dt_s": 0.005,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.1349378526210785,
+        "max_frame_world_body_error_m": 0.22646832466125488,
+        "mean_local_body_error_m": 0.06958331167697906,
+        "world_root_endpoint_error_m": 0.03026369772851467,
+        "separate_start_frame_root_error_m": 0.1439146101474762,
+        "min_playback_root_height_m": 0.9354790449142456,
+        "root_trajectory": "outputs/t800/eval-verified/aiming1_subject1.root.npz",
+        "trajectory": "outputs/t800/eval-verified/aiming1_subject1.trajectory.npz",
+        "passed": true
+      },
+      {
+        "motion": "/home/galbot/projects/sim2real-wt/t800/checkpoints/engineai_t800/motions/motions/dance2_subject1.npz",
+        "policy": "/home/galbot/projects/sim2real-wt/t800/checkpoints/proteus/proteus_wamseq_62/engineai_t800/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "f691077e9ee9322ae08601f73e8c5123c6e960e403747916b9f2a6b348038e81",
+        "policy_yaml_sha256": "4cc5de2d3fdc2235d8d5ef37648cd79e17f74a8da6feb4c40dea74d5e4c6041f",
+        "onnx_sha256": "ba8355d629c56c132b4283026599b860eb785ffc1b79dac0c4ec1d064e6103f5",
+        "manifest_sha256": "584e1c01a691542454ed5f2719bc78a334cf97c59ab66f30d16c54ac1da169dc",
+        "prepared_mjcf_sha256": "e94ed349e4611d0c12620f2720600b322878564735360bdac9cd98a2e3598afe",
+        "sim_dt_s": 0.005,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.12733253836631775,
+        "max_frame_world_body_error_m": 0.2513850927352905,
+        "mean_local_body_error_m": 0.05040811002254486,
+        "world_root_endpoint_error_m": 0.24713493883609772,
+        "separate_start_frame_root_error_m": 0.35069775581359863,
+        "min_playback_root_height_m": 0.9698524475097656,
+        "root_trajectory": "outputs/t800/eval-verified/dance2_subject1.root.npz",
+        "trajectory": "outputs/t800/eval-verified/dance2_subject1.trajectory.npz",
+        "passed": true
+      },
+      {
+        "motion": "/home/galbot/projects/sim2real-wt/t800/checkpoints/engineai_t800/motions/motions/fightAndSports1_subject4.npz",
+        "policy": "/home/galbot/projects/sim2real-wt/t800/checkpoints/proteus/proteus_wamseq_62/engineai_t800/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "96b5f67b3b9b1c641c037cf788a00d248473918d4be8d0faf2a4beb3fb237ec1",
+        "policy_yaml_sha256": "4cc5de2d3fdc2235d8d5ef37648cd79e17f74a8da6feb4c40dea74d5e4c6041f",
+        "onnx_sha256": "ba8355d629c56c132b4283026599b860eb785ffc1b79dac0c4ec1d064e6103f5",
+        "manifest_sha256": "584e1c01a691542454ed5f2719bc78a334cf97c59ab66f30d16c54ac1da169dc",
+        "prepared_mjcf_sha256": "e94ed349e4611d0c12620f2720600b322878564735360bdac9cd98a2e3598afe",
+        "sim_dt_s": 0.005,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.14186863601207733,
+        "max_frame_world_body_error_m": 0.4398220479488373,
+        "mean_local_body_error_m": 0.06151994690299034,
+        "world_root_endpoint_error_m": 0.13187767565250397,
+        "separate_start_frame_root_error_m": 0.12642937898635864,
+        "min_playback_root_height_m": 0.7926233410835266,
+        "root_trajectory": "outputs/t800/eval-verified/fightAndSports1_subject4.root.npz",
+        "trajectory": "outputs/t800/eval-verified/fightAndSports1_subject4.trajectory.npz",
+        "passed": true
+      },
+      {
+        "motion": "/home/galbot/projects/sim2real-wt/t800/checkpoints/engineai_t800/motions/motions/walk1_subject1.npz",
+        "policy": "/home/galbot/projects/sim2real-wt/t800/checkpoints/proteus/proteus_wamseq_62/engineai_t800/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "87b2016f9b8056a4a5662f1f1cfe50f3ea275ef16a915641fe5dc0f727add026",
+        "policy_yaml_sha256": "4cc5de2d3fdc2235d8d5ef37648cd79e17f74a8da6feb4c40dea74d5e4c6041f",
+        "onnx_sha256": "ba8355d629c56c132b4283026599b860eb785ffc1b79dac0c4ec1d064e6103f5",
+        "manifest_sha256": "584e1c01a691542454ed5f2719bc78a334cf97c59ab66f30d16c54ac1da169dc",
+        "prepared_mjcf_sha256": "e94ed349e4611d0c12620f2720600b322878564735360bdac9cd98a2e3598afe",
+        "sim_dt_s": 0.005,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.12629900872707367,
+        "max_frame_world_body_error_m": 0.3307621479034424,
+        "mean_local_body_error_m": 0.07121246308088303,
+        "world_root_endpoint_error_m": 0.10701311379671097,
+        "separate_start_frame_root_error_m": 0.2940447926521301,
+        "min_playback_root_height_m": 0.9118857383728027,
+        "root_trajectory": "outputs/t800/eval-verified/walk1_subject1.root.npz",
+        "trajectory": "outputs/t800/eval-verified/walk1_subject1.trajectory.npz",
+        "passed": true
+      }
+    ]
+  },
+  "hardware_tested": false,
+  "physical_pico_tested": false,
+  "test_results": {
+    "runtime": "47 passed, 1 skipped, 1 warning in 4.50s",
+    "pico": "13 passed, 1 warning in 13.40s"
+  },
+  "stress_tests": {
+    "note": "dance1 is excluded from the default four-clip library. The full actor passed this stress clip; the standard actor fell. Default metrics use the standard actor with fixed input hashes.",
+    "trials": [
+      {
+        "release": "proteus_wamseq_62",
+        "motion": "/home/galbot/projects/sim2real-wt/t800/checkpoints/engineai_t800/motions-vendor-stress/motions/dance1_subject1.npz",
+        "motion_sha256": "9b1d0ff8e9e7fedf8a656b2d0fc9428849fdfdeda356c70d1209ed37f80d3489",
+        "passed": false,
+        "mean_world_body_error_m": 1.3023390769958496,
+        "max_frame_world_body_error_m": 2.1839964389801025,
+        "world_root_endpoint_error_m": 2.072962999343872
+      },
+      {
+        "release": "proteus_wamseq_62_full",
+        "motion": "/home/galbot/projects/sim2real-wt/t800/checkpoints/engineai_t800/motions-vendor-stress/motions/dance1_subject1.npz",
+        "motion_sha256": "9b1d0ff8e9e7fedf8a656b2d0fc9428849fdfdeda356c70d1209ed37f80d3489",
+        "passed": true,
+        "mean_world_body_error_m": 0.15931154787540436,
+        "max_frame_world_body_error_m": 0.2709141969680786,
+        "world_root_endpoint_error_m": 0.23141637444496155
+      }
+    ]
+  },
+  "full_policy_comparison": {
+    "release": "proteus_wamseq_62_full",
+    "actor_kind": "wam_seq",
+    "contract": "engineai_t800",
+    "robot": "t800",
+    "far_offset": 16,
+    "passed": true,
+    "max_abs_error": 0.0,
+    "tolerance": 1e-06,
+    "num_samples": 64,
+    "seed": 0,
+    "method": "standard-normal inputs in sim2real layout; the released actor gets them with a batch axis and the contract's morph; action is compared with actions[driven slots], next_slot_action with actions",
+    "sources": {
+      "proteus_actor.onnx": "3d3d7fe8e8e2da806eb2378b4cfa9f036fa0935a41bdd814609e4e965acf451a",
+      "engineai_t800.json": "50892110948098ae52cf4fffd2071dd6e7b79be0f271dad08e163d7c76985ab1"
+    },
+    "artifact": {
+      "policy.onnx": {
+        "sha256": "2b6f8c96c88d691f4d41ff9a3610c28d836d8b3e91cc3f6f8c15a8fa02e74e85",
+        "ir_version": 8,
+        "opset": {
+          "ai.onnx": 17
+        },
+        "inputs": {
+          "proprioception": [
+            10,
+            68
+          ],
+          "task": [
+            6,
+            253
+          ],
+          "action_history": [
+            10,
+            31
+          ],
+          "history_valid": [
+            10
+          ]
+        },
+        "outputs": {
+          "action": [
+            25
+          ],
+          "next_slot_action": [
+            31
+          ]
+        }
+      }
+    },
+    "versions": {
+      "onnx": "1.17.0",
+      "onnxruntime": "1.23.2"
+    }
+  },
+  "hardware_interface_source": {
+    "repository": "engineai-robotics/engineai_ros2_workspace",
+    "commit": "c41043f64ca1d308be187ebdcc2eaae40884f59c",
+    "physical_tested": false
+  }
+}

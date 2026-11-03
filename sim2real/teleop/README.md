@@ -15,3 +15,5 @@ Runtime artifacts, including JetPack 5 prebuilt packages:
 - [Getting Started / Teleop Project (Onboard Orin)](../../docs/getting-started/teleop-onboard-orin.md)
 - [Tutorial / Pico Teleoperation](../../docs/tutorials/pico-teleoperation.md)
 - [Tutorial / Motion Recording](../../docs/tutorials/motion-recording.md)
+
+[Proteus EngineAI T800](../../docs/tutorials/proteus-t800.md): `--robot t800`; body IK, ZMQ motion/buttons, simulation and hardware launchers.

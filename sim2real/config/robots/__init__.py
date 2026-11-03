@@ -4,10 +4,13 @@ from sim2real.config.robots.g1 import G1_CFG
 from sim2real.config.robots.h2 import H2_CFG
 from sim2real.config.robots.oli import OLI_CFG
 from sim2real.config.robots.x2 import X2_CFG
+from sim2real.config.robots.t800 import T800_CFG
 from typing import Dict
 
 
 _ROBOT_CFGS: Dict[str, RobotCfg] = {
+    "t800": T800_CFG,
+    "engineai_t800": T800_CFG,
     G1_CFG.name: G1_CFG,
     H2_CFG.name: H2_CFG,
     "unitree_h2": H2_CFG,
@@ -31,4 +34,4 @@ def get_robot_cfg(name: str) -> RobotCfg:
         raise ValueError(f"Unknown robot '{name}'. Available robots: {available}") from exc
 
 
-__all__ = ["RobotCfg", "ET1_CFG", "G1_CFG", "H2_CFG", "OLI_CFG", "X2_CFG", "get_robot_cfg"]
+__all__ = ["RobotCfg", "T800_CFG", "ET1_CFG", "G1_CFG", "H2_CFG", "OLI_CFG", "X2_CFG", "get_robot_cfg"]
