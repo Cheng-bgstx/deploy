@@ -38,7 +38,7 @@ include = [
 package = true
 
 [tool.setuptools.package-data]
-sim2real = ["teleop/configs/*.json", "teleop/configs/*LICENSE"]
+sim2real = ["config/robots/specs/*.yaml", "teleop/configs/*.json", "teleop/configs/*LICENSE"]
 
 [tool.uv.sources]
 general-motion-retargeting = { git = "https://github.com/EGalahad/GMR.git", branch = "codex/add-pyproject-toml" }

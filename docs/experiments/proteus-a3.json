@@ -1,0 +1,380 @@
+{
+  "date": "2026-11-03",
+  "branch": "feat/proteus-wamseq-agibot-a3",
+  "proteus_source_commit": "1e0e0381bdec73652f8aa90b871f2980586bb52a",
+  "lafan_source_commit": "94084601bacdf9cc3764b5c73daaeccae6035fac",
+  "policy_comparison": {
+    "release": "proteus_wamseq_62",
+    "actor_kind": "wam_seq",
+    "contract": "agibot_a3",
+    "robot": "a3",
+    "far_offset": 16,
+    "passed": true,
+    "max_abs_error": 0.0,
+    "tolerance": 1e-06,
+    "num_samples": 64,
+    "seed": 0,
+    "method": "standard-normal inputs in sim2real layout; the released actor gets them with a batch axis and the contract's morph; action is compared with actions[driven slots], next_slot_action with actions",
+    "sources": {
+      "proteus_actor.onnx": "33bc2ff91f5322abb9e939e5f691e62c03897906161ba1ab2bee9b0533fb9df1",
+      "agibot_a3.json": "e9f68603166c0bf16276baa1db426eabd93b65d7150e1fcf681ea29a23700a71"
+    },
+    "artifact": {
+      "policy.onnx": {
+        "sha256": "75f89ec4287ed8513f4bf27c16d7e9f459a1c5df69317d22dca034d8b5849a13",
+        "ir_version": 8,
+        "opset": {
+          "ai.onnx": 17
+        },
+        "inputs": {
+          "proprioception": [
+            10,
+            68
+          ],
+          "task": [
+            6,
+            253
+          ],
+          "action_history": [
+            10,
+            31
+          ],
+          "history_valid": [
+            10
+          ]
+        },
+        "outputs": {
+          "action": [
+            30
+          ],
+          "next_slot_action": [
+            31
+          ]
+        }
+      }
+    },
+    "versions": {
+      "onnx": "1.17.0",
+      "onnxruntime": "1.23.2"
+    }
+  },
+  "model_validation": {
+    "robot": "a3",
+    "contract": "agibot_a3",
+    "source_xml": "/home/galbot/projects/A3-A3U-robot-model/a3_t2d5/mjcf/a3_t2d5.xml",
+    "source_xml_sha256": "0cff06256df6ac1752b4cd4cc1bec8d93bfc97c4933262874718e714bfd0e56b",
+    "spec_sha256": "c135fa57b45f8c5dc794022de10af57665244c4e9bb2a6e0945da97955173058",
+    "vendor_mass_kg": 57.980648,
+    "training_mass_kg": 57.786812610000005,
+    "mass_difference_kg": 0.19383538999999672,
+    "max_joint_axis_error": 3.989694548275913e-07,
+    "joint_limit_overrides": {
+      "head_yaw_joint": {
+        "vendor": [
+          -1.0472,
+          1.0472
+        ],
+        "training": [
+          -0.785398,
+          0.785398
+        ]
+      },
+      "left_hip_roll_joint": {
+        "vendor": [
+          -0.523599,
+          1.6057
+        ],
+        "training": [
+          -0.523599,
+          1.48353
+        ]
+      },
+      "left_knee_joint": {
+        "vendor": [
+          -0.122173,
+          2.49582
+        ],
+        "training": [
+          -0.122173,
+          2.53073
+        ]
+      },
+      "right_hip_roll_joint": {
+        "vendor": [
+          -1.6057,
+          0.523599
+        ],
+        "training": [
+          -1.48353,
+          0.523599
+        ]
+      },
+      "right_knee_joint": {
+        "vendor": [
+          -0.122173,
+          2.49582
+        ],
+        "training": [
+          -0.122173,
+          2.53073
+        ]
+      }
+    },
+    "joints_fixed_at_zero": [
+      "head_pitch_joint"
+    ],
+    "prepared_xml_sha256": "609b677b2ad5dc0b3af68a2331631b07b3af7264aa7896e56e4dd3fdab77244a"
+  },
+  "motion_manifest": {
+    "format_version": 2,
+    "dataset_name": "a3_lafan",
+    "mjcf": "../../../third_party/agibot_a3/model/mjcf/scene_floor_tracking.xml",
+    "motions_subdir": "motions",
+    "timestep": 0.033333,
+    "qpos_dim": 37,
+    "qpos_names": [
+      "free_joint_tx",
+      "free_joint_ty",
+      "free_joint_tz",
+      "free_joint_qw",
+      "free_joint_qx",
+      "free_joint_qy",
+      "free_joint_qz",
+      "waist_yaw_joint",
+      "waist_roll_joint",
+      "waist_pitch_joint",
+      "head_yaw_joint",
+      "left_shoulder_pitch_joint",
+      "left_shoulder_roll_joint",
+      "left_shoulder_yaw_joint",
+      "left_elbow_joint",
+      "left_wrist_roll_joint",
+      "left_wrist_pitch_joint",
+      "left_wrist_yaw_joint",
+      "right_shoulder_pitch_joint",
+      "right_shoulder_roll_joint",
+      "right_shoulder_yaw_joint",
+      "right_elbow_joint",
+      "right_wrist_roll_joint",
+      "right_wrist_pitch_joint",
+      "right_wrist_yaw_joint",
+      "left_hip_pitch_joint",
+      "left_hip_roll_joint",
+      "left_hip_yaw_joint",
+      "left_knee_joint",
+      "left_ankle_pitch_joint",
+      "left_ankle_roll_joint",
+      "right_hip_pitch_joint",
+      "right_hip_roll_joint",
+      "right_hip_yaw_joint",
+      "right_knee_joint",
+      "right_ankle_pitch_joint",
+      "right_ankle_roll_joint"
+    ],
+    "num_motions": 3,
+    "source": {
+      "kind": "LAFAN1 human mocap solved by target-model IK",
+      "motions": [
+        {
+          "file": "motions/walk1_subject1.npz",
+          "frames": 240,
+          "bvh": "walk1_subject1.bvh",
+          "bvh_sha256": "4c9d591f323ffa660d9de6ef20c5d7077e66b2102a009feedf01afa22a6fbc73",
+          "start_s": 0.0,
+          "duration_s": 7.99992,
+          "ground_shift_range_m": [
+            -0.05212906993359096,
+            -0.01478275686177086
+          ]
+        },
+        {
+          "file": "motions/dance1_subject1.npz",
+          "frames": 240,
+          "bvh": "dance1_subject1.bvh",
+          "bvh_sha256": "9a285b61bb0446aa4c919c62247ff895eb158bc693be3b7477d31ef070995d73",
+          "start_s": 0.0,
+          "duration_s": 7.99992,
+          "ground_shift_range_m": [
+            -0.038284932075553495,
+            -0.015057040825779761
+          ]
+        },
+        {
+          "file": "motions/fightAndSports1_subject4.npz",
+          "frames": 240,
+          "bvh": "fightAndSports1_subject4.bvh",
+          "bvh_sha256": "205396f5a212419b721c2d3b1f9072d625718567354ee623f89beacc84d5b98c",
+          "start_s": 0.0,
+          "duration_s": 7.99992,
+          "ground_shift_range_m": [
+            -0.0477361602699252,
+            0.018554249004075107
+          ]
+        }
+      ],
+      "profile_sha256": "f523599416af0f6847631ef7b8ef44ba5617d7aed90b440447e7ab678af74b14",
+      "max_joint_speed_rad_s": 12.0,
+      "root_xy": "recentered at first frame",
+      "quaternion": "wxyz"
+    },
+    "total_hours": 0.006666600000000001
+  },
+  "pico_profile": {
+    "method": "neutral FK morphology transfer of calibrated human frames; target IK",
+    "source_config": "xrobot_to_g1.json",
+    "source_sha256": "34ff208990409365928e86a433d7201c268b690cac40b4c09eb83a1067d63a0b",
+    "target_spec_sha256": "c135fa57b45f8c5dc794022de10af57665244c4e9bb2a6e0945da97955173058",
+    "generator": "scripts/proteus/build_retarget_profiles.py"
+  },
+  "pico_profile_sha256": "14f9b34ec68aedc53c6e6803a13c243efc519809d45c20adb79a52e6b3cb2bea",
+  "commands": [
+    [
+      "uv",
+      "run",
+      "--no-sync",
+      "python",
+      "-m",
+      "scripts.a3.prepare"
+    ],
+    [
+      "uv",
+      "run",
+      "--no-sync",
+      "python",
+      "-m",
+      "scripts.proteus.evaluate",
+      "--robot",
+      "a3",
+      "--policy-config",
+      "checkpoints/proteus/proteus_wamseq_62/agibot_a3/policy-sim.yaml",
+      "--dataset",
+      "checkpoints/agibot_a3/motions",
+      "--output",
+      "outputs/a3/eval-verified"
+    ],
+    [
+      "uv",
+      "run",
+      "--no-sync",
+      "python",
+      "-m",
+      "pytest",
+      "tests/test_proteus_transport.py",
+      "tests/test_proteus_observations.py",
+      "tests/test_robot_io.py",
+      "tests/test_command_sender.py",
+      "tests/test_oli.py",
+      "tests/test_x2.py",
+      "-q"
+    ],
+    [
+      "uv",
+      "run",
+      "--project",
+      "venv/pico",
+      "--no-sync",
+      "python",
+      "-m",
+      "pytest",
+      "tests/test_pico_retarget_profiles.py",
+      "-q"
+    ]
+  ],
+  "evaluation": {
+    "robot": "a3",
+    "policy": "/home/galbot/projects/sim2real-wt/a3/checkpoints/proteus/proteus_wamseq_62/agibot_a3/policy-sim.yaml",
+    "dataset": "/home/galbot/projects/sim2real-wt/a3/checkpoints/agibot_a3/motions",
+    "passed": true,
+    "motions": [
+      {
+        "motion": "/home/galbot/projects/sim2real-wt/a3/checkpoints/agibot_a3/motions/motions/dance1_subject1.npz",
+        "policy": "/home/galbot/projects/sim2real-wt/a3/checkpoints/proteus/proteus_wamseq_62/agibot_a3/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "9ed590eb743a2b8311679c6670ec7687bf3f2a286bb555061fd7df58f7066ca6",
+        "policy_yaml_sha256": "b496867dc15151ae15cf5892bf5c2a94928cfe763be1544f879febc52f8401ec",
+        "onnx_sha256": "75f89ec4287ed8513f4bf27c16d7e9f459a1c5df69317d22dca034d8b5849a13",
+        "manifest_sha256": "163b0569f1b0e145dbef1bf3ebbf7c55d9ce067262b89b0075cf52f948240189",
+        "prepared_mjcf_sha256": "609b677b2ad5dc0b3af68a2331631b07b3af7264aa7896e56e4dd3fdab77244a",
+        "sim_dt_s": 0.005,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.057545214891433716,
+        "max_frame_world_body_error_m": 0.14886967837810516,
+        "mean_local_body_error_m": 0.051812272518873215,
+        "world_root_endpoint_error_m": 0.09874580800533295,
+        "separate_start_frame_root_error_m": 0.3127218186855316,
+        "min_playback_root_height_m": 1.0187474489212036,
+        "root_trajectory": "outputs/a3/eval-verified/dance1_subject1.root.npz",
+        "trajectory": "outputs/a3/eval-verified/dance1_subject1.trajectory.npz",
+        "passed": true
+      },
+      {
+        "motion": "/home/galbot/projects/sim2real-wt/a3/checkpoints/agibot_a3/motions/motions/fightAndSports1_subject4.npz",
+        "policy": "/home/galbot/projects/sim2real-wt/a3/checkpoints/proteus/proteus_wamseq_62/agibot_a3/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "eefe12582e66a8aac817d408501611194ed89cb07ef499167de23afa0b5ef63f",
+        "policy_yaml_sha256": "b496867dc15151ae15cf5892bf5c2a94928cfe763be1544f879febc52f8401ec",
+        "onnx_sha256": "75f89ec4287ed8513f4bf27c16d7e9f459a1c5df69317d22dca034d8b5849a13",
+        "manifest_sha256": "163b0569f1b0e145dbef1bf3ebbf7c55d9ce067262b89b0075cf52f948240189",
+        "prepared_mjcf_sha256": "609b677b2ad5dc0b3af68a2331631b07b3af7264aa7896e56e4dd3fdab77244a",
+        "sim_dt_s": 0.005,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.07356530427932739,
+        "max_frame_world_body_error_m": 0.23512612283229828,
+        "mean_local_body_error_m": 0.04933849349617958,
+        "world_root_endpoint_error_m": 0.08587606996297836,
+        "separate_start_frame_root_error_m": 0.05630756914615631,
+        "min_playback_root_height_m": 0.8752337098121643,
+        "root_trajectory": "outputs/a3/eval-verified/fightAndSports1_subject4.root.npz",
+        "trajectory": "outputs/a3/eval-verified/fightAndSports1_subject4.trajectory.npz",
+        "passed": true
+      },
+      {
+        "motion": "/home/galbot/projects/sim2real-wt/a3/checkpoints/agibot_a3/motions/motions/walk1_subject1.npz",
+        "policy": "/home/galbot/projects/sim2real-wt/a3/checkpoints/proteus/proteus_wamseq_62/agibot_a3/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "66262d8fd8ce05759bd3fdcf4e6183b08d1f37505991a024f58e47d545d13111",
+        "policy_yaml_sha256": "b496867dc15151ae15cf5892bf5c2a94928cfe763be1544f879febc52f8401ec",
+        "onnx_sha256": "75f89ec4287ed8513f4bf27c16d7e9f459a1c5df69317d22dca034d8b5849a13",
+        "manifest_sha256": "163b0569f1b0e145dbef1bf3ebbf7c55d9ce067262b89b0075cf52f948240189",
+        "prepared_mjcf_sha256": "609b677b2ad5dc0b3af68a2331631b07b3af7264aa7896e56e4dd3fdab77244a",
+        "sim_dt_s": 0.005,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.04167995601892471,
+        "max_frame_world_body_error_m": 0.0809323787689209,
+        "mean_local_body_error_m": 0.03457587957382202,
+        "world_root_endpoint_error_m": 0.015997163951396942,
+        "separate_start_frame_root_error_m": 0.1266341209411621,
+        "min_playback_root_height_m": 1.0091956853866577,
+        "root_trajectory": "outputs/a3/eval-verified/walk1_subject1.root.npz",
+        "trajectory": "outputs/a3/eval-verified/walk1_subject1.trajectory.npz",
+        "passed": true
+      }
+    ]
+  },
+  "hardware_tested": false,
+  "physical_pico_tested": false,
+  "test_results": {
+    "runtime": "46 passed, 2 skipped, 1 warning in 4.38s",
+    "pico": "13 passed, 1 warning in 12.59s"
+  },
+  "hardware_interface_source": {
+    "repository": "AgibotTech/sonic_for_a3",
+    "commit": "0311d712e3d6febbafd58dcb8b09417e4b2a3bb1",
+    "physical_tested": false
+  }
+}

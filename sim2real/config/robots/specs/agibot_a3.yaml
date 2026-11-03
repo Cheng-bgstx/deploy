@@ -1,0 +1,510 @@
+# Imported from the candidate dataset lafan_full19 (spec drafted by its
+# build_robot_spec.py snapshot); asset paths rewritten for the robot asset root, signs refixed.
+name: agibot_a3
+mjcf: agibot_a3/model/mjcf/scene_floor_tracking.xml
+usd: agibot_a3/usd/agibot_a3.usda
+tree: agibot_a3/agibot_a3_tree.npz
+stand_height: 0.9002300526219893
+root_height: 1.0781452360909212
+self_collisions: false
+mass: 57.786812610000005
+semantic_bodies:
+  pelvis: pelvis_link
+  left_hip: left_hip_roll_Link
+  left_knee: left_knee_Link
+  left_ankle: left_ankle_roll_Link
+  right_hip: right_hip_roll_Link
+  right_knee: right_knee_Link
+  right_ankle: right_ankle_roll_Link
+  torso: torso_Link
+  left_shoulder: left_shoulder_roll_Link
+  left_elbow: left_elbow_Link
+  left_wrist: left_wrist_yaw_Link
+  right_shoulder: right_shoulder_roll_Link
+  right_elbow: right_elbow_Link
+  right_wrist: right_wrist_yaw_Link
+markers: {}
+feet:
+- left_ankle_roll_Link
+- right_ankle_roll_Link
+joints:
+  left_hip_pitch_joint:
+    slot: left_hip_pitch
+    sign: 1
+    axis:
+    - 0.0
+    - 0.9659259343044766
+    - -0.2588186419831923
+    lower: -2.51327
+    upper: 2.93215
+    default: -0.011703622429431702
+    effort: 220.0
+    velocity: 27.9728
+    armature: 0.0302098
+    stiffness: 91.1339
+    damping: 6.637
+    actuated: true
+  left_hip_roll_joint:
+    slot: left_hip_roll
+    sign: 1
+    axis:
+    - 0.9999315133927649
+    - 0.003029046511868904
+    - 0.01130457435217781
+    lower: -0.523599
+    upper: 1.48353
+    default: 0.15259478368642168
+    effort: 220.0
+    velocity: 17.483
+    armature: 0.0745098
+    stiffness: 224.7735
+    damping: 16.3696
+    actuated: true
+  left_hip_yaw_joint:
+    slot: left_hip_yaw
+    sign: 1
+    axis:
+    - -0.010712790100601775
+    - -0.15201949890664776
+    - 0.9883194362555217
+    lower: -2.72271
+    upper: 2.72271
+    default: -0.03964726532495229
+    effort: 220.0
+    velocity: 27.9728
+    armature: 0.0302098
+    stiffness: 91.1339
+    damping: 6.637
+    actuated: true
+  left_knee_joint:
+    slot: left_knee
+    sign: 1
+    axis:
+    - 0.034925686383555685
+    - 0.9877162024095889
+    - 0.1523052852931165
+    lower: -0.122173
+    upper: 2.53073
+    default: -0.06911494
+    effort: 320.0
+    velocity: 17.483
+    armature: 0.0745098
+    stiffness: 224.7735
+    damping: 16.3696
+    actuated: true
+  left_ankle_pitch_joint:
+    slot: left_ankle_pitch
+    sign: 1
+    axis:
+    - 0.034925686383555685
+    - 0.9877162024095889
+    - 0.15230528529311646
+    lower: -0.907571
+    upper: 0.523599
+    default: -0.02396246081368267
+    effort: 115.0
+    velocity: 32.3435
+    armature: 0.0214294
+    stiffness: 64.6461
+    damping: 4.708
+    actuated: true
+  left_ankle_roll_joint:
+    slot: left_ankle_roll
+    sign: 1
+    axis:
+    - 0.9940111284059617
+    - -0.05012203215921999
+    - 0.09710642871271094
+    lower: -0.349066
+    upper: 0.349066
+    default: -0.15485079784578526
+    effort: 54.0
+    velocity: 32.3435
+    armature: 0.0214294
+    stiffness: 64.6461
+    damping: 4.708
+    actuated: true
+  right_hip_pitch_joint:
+    slot: right_hip_pitch
+    sign: 1
+    axis:
+    - 0.0
+    - 0.9659259343044766
+    - 0.2588186419831923
+    lower: -2.51327
+    upper: 2.93215
+    default: 0.04839405949307843
+    effort: 220.0
+    velocity: 27.9728
+    armature: 0.0302098
+    stiffness: 91.1339
+    damping: 6.637
+    actuated: true
+  right_hip_roll_joint:
+    slot: right_hip_roll
+    sign: 1
+    axis:
+    - 0.998829236022288
+    - 0.012520396325693968
+    - -0.04672683322225163
+    lower: -1.48353
+    upper: 0.523599
+    default: 0.04392336276437085
+    effort: 220.0
+    velocity: 17.483
+    armature: 0.0745098
+    stiffness: 224.7735
+    damping: 16.3696
+    actuated: true
+  right_hip_yaw_joint:
+    slot: right_hip_yaw
+    sign: 1
+    axis:
+    - 0.047231527419124404
+    - -0.04361338894150148
+    - 0.9979313879835096
+    lower: -2.72271
+    upper: 2.72271
+    default: -0.3879858902975508
+    effort: 220.0
+    velocity: 27.9728
+    armature: 0.0302098
+    stiffness: 91.1339
+    damping: 6.637
+    actuated: true
+  right_knee_joint:
+    slot: right_knee
+    sign: 1
+    axis:
+    - 0.36820247405578593
+    - 0.9294562812065158
+    - 0.02319395233573765
+    lower: -0.122173
+    upper: 2.53073
+    default: -0.06911494
+    effort: 320.0
+    velocity: 17.483
+    armature: 0.0745098
+    stiffness: 224.7735
+    damping: 16.3696
+    actuated: true
+  right_ankle_pitch_joint:
+    slot: right_ankle_pitch
+    sign: 1
+    axis:
+    - 0.36820247405578604
+    - 0.9294562812065158
+    - 0.02319395233573765
+    lower: -0.907571
+    upper: 0.523599
+    default: 0.016369977773183095
+    effort: 115.0
+    velocity: 32.3435
+    armature: 0.0214294
+    stiffness: 64.6461
+    damping: 4.708
+    actuated: true
+  right_ankle_roll_joint:
+    slot: right_ankle_roll
+    sign: 1
+    axis:
+    - 0.9297439125006106
+    - -0.3681351663785963
+    - -0.007263363095711421
+    lower: -0.349066
+    upper: 0.349066
+    default: 0.07898529369088661
+    effort: 54.0
+    velocity: 32.3435
+    armature: 0.0214294
+    stiffness: 64.6461
+    damping: 4.708
+    actuated: true
+  waist_yaw_joint:
+    slot: waist_yaw
+    sign: 1
+    axis:
+    - 0.0
+    - 0.0
+    - 1.0
+    lower: -2.61799
+    upper: 2.61799
+    default: -0.007126905818815259
+    effort: 220.0
+    velocity: 27.9728
+    armature: 0.0302098
+    stiffness: 226.8184
+    damping: 5.1895
+    actuated: true
+  waist_roll_joint:
+    slot: waist_roll
+    sign: 1
+    axis:
+    - 0.9999746037142209
+    - -0.007126845486400812
+    - 0.0
+    lower: -0.349066
+    upper: 0.349066
+    default: 0.0401666069797907
+    effort: 46.0
+    velocity: 32.3435
+    armature: 0.0214294
+    stiffness: 680.4553
+    damping: 12.9737
+    actuated: true
+  waist_pitch_joint:
+    slot: waist_pitch
+    sign: 1
+    axis:
+    - 0.007121097188710577
+    - 0.9991680544890705
+    - 0.04015580734283165
+    lower: -0.488692
+    upper: 0.418879
+    default: 0.03224329884257475
+    effort: 118.0
+    velocity: 32.3435
+    armature: 0.0214294
+    stiffness: 680.4553
+    damping: 12.9737
+    actuated: true
+  head_yaw_joint:
+    slot: head_yaw
+    sign: 1
+    axis:
+    - 0.03195085807867814
+    - -0.04036366946971677
+    - 0.9986740793947622
+    lower: -0.785398
+    upper: 0.785398
+    default: 0.28641678226712514
+    effort: 6.0
+    velocity: 19.2313
+    armature: 0.0126152
+    stiffness: 38.0563
+    damping: 2.7715
+    actuated: true
+  left_shoulder_pitch_joint:
+    slot: left_shoulder_pitch
+    sign: 1
+    axis:
+    - 0.009878688950837577
+    - 0.9918480379866093
+    - 0.1270428315440364
+    lower: -2.87979
+    upper: 2.87979
+    default: 0.5422130467647158
+    effort: 60.0
+    velocity: 32.3435
+    armature: 0.0107147
+    stiffness: 32.323
+    damping: 2.354
+    actuated: true
+  left_shoulder_roll_joint:
+    slot: left_shoulder_roll
+    sign: 1
+    axis:
+    - 0.8400050348618922
+    - 0.06069471707000141
+    - -0.5391731565336538
+    lower: -0.0872665
+    upper: 2.61799
+    default: 0.6893691391577219
+    effort: 60.0
+    velocity: 32.3435
+    armature: 0.0107147
+    stiffness: 32.323
+    damping: 2.354
+    actuated: true
+  left_shoulder_yaw_joint:
+    slot: left_shoulder_yaw
+    sign: 1
+    axis:
+    - 0.4414949815935883
+    - -0.6540996265947449
+    - 0.6141952944433002
+    lower: -2.79253
+    upper: 2.79253
+    default: -0.14007278361004297
+    effort: 24.0
+    velocity: 32.3435
+    armature: 0.0107147
+    stiffness: 32.323
+    damping: 2.354
+    actuated: true
+  left_elbow_joint:
+    slot: left_elbow
+    sign: 1
+    axis:
+    - 0.4295829841305182
+    - 0.7550587878139753
+    - 0.4953228105896285
+    lower: -0.959931
+    upper: 1.74533
+    default: 0.5484318761955098
+    effort: 24.0
+    velocity: 32.3435
+    armature: 0.0107147
+    stiffness: 32.323
+    damping: 2.354
+    actuated: true
+  left_wrist_roll_joint:
+    slot: left_wrist_roll
+    sign: 1
+    axis:
+    - 0.44204264702288054
+    - 0.3024731509023082
+    - -0.8444573945417462
+    lower: -2.79253
+    upper: 2.79253
+    default: -0.16659203266121791
+    effort: 24.0
+    velocity: 32.3435
+    armature: 0.0107147
+    stiffness: 32.323
+    damping: 2.354
+    actuated: true
+  left_wrist_pitch_joint:
+    slot: left_wrist_pitch
+    sign: 1
+    axis:
+    - 0.29306090097409065
+    - 0.8410674669843331
+    - 0.4546656181204071
+    lower: -1.62316
+    upper: 1.62316
+    default: -0.25705738801928785
+    effort: 6.0
+    velocity: 19.2313
+    armature: 0.0126152
+    stiffness: 38.0563
+    damping: 2.7715
+    actuated: true
+  left_wrist_yaw_joint:
+    slot: left_wrist_yaw
+    sign: 1
+    axis:
+    - 0.7075309668676574
+    - -0.5106231803400862
+    - 0.4885323926032884
+    lower: -1.62316
+    upper: 1.62316
+    default: 0.16323859840310123
+    effort: 6.0
+    velocity: 19.2313
+    armature: 0.0126152
+    stiffness: 38.0563
+    damping: 2.7715
+    actuated: true
+  right_shoulder_pitch_joint:
+    slot: right_shoulder_pitch
+    sign: 1
+    axis:
+    - 0.004309310017852229
+    - 0.9988838606192615
+    - -0.04703682431382704
+    lower: -2.87979
+    upper: 2.87979
+    default: 0.20448418384845363
+    effort: 60.0
+    velocity: 32.3435
+    armature: 0.0107147
+    stiffness: 32.323
+    damping: 2.354
+    actuated: true
+  right_shoulder_roll_joint:
+    slot: right_shoulder_roll
+    sign: 1
+    axis:
+    - 0.9720517466547303
+    - -0.015225299088644242
+    - -0.23427247404069756
+    lower: -2.61799
+    upper: 0.0872665
+    default: -0.405589341973491
+    effort: 60.0
+    velocity: 32.3435
+    armature: 0.0107147
+    stiffness: 32.323
+    damping: 2.354
+    actuated: true
+  right_shoulder_yaw_joint:
+    slot: right_shoulder_yaw
+    sign: 1
+    axis:
+    - 0.2242835163607008
+    - 0.3550915292431953
+    - 0.9075279114983782
+    lower: -2.79253
+    upper: 2.79253
+    default: 0.005530214629255865
+    effort: 24.0
+    velocity: 32.3435
+    armature: 0.0107147
+    stiffness: 32.323
+    damping: 2.354
+    actuated: true
+  right_elbow_joint:
+    slot: right_elbow
+    sign: 1
+    axis:
+    - -0.07474535378158736
+    - 0.9347774513448699
+    - -0.34728122400333544
+    lower: -0.959931
+    upper: 1.74533
+    default: 0.6162913916352134
+    effort: 24.0
+    velocity: 32.3435
+    armature: 0.0107147
+    stiffness: 32.323
+    damping: 2.354
+    actuated: true
+  right_wrist_roll_joint:
+    slot: right_wrist_roll
+    sign: 1
+    axis:
+    - 0.663257206312591
+    - -0.21345339568838462
+    - -0.7173057410501571
+    lower: -2.79253
+    upper: 2.79253
+    default: -0.032661976484505605
+    effort: 24.0
+    velocity: 32.3435
+    armature: 0.0107147
+    stiffness: 32.323
+    damping: 2.354
+    actuated: true
+  right_wrist_pitch_joint:
+    slot: right_wrist_pitch
+    sign: 1
+    axis:
+    - -0.0990228911509982
+    - 0.9250060970477038
+    - -0.366821737977279
+    lower: -1.62316
+    upper: 1.62316
+    default: -0.10274440322227174
+    effort: 6.0
+    velocity: 19.2313
+    armature: 0.0126152
+    stiffness: 38.0563
+    damping: 2.7715
+    actuated: true
+  right_wrist_yaw_joint:
+    slot: right_wrist_yaw
+    sign: 1
+    axis:
+    - 0.6698734055300223
+    - 0.3345618029423756
+    - 0.6628257844830399
+    lower: -1.62316
+    upper: 1.62316
+    default: -0.19560769007089557
+    effort: 6.0
+    velocity: 19.2313
+    armature: 0.0126152
+    stiffness: 38.0563
+    damping: 2.7715
+    actuated: true
