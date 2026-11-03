@@ -1,0 +1,1022 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "1e0e0381bdec73652f8aa90b871f2980586bb52a",
+  "source_worktree_clean": true,
+  "seed": 0,
+  "policy_hz": 50,
+  "reference_control": "Identical sim2real MotionDataset 50-Hz arrays packed into native MotionLibrary; no retargeting or frame modification.",
+  "model_control": "Original CLI and trace runner use the same prepared vendor model as sim2real; original training asset revisions are not substituted.",
+  "sampling": "First common physical sample per playback frame 1..T-1 at 50 Hz. Current retains 1-s initial Hold; original uses native start and reference velocities. Video metrics can differ with sampling phase.",
+  "observations_note": "Source post-mj_step body transform caches lag fresh qpos by one physics step. The diagnostic also compares both builders on fresh FK and unit reference quaternions. History masks and raw action history are identical.",
+  "runtime_variants": {
+    "delivered": "sim2real unchanged: 5-ms external PD",
+    "original": "unmodified source CLI and track(): 0.625-ms implicit servo, elliptic contacts",
+    "small_step_hold": "sim2real: change only timestep to 0.625 ms, retaining 50-Hz control and Hold logic"
+  },
+  "source_files_sha256": {
+    "ScaleTrack/deploy/sim2sim.py": "0f2f0eabe2f4584ed98bb5d9925415c94c3c297a314629e612004fddd75eed27",
+    "ScaleTrack/deploy/proteus/rollout.py": "279619bd9571a65858c900abe7aecd5e363dd87fac9f65e4f75567809bb42791",
+    "ScaleTrack/deploy/proteus/mujoco_robot.py": "2e14152d42c1f5c2074acd7110ce47212217d662ecb3c4dfdac3f56fbe745a59"
+  },
+  "probe_scripts_sha256": {
+    "render_comparison.py": "2dceaad890387c88518b43572aa8acd983ee2340f5731fd8114678a2545b2f88",
+    "run_probe.py": "ecd3bdd880e81b187d69176a62c6917f6ba7578be6876dfee9c92fad59fdec73",
+    "check_audit.py": "16abbeccee840bfa22797c042451b5baba79c8ca5131cb01bae717e1c51e9fb0",
+    "compare_observations.py": "e9e99401df86f0423a79a3ec791cda2012cd5d64cdf81bf13d41970f4e5db479",
+    "pack_same_reference.py": "e136d80d357a407a6712747f2568b61eafb17eea3255de8c3729999ccbe9e60c",
+    "run_batch.py": "644491599ce3cecb7aebbc189c5c99ed071ff03de095a800b5f17a537121de14"
+  },
+  "artifact_directory": "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600",
+  "robot": "x2",
+  "branch": "feat/proteus-wamseq-lingxi-x2",
+  "audited_commit": "6cc862efb081442e7952431398561617d5ab876a",
+  "runtime_changed": false,
+  "policy": "/home/galbot/projects/sim2real/checkpoints/proteus/proteus_wamseq_62/lingxi_x2/policy-sim.yaml",
+  "policy_onnx_sha256": "5e81f26337f8cfee0971a283e7ef65b128218953352973fca6233b182c048d22",
+  "source_actor_sha256": "33bc2ff91f5322abb9e939e5f691e62c03897906161ba1ab2bee9b0533fb9df1",
+  "robot_model_sha256": "986660ece680a94c05812a0c8b2d5392c58899d0ba49d063d124529a219a4f1b",
+  "conclusion": "No analogous timestep-induced oscillation or major source/local gap on the checked motions. Retain current defaults. Reducing timestep does not improve mean position accuracy on these references.",
+  "motions": {
+    "walk": {
+      "native_library_index": {
+        "motion_names": [
+          "walk1_subject1"
+        ],
+        "lengths": [
+          399
+        ],
+        "fps": 50,
+        "joint_names": [
+          "left_hip_pitch_joint",
+          "left_hip_roll_joint",
+          "left_hip_yaw_joint",
+          "left_knee_joint",
+          "left_ankle_pitch_joint",
+          "left_ankle_roll_joint",
+          "right_hip_pitch_joint",
+          "right_hip_roll_joint",
+          "right_hip_yaw_joint",
+          "right_knee_joint",
+          "right_ankle_pitch_joint",
+          "right_ankle_roll_joint",
+          "waist_yaw_joint",
+          "waist_pitch_joint",
+          "waist_roll_joint",
+          "left_shoulder_pitch_joint",
+          "left_shoulder_roll_joint",
+          "left_shoulder_yaw_joint",
+          "left_elbow_joint",
+          "left_wrist_yaw_joint",
+          "left_wrist_pitch_joint",
+          "left_wrist_roll_joint",
+          "right_shoulder_pitch_joint",
+          "right_shoulder_roll_joint",
+          "right_shoulder_yaw_joint",
+          "right_elbow_joint",
+          "right_wrist_yaw_joint",
+          "right_wrist_pitch_joint",
+          "right_wrist_roll_joint",
+          "head_yaw_joint",
+          "head_pitch_joint"
+        ],
+        "body_names": [
+          "pelvis",
+          "left_hip_roll_link",
+          "left_knee_link",
+          "left_ankle_roll_link",
+          "right_hip_roll_link",
+          "right_knee_link",
+          "right_ankle_roll_link",
+          "torso_link",
+          "left_shoulder_roll_link",
+          "left_elbow_link",
+          "left_wrist_roll_link",
+          "right_shoulder_roll_link",
+          "right_elbow_link",
+          "right_wrist_roll_link"
+        ],
+        "source": {
+          "path": "/home/galbot/projects/sim2real/outputs/x2/lafan_suite/walk/motions/walk1_subject1.npz",
+          "sha256": "9335e938942dce0a0e5fac3a63ef683db7f5769b85b4641a325e9d88d26eaa18",
+          "method": "exact sim2real MotionDataset 50-Hz tensors, body selection by original contract names; no retargeting, frame or pose modification",
+          "source_storage_dtype": "float16"
+        }
+      },
+      "original_cli": {
+        "robot": "lingxi_x2",
+        "success_rate": 1.0,
+        "motions": {
+          "walk1_subject1": {
+            "success": true,
+            "mean_error": 0.04385592043399811
+          }
+        }
+      },
+      "delivered": {
+        "robot": "x2",
+        "name": "delivered",
+        "mode": "current",
+        "frames": 398,
+        "physics": {
+          "dt": 0.005,
+          "servo": false,
+          "elliptic": false,
+          "initial_pause": 1.0,
+          "initial_velocity": "zero"
+        },
+        "mean_world_body_error_m": 0.04699762693224712,
+        "max_world_body_error_m": 0.08265803772538326,
+        "joint_position_rmse_rad": 0.3097471051984286,
+        "joint_velocity_rmse_rad_s": 0.43743413813083526,
+        "joint_acceleration_rms_rad_s2": 10.221874713839659,
+        "min_root_z": 0.6195456546185593,
+        "max_root_z": 0.6663721011815656,
+        "source_cli_metric": null,
+        "library": "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/walk/x2_library",
+        "library_index_sha256": "0bcd7fe42336a6ec467faf826933a72a3ffddcd74d6b8878c1b41d3ff232c594",
+        "onnx_sha256": "33bc2ff91f5322abb9e939e5f691e62c03897906161ba1ab2bee9b0533fb9df1"
+      },
+      "original": {
+        "robot": "x2",
+        "name": "original",
+        "mode": "source",
+        "frames": 398,
+        "physics": {
+          "dt": 0.000625,
+          "substeps": 8,
+          "servo": true,
+          "elliptic": true,
+          "initial_pause": 0.0,
+          "initial_velocity": "reference"
+        },
+        "mean_world_body_error_m": 0.043846244599522716,
+        "max_world_body_error_m": 0.07847438995324214,
+        "joint_position_rmse_rad": 0.30125676350267644,
+        "joint_velocity_rmse_rad_s": 0.5293649892170428,
+        "joint_acceleration_rms_rad_s2": 9.800326189722371,
+        "min_root_z": 0.6202834018749138,
+        "max_root_z": 0.6746188317985176,
+        "source_cli_metric": 0.04385592043399811,
+        "library": "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/walk/x2_library",
+        "library_index_sha256": "0bcd7fe42336a6ec467faf826933a72a3ffddcd74d6b8878c1b41d3ff232c594",
+        "onnx_sha256": "33bc2ff91f5322abb9e939e5f691e62c03897906161ba1ab2bee9b0533fb9df1"
+      },
+      "small_step_hold": {
+        "robot": "x2",
+        "name": "small_step_hold",
+        "mode": "current",
+        "frames": 398,
+        "physics": {
+          "dt": 0.000625,
+          "servo": false,
+          "elliptic": false,
+          "initial_pause": 1.0,
+          "initial_velocity": "zero"
+        },
+        "mean_world_body_error_m": 0.048215890239682056,
+        "max_world_body_error_m": 0.08552515826614267,
+        "joint_position_rmse_rad": 0.3094136049383879,
+        "joint_velocity_rmse_rad_s": 0.4326278495010988,
+        "joint_acceleration_rms_rad_s2": 9.1284814067432,
+        "min_root_z": 0.6198787991031087,
+        "max_root_z": 0.6664215990792206,
+        "source_cli_metric": null,
+        "library": "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/walk/x2_library",
+        "library_index_sha256": "0bcd7fe42336a6ec467faf826933a72a3ffddcd74d6b8878c1b41d3ff232c594",
+        "onnx_sha256": "33bc2ff91f5322abb9e939e5f691e62c03897906161ba1ab2bee9b0533fb9df1"
+      },
+      "reproduction_commands": {
+        "pack_reference": [
+          "uv",
+          "run",
+          "--no-sync",
+          "python",
+          "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/pack_same_reference.py",
+          "--robot",
+          "x2",
+          "--contract",
+          "/home/galbot/projects/Proteus-wamseq/ScaleTrack/checkpoints/proteus_wamseq_62/lingxi_x2.json",
+          "--motion",
+          "/home/galbot/projects/sim2real/outputs/x2/lafan_suite/walk/motions/walk1_subject1.npz",
+          "--output",
+          "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/walk/x2_library"
+        ],
+        "original_cli": [
+          "uv",
+          "run",
+          "--no-sync",
+          "python",
+          "/home/galbot/projects/Proteus-wamseq/ScaleTrack/deploy/sim2sim.py",
+          "--export",
+          "/home/galbot/projects/Proteus-wamseq/ScaleTrack/checkpoints/proteus_wamseq_62",
+          "--robot",
+          "lingxi_x2",
+          "--library",
+          "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/walk/x2_library",
+          "--max_steps",
+          "399",
+          "--results",
+          "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/walk/x2_original_cli.json"
+        ]
+      }
+    },
+    "aiming": {
+      "native_library_index": {
+        "motion_names": [
+          "aiming1_subject1"
+        ],
+        "lengths": [
+          399
+        ],
+        "fps": 50,
+        "joint_names": [
+          "left_hip_pitch_joint",
+          "left_hip_roll_joint",
+          "left_hip_yaw_joint",
+          "left_knee_joint",
+          "left_ankle_pitch_joint",
+          "left_ankle_roll_joint",
+          "right_hip_pitch_joint",
+          "right_hip_roll_joint",
+          "right_hip_yaw_joint",
+          "right_knee_joint",
+          "right_ankle_pitch_joint",
+          "right_ankle_roll_joint",
+          "waist_yaw_joint",
+          "waist_pitch_joint",
+          "waist_roll_joint",
+          "left_shoulder_pitch_joint",
+          "left_shoulder_roll_joint",
+          "left_shoulder_yaw_joint",
+          "left_elbow_joint",
+          "left_wrist_yaw_joint",
+          "left_wrist_pitch_joint",
+          "left_wrist_roll_joint",
+          "right_shoulder_pitch_joint",
+          "right_shoulder_roll_joint",
+          "right_shoulder_yaw_joint",
+          "right_elbow_joint",
+          "right_wrist_yaw_joint",
+          "right_wrist_pitch_joint",
+          "right_wrist_roll_joint",
+          "head_yaw_joint",
+          "head_pitch_joint"
+        ],
+        "body_names": [
+          "pelvis",
+          "left_hip_roll_link",
+          "left_knee_link",
+          "left_ankle_roll_link",
+          "right_hip_roll_link",
+          "right_knee_link",
+          "right_ankle_roll_link",
+          "torso_link",
+          "left_shoulder_roll_link",
+          "left_elbow_link",
+          "left_wrist_roll_link",
+          "right_shoulder_roll_link",
+          "right_elbow_link",
+          "right_wrist_roll_link"
+        ],
+        "source": {
+          "path": "/home/galbot/projects/sim2real/outputs/x2/lafan_suite/aiming/motions/aiming1_subject1.npz",
+          "sha256": "5bc4bbff854e8765c286e6b944cd6836b39b1b63cd23c6dd1e1cfe0f5701f54e",
+          "method": "exact sim2real MotionDataset 50-Hz tensors, body selection by original contract names; no retargeting, frame or pose modification",
+          "source_storage_dtype": "float16"
+        }
+      },
+      "original_cli": {
+        "robot": "lingxi_x2",
+        "success_rate": 1.0,
+        "motions": {
+          "aiming1_subject1": {
+            "success": true,
+            "mean_error": 0.03637855499982834
+          }
+        }
+      },
+      "delivered": {
+        "robot": "x2",
+        "name": "delivered",
+        "mode": "current",
+        "frames": 398,
+        "physics": {
+          "dt": 0.005,
+          "servo": false,
+          "elliptic": false,
+          "initial_pause": 1.0,
+          "initial_velocity": "zero"
+        },
+        "mean_world_body_error_m": 0.037587747721937355,
+        "max_world_body_error_m": 0.055446046989662254,
+        "joint_position_rmse_rad": 0.2799719175112017,
+        "joint_velocity_rmse_rad_s": 0.2621562458053005,
+        "joint_acceleration_rms_rad_s2": 5.114651943612757,
+        "min_root_z": 0.6409221442513584,
+        "max_root_z": 0.667092783277268,
+        "source_cli_metric": null,
+        "library": "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/aiming/x2_library",
+        "library_index_sha256": "2ab9d0283d1b52ebfea3bbc61e1d5dd24ca70818ba3f5ab47d1568ee8b420ad5",
+        "onnx_sha256": "33bc2ff91f5322abb9e939e5f691e62c03897906161ba1ab2bee9b0533fb9df1"
+      },
+      "original": {
+        "robot": "x2",
+        "name": "original",
+        "mode": "source",
+        "frames": 398,
+        "physics": {
+          "dt": 0.000625,
+          "substeps": 8,
+          "servo": true,
+          "elliptic": true,
+          "initial_pause": 0.0,
+          "initial_velocity": "reference"
+        },
+        "mean_world_body_error_m": 0.03637414142609702,
+        "max_world_body_error_m": 0.05572984505943832,
+        "joint_position_rmse_rad": 0.2721853586735053,
+        "joint_velocity_rmse_rad_s": 0.358358664396365,
+        "joint_acceleration_rms_rad_s2": 6.037342740261812,
+        "min_root_z": 0.64017973055653,
+        "max_root_z": 0.6761325899079862,
+        "source_cli_metric": 0.03637855499982834,
+        "library": "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/aiming/x2_library",
+        "library_index_sha256": "2ab9d0283d1b52ebfea3bbc61e1d5dd24ca70818ba3f5ab47d1568ee8b420ad5",
+        "onnx_sha256": "33bc2ff91f5322abb9e939e5f691e62c03897906161ba1ab2bee9b0533fb9df1"
+      },
+      "small_step_hold": {
+        "robot": "x2",
+        "name": "small_step_hold",
+        "mode": "current",
+        "frames": 398,
+        "physics": {
+          "dt": 0.000625,
+          "servo": false,
+          "elliptic": false,
+          "initial_pause": 1.0,
+          "initial_velocity": "zero"
+        },
+        "mean_world_body_error_m": 0.037479560334415754,
+        "max_world_body_error_m": 0.05583855634875516,
+        "joint_position_rmse_rad": 0.279905070573461,
+        "joint_velocity_rmse_rad_s": 0.2614087588687917,
+        "joint_acceleration_rms_rad_s2": 4.889820042448035,
+        "min_root_z": 0.6405828221011248,
+        "max_root_z": 0.6670905344248536,
+        "source_cli_metric": null,
+        "library": "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/aiming/x2_library",
+        "library_index_sha256": "2ab9d0283d1b52ebfea3bbc61e1d5dd24ca70818ba3f5ab47d1568ee8b420ad5",
+        "onnx_sha256": "33bc2ff91f5322abb9e939e5f691e62c03897906161ba1ab2bee9b0533fb9df1"
+      },
+      "reproduction_commands": {
+        "pack_reference": [
+          "uv",
+          "run",
+          "--no-sync",
+          "python",
+          "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/pack_same_reference.py",
+          "--robot",
+          "x2",
+          "--contract",
+          "/home/galbot/projects/Proteus-wamseq/ScaleTrack/checkpoints/proteus_wamseq_62/lingxi_x2.json",
+          "--motion",
+          "/home/galbot/projects/sim2real/outputs/x2/lafan_suite/aiming/motions/aiming1_subject1.npz",
+          "--output",
+          "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/aiming/x2_library"
+        ],
+        "original_cli": [
+          "uv",
+          "run",
+          "--no-sync",
+          "python",
+          "/home/galbot/projects/Proteus-wamseq/ScaleTrack/deploy/sim2sim.py",
+          "--export",
+          "/home/galbot/projects/Proteus-wamseq/ScaleTrack/checkpoints/proteus_wamseq_62",
+          "--robot",
+          "lingxi_x2",
+          "--library",
+          "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/aiming/x2_library",
+          "--max_steps",
+          "399",
+          "--results",
+          "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/aiming/x2_original_cli.json"
+        ]
+      }
+    },
+    "dance2": {
+      "native_library_index": {
+        "motion_names": [
+          "dance2_subject1"
+        ],
+        "lengths": [
+          399
+        ],
+        "fps": 50,
+        "joint_names": [
+          "left_hip_pitch_joint",
+          "left_hip_roll_joint",
+          "left_hip_yaw_joint",
+          "left_knee_joint",
+          "left_ankle_pitch_joint",
+          "left_ankle_roll_joint",
+          "right_hip_pitch_joint",
+          "right_hip_roll_joint",
+          "right_hip_yaw_joint",
+          "right_knee_joint",
+          "right_ankle_pitch_joint",
+          "right_ankle_roll_joint",
+          "waist_yaw_joint",
+          "waist_pitch_joint",
+          "waist_roll_joint",
+          "left_shoulder_pitch_joint",
+          "left_shoulder_roll_joint",
+          "left_shoulder_yaw_joint",
+          "left_elbow_joint",
+          "left_wrist_yaw_joint",
+          "left_wrist_pitch_joint",
+          "left_wrist_roll_joint",
+          "right_shoulder_pitch_joint",
+          "right_shoulder_roll_joint",
+          "right_shoulder_yaw_joint",
+          "right_elbow_joint",
+          "right_wrist_yaw_joint",
+          "right_wrist_pitch_joint",
+          "right_wrist_roll_joint",
+          "head_yaw_joint",
+          "head_pitch_joint"
+        ],
+        "body_names": [
+          "pelvis",
+          "left_hip_roll_link",
+          "left_knee_link",
+          "left_ankle_roll_link",
+          "right_hip_roll_link",
+          "right_knee_link",
+          "right_ankle_roll_link",
+          "torso_link",
+          "left_shoulder_roll_link",
+          "left_elbow_link",
+          "left_wrist_roll_link",
+          "right_shoulder_roll_link",
+          "right_elbow_link",
+          "right_wrist_roll_link"
+        ],
+        "source": {
+          "path": "/home/galbot/projects/sim2real/outputs/x2/lafan_suite/dance2/motions/dance2_subject1.npz",
+          "sha256": "b07f9c491252cef992018b4ee6c3ca91b528e9c9448ef6ef1dd1c54e3af12a92",
+          "method": "exact sim2real MotionDataset 50-Hz tensors, body selection by original contract names; no retargeting, frame or pose modification",
+          "source_storage_dtype": "float16"
+        }
+      },
+      "original_cli": {
+        "robot": "lingxi_x2",
+        "success_rate": 1.0,
+        "motions": {
+          "dance2_subject1": {
+            "success": true,
+            "mean_error": 0.042492736130952835
+          }
+        }
+      },
+      "delivered": {
+        "robot": "x2",
+        "name": "delivered",
+        "mode": "current",
+        "frames": 398,
+        "physics": {
+          "dt": 0.005,
+          "servo": false,
+          "elliptic": false,
+          "initial_pause": 1.0,
+          "initial_velocity": "zero"
+        },
+        "mean_world_body_error_m": 0.04252677393912902,
+        "max_world_body_error_m": 0.06874851577345888,
+        "joint_position_rmse_rad": 0.3712285248319677,
+        "joint_velocity_rmse_rad_s": 0.553094125483459,
+        "joint_acceleration_rms_rad_s2": 9.730568527516379,
+        "min_root_z": 0.6201936877326228,
+        "max_root_z": 0.6654844367406048,
+        "source_cli_metric": null,
+        "library": "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/dance2/x2_library",
+        "library_index_sha256": "52d6125d4bf85ad7c5c518af88515421f3aaca99ceb3dabe7e1f87605a894530",
+        "onnx_sha256": "33bc2ff91f5322abb9e939e5f691e62c03897906161ba1ab2bee9b0533fb9df1"
+      },
+      "original": {
+        "robot": "x2",
+        "name": "original",
+        "mode": "source",
+        "frames": 398,
+        "physics": {
+          "dt": 0.000625,
+          "substeps": 8,
+          "servo": true,
+          "elliptic": true,
+          "initial_pause": 0.0,
+          "initial_velocity": "reference"
+        },
+        "mean_world_body_error_m": 0.042467986609078946,
+        "max_world_body_error_m": 0.07778086072067462,
+        "joint_position_rmse_rad": 0.36045619283238706,
+        "joint_velocity_rmse_rad_s": 0.6474351959583854,
+        "joint_acceleration_rms_rad_s2": 10.913274373597256,
+        "min_root_z": 0.6233022499896704,
+        "max_root_z": 0.6780054761806689,
+        "source_cli_metric": 0.042492736130952835,
+        "library": "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/dance2/x2_library",
+        "library_index_sha256": "52d6125d4bf85ad7c5c518af88515421f3aaca99ceb3dabe7e1f87605a894530",
+        "onnx_sha256": "33bc2ff91f5322abb9e939e5f691e62c03897906161ba1ab2bee9b0533fb9df1"
+      },
+      "small_step_hold": {
+        "robot": "x2",
+        "name": "small_step_hold",
+        "mode": "current",
+        "frames": 398,
+        "physics": {
+          "dt": 0.000625,
+          "servo": false,
+          "elliptic": false,
+          "initial_pause": 1.0,
+          "initial_velocity": "zero"
+        },
+        "mean_world_body_error_m": 0.042894050308849144,
+        "max_world_body_error_m": 0.06877334732786282,
+        "joint_position_rmse_rad": 0.37112888425367874,
+        "joint_velocity_rmse_rad_s": 0.5533364617408477,
+        "joint_acceleration_rms_rad_s2": 9.34039055879013,
+        "min_root_z": 0.6198650645505779,
+        "max_root_z": 0.6655174867031722,
+        "source_cli_metric": null,
+        "library": "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/dance2/x2_library",
+        "library_index_sha256": "52d6125d4bf85ad7c5c518af88515421f3aaca99ceb3dabe7e1f87605a894530",
+        "onnx_sha256": "33bc2ff91f5322abb9e939e5f691e62c03897906161ba1ab2bee9b0533fb9df1"
+      },
+      "reproduction_commands": {
+        "pack_reference": [
+          "uv",
+          "run",
+          "--no-sync",
+          "python",
+          "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/pack_same_reference.py",
+          "--robot",
+          "x2",
+          "--contract",
+          "/home/galbot/projects/Proteus-wamseq/ScaleTrack/checkpoints/proteus_wamseq_62/lingxi_x2.json",
+          "--motion",
+          "/home/galbot/projects/sim2real/outputs/x2/lafan_suite/dance2/motions/dance2_subject1.npz",
+          "--output",
+          "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/dance2/x2_library"
+        ],
+        "original_cli": [
+          "uv",
+          "run",
+          "--no-sync",
+          "python",
+          "/home/galbot/projects/Proteus-wamseq/ScaleTrack/deploy/sim2sim.py",
+          "--export",
+          "/home/galbot/projects/Proteus-wamseq/ScaleTrack/checkpoints/proteus_wamseq_62",
+          "--robot",
+          "lingxi_x2",
+          "--library",
+          "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/dance2/x2_library",
+          "--max_steps",
+          "399",
+          "--results",
+          "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/dance2/x2_original_cli.json"
+        ]
+      }
+    },
+    "gangam": {
+      "native_library_index": {
+        "motion_names": [
+          "gangam_dance"
+        ],
+        "lengths": [
+          460
+        ],
+        "fps": 50,
+        "joint_names": [
+          "left_hip_pitch_joint",
+          "left_hip_roll_joint",
+          "left_hip_yaw_joint",
+          "left_knee_joint",
+          "left_ankle_pitch_joint",
+          "left_ankle_roll_joint",
+          "right_hip_pitch_joint",
+          "right_hip_roll_joint",
+          "right_hip_yaw_joint",
+          "right_knee_joint",
+          "right_ankle_pitch_joint",
+          "right_ankle_roll_joint",
+          "waist_yaw_joint",
+          "waist_pitch_joint",
+          "waist_roll_joint",
+          "left_shoulder_pitch_joint",
+          "left_shoulder_roll_joint",
+          "left_shoulder_yaw_joint",
+          "left_elbow_joint",
+          "left_wrist_yaw_joint",
+          "left_wrist_pitch_joint",
+          "left_wrist_roll_joint",
+          "right_shoulder_pitch_joint",
+          "right_shoulder_roll_joint",
+          "right_shoulder_yaw_joint",
+          "right_elbow_joint",
+          "right_wrist_yaw_joint",
+          "right_wrist_pitch_joint",
+          "right_wrist_roll_joint",
+          "head_yaw_joint",
+          "head_pitch_joint"
+        ],
+        "body_names": [
+          "pelvis",
+          "left_hip_roll_link",
+          "left_knee_link",
+          "left_ankle_roll_link",
+          "right_hip_roll_link",
+          "right_knee_link",
+          "right_ankle_roll_link",
+          "torso_link",
+          "left_shoulder_roll_link",
+          "left_elbow_link",
+          "left_wrist_roll_link",
+          "right_shoulder_roll_link",
+          "right_elbow_link",
+          "right_wrist_roll_link"
+        ],
+        "source": {
+          "path": "/home/galbot/projects/sim2real/outputs/x2/gangam_dance/motions/gangam_dance.npz",
+          "sha256": "f10fd2c8c267edd399178576010cd2615af1c80308ecc2bc7c6fb21437b03d69",
+          "method": "exact sim2real MotionDataset 50-Hz tensors, body selection by original contract names; no retargeting, frame or pose modification",
+          "source_storage_dtype": "float16"
+        }
+      },
+      "original_cli": {
+        "robot": "lingxi_x2",
+        "success_rate": 1.0,
+        "motions": {
+          "gangam_dance": {
+            "success": true,
+            "mean_error": 0.08259887993335724
+          }
+        }
+      },
+      "delivered": {
+        "robot": "x2",
+        "name": "delivered",
+        "mode": "current",
+        "frames": 459,
+        "physics": {
+          "dt": 0.005,
+          "servo": false,
+          "elliptic": false,
+          "initial_pause": 1.0,
+          "initial_velocity": "zero"
+        },
+        "mean_world_body_error_m": 0.08180654831026009,
+        "max_world_body_error_m": 0.13321306974858624,
+        "joint_position_rmse_rad": 0.2026046339323241,
+        "joint_velocity_rmse_rad_s": 2.014470622955928,
+        "joint_acceleration_rms_rad_s2": 24.015801348048132,
+        "min_root_z": 0.6082751435675535,
+        "max_root_z": 0.6652172831366685,
+        "source_cli_metric": null,
+        "library": "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/gangam/x2_library",
+        "library_index_sha256": "c02f50c422ef91a418f116469e725e796125ecb081aab26aaed64ef80dcc3b66",
+        "onnx_sha256": "33bc2ff91f5322abb9e939e5f691e62c03897906161ba1ab2bee9b0533fb9df1"
+      },
+      "original": {
+        "robot": "x2",
+        "name": "original",
+        "mode": "source",
+        "frames": 459,
+        "physics": {
+          "dt": 0.000625,
+          "substeps": 8,
+          "servo": true,
+          "elliptic": true,
+          "initial_pause": 0.0,
+          "initial_velocity": "reference"
+        },
+        "mean_world_body_error_m": 0.08271451412604686,
+        "max_world_body_error_m": 0.13636844307073334,
+        "joint_position_rmse_rad": 0.20541876511790036,
+        "joint_velocity_rmse_rad_s": 2.1148381616403347,
+        "joint_acceleration_rms_rad_s2": 24.236805161921158,
+        "min_root_z": 0.6072984882671012,
+        "max_root_z": 0.6716484506149911,
+        "source_cli_metric": 0.08259887993335724,
+        "library": "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/gangam/x2_library",
+        "library_index_sha256": "c02f50c422ef91a418f116469e725e796125ecb081aab26aaed64ef80dcc3b66",
+        "onnx_sha256": "33bc2ff91f5322abb9e939e5f691e62c03897906161ba1ab2bee9b0533fb9df1"
+      },
+      "small_step_hold": {
+        "robot": "x2",
+        "name": "small_step_hold",
+        "mode": "current",
+        "frames": 459,
+        "physics": {
+          "dt": 0.000625,
+          "servo": false,
+          "elliptic": false,
+          "initial_pause": 1.0,
+          "initial_velocity": "zero"
+        },
+        "mean_world_body_error_m": 0.08234541482065395,
+        "max_world_body_error_m": 0.13421587179033242,
+        "joint_position_rmse_rad": 0.20285168884219623,
+        "joint_velocity_rmse_rad_s": 2.0165927260733394,
+        "joint_acceleration_rms_rad_s2": 23.882653576617717,
+        "min_root_z": 0.6075560664590096,
+        "max_root_z": 0.6652351173832459,
+        "source_cli_metric": null,
+        "library": "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/gangam/x2_library",
+        "library_index_sha256": "c02f50c422ef91a418f116469e725e796125ecb081aab26aaed64ef80dcc3b66",
+        "onnx_sha256": "33bc2ff91f5322abb9e939e5f691e62c03897906161ba1ab2bee9b0533fb9df1"
+      },
+      "reproduction_commands": {
+        "pack_reference": [
+          "uv",
+          "run",
+          "--no-sync",
+          "python",
+          "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/pack_same_reference.py",
+          "--robot",
+          "x2",
+          "--contract",
+          "/home/galbot/projects/Proteus-wamseq/ScaleTrack/checkpoints/proteus_wamseq_62/lingxi_x2.json",
+          "--motion",
+          "/home/galbot/projects/sim2real/outputs/x2/gangam_dance/motions/gangam_dance.npz",
+          "--output",
+          "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/gangam/x2_library"
+        ],
+        "original_cli": [
+          "uv",
+          "run",
+          "--no-sync",
+          "python",
+          "/home/galbot/projects/Proteus-wamseq/ScaleTrack/deploy/sim2sim.py",
+          "--export",
+          "/home/galbot/projects/Proteus-wamseq/ScaleTrack/checkpoints/proteus_wamseq_62",
+          "--robot",
+          "lingxi_x2",
+          "--library",
+          "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/gangam/x2_library",
+          "--max_steps",
+          "460",
+          "--results",
+          "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/gangam/x2_original_cli.json"
+        ]
+      }
+    },
+    "relaxed": {
+      "native_library_index": {
+        "motion_names": [
+          "relaxed_walk"
+        ],
+        "lengths": [
+          741
+        ],
+        "fps": 50,
+        "joint_names": [
+          "left_hip_pitch_joint",
+          "left_hip_roll_joint",
+          "left_hip_yaw_joint",
+          "left_knee_joint",
+          "left_ankle_pitch_joint",
+          "left_ankle_roll_joint",
+          "right_hip_pitch_joint",
+          "right_hip_roll_joint",
+          "right_hip_yaw_joint",
+          "right_knee_joint",
+          "right_ankle_pitch_joint",
+          "right_ankle_roll_joint",
+          "waist_yaw_joint",
+          "waist_pitch_joint",
+          "waist_roll_joint",
+          "left_shoulder_pitch_joint",
+          "left_shoulder_roll_joint",
+          "left_shoulder_yaw_joint",
+          "left_elbow_joint",
+          "left_wrist_yaw_joint",
+          "left_wrist_pitch_joint",
+          "left_wrist_roll_joint",
+          "right_shoulder_pitch_joint",
+          "right_shoulder_roll_joint",
+          "right_shoulder_yaw_joint",
+          "right_elbow_joint",
+          "right_wrist_yaw_joint",
+          "right_wrist_pitch_joint",
+          "right_wrist_roll_joint",
+          "head_yaw_joint",
+          "head_pitch_joint"
+        ],
+        "body_names": [
+          "pelvis",
+          "left_hip_roll_link",
+          "left_knee_link",
+          "left_ankle_roll_link",
+          "right_hip_roll_link",
+          "right_knee_link",
+          "right_ankle_roll_link",
+          "torso_link",
+          "left_shoulder_roll_link",
+          "left_elbow_link",
+          "left_wrist_roll_link",
+          "right_shoulder_roll_link",
+          "right_elbow_link",
+          "right_wrist_roll_link"
+        ],
+        "source": {
+          "path": "/home/galbot/projects/sim2real/outputs/x2/relaxed_walk/motions/relaxed_walk.npz",
+          "sha256": "0806b94ef41807fa21462125c49ad51e687928c56a9a8378c6b81ce73b77b553",
+          "method": "exact sim2real MotionDataset 50-Hz tensors, body selection by original contract names; no retargeting, frame or pose modification",
+          "source_storage_dtype": "float16"
+        }
+      },
+      "original_cli": {
+        "robot": "lingxi_x2",
+        "success_rate": 1.0,
+        "motions": {
+          "relaxed_walk": {
+            "success": true,
+            "mean_error": 0.04600895568728447
+          }
+        }
+      },
+      "delivered": {
+        "robot": "x2",
+        "name": "delivered",
+        "mode": "current",
+        "frames": 740,
+        "physics": {
+          "dt": 0.005,
+          "servo": false,
+          "elliptic": false,
+          "initial_pause": 1.0,
+          "initial_velocity": "zero"
+        },
+        "mean_world_body_error_m": 0.0486757811134014,
+        "max_world_body_error_m": 0.07740012353328031,
+        "joint_position_rmse_rad": 0.12295609443286772,
+        "joint_velocity_rmse_rad_s": 0.6405904782171351,
+        "joint_acceleration_rms_rad_s2": 12.181875826292693,
+        "min_root_z": 0.6354645487169363,
+        "max_root_z": 0.667473024127468,
+        "source_cli_metric": null,
+        "library": "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/relaxed/x2_library",
+        "library_index_sha256": "54687ce67c6db7e52136d8eedec194948c3601edc332c7abd19a2a95c0fa2041",
+        "onnx_sha256": "33bc2ff91f5322abb9e939e5f691e62c03897906161ba1ab2bee9b0533fb9df1"
+      },
+      "original": {
+        "robot": "x2",
+        "name": "original",
+        "mode": "source",
+        "frames": 740,
+        "physics": {
+          "dt": 0.000625,
+          "substeps": 8,
+          "servo": true,
+          "elliptic": true,
+          "initial_pause": 0.0,
+          "initial_velocity": "reference"
+        },
+        "mean_world_body_error_m": 0.04601845897835436,
+        "max_world_body_error_m": 0.07883314753719382,
+        "joint_position_rmse_rad": 0.1242176135486132,
+        "joint_velocity_rmse_rad_s": 0.7112718625510773,
+        "joint_acceleration_rms_rad_s2": 11.710383288056613,
+        "min_root_z": 0.6345167717443146,
+        "max_root_z": 0.6690868072728128,
+        "source_cli_metric": 0.04600895568728447,
+        "library": "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/relaxed/x2_library",
+        "library_index_sha256": "54687ce67c6db7e52136d8eedec194948c3601edc332c7abd19a2a95c0fa2041",
+        "onnx_sha256": "33bc2ff91f5322abb9e939e5f691e62c03897906161ba1ab2bee9b0533fb9df1"
+      },
+      "small_step_hold": {
+        "robot": "x2",
+        "name": "small_step_hold",
+        "mode": "current",
+        "frames": 740,
+        "physics": {
+          "dt": 0.000625,
+          "servo": false,
+          "elliptic": false,
+          "initial_pause": 1.0,
+          "initial_velocity": "zero"
+        },
+        "mean_world_body_error_m": 0.05055289003514251,
+        "max_world_body_error_m": 0.08138682625861417,
+        "joint_position_rmse_rad": 0.12304452904243998,
+        "joint_velocity_rmse_rad_s": 0.6370060027945962,
+        "joint_acceleration_rms_rad_s2": 11.348095806483494,
+        "min_root_z": 0.6347774731938104,
+        "max_root_z": 0.6684395685711292,
+        "source_cli_metric": null,
+        "library": "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/relaxed/x2_library",
+        "library_index_sha256": "54687ce67c6db7e52136d8eedec194948c3601edc332c7abd19a2a95c0fa2041",
+        "onnx_sha256": "33bc2ff91f5322abb9e939e5f691e62c03897906161ba1ab2bee9b0533fb9df1"
+      },
+      "reproduction_commands": {
+        "pack_reference": [
+          "uv",
+          "run",
+          "--no-sync",
+          "python",
+          "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/pack_same_reference.py",
+          "--robot",
+          "x2",
+          "--contract",
+          "/home/galbot/projects/Proteus-wamseq/ScaleTrack/checkpoints/proteus_wamseq_62/lingxi_x2.json",
+          "--motion",
+          "/home/galbot/projects/sim2real/outputs/x2/relaxed_walk/motions/relaxed_walk.npz",
+          "--output",
+          "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/relaxed/x2_library"
+        ],
+        "original_cli": [
+          "uv",
+          "run",
+          "--no-sync",
+          "python",
+          "/home/galbot/projects/Proteus-wamseq/ScaleTrack/deploy/sim2sim.py",
+          "--export",
+          "/home/galbot/projects/Proteus-wamseq/ScaleTrack/checkpoints/proteus_wamseq_62",
+          "--robot",
+          "lingxi_x2",
+          "--library",
+          "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/relaxed/x2_library",
+          "--max_steps",
+          "741",
+          "--results",
+          "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/relaxed/x2_original_cli.json"
+        ]
+      }
+    }
+  },
+  "observation_comparison": {
+    "robot": "x2",
+    "states": 399,
+    "max_abs_errors": {
+      "proprioception": 1.1965632438659668e-05,
+      "task": 0.004428103566169739,
+      "action_history": 0.0,
+      "history_valid": 0.0,
+      "action": 0.015457987785339355,
+      "task_unit_reference": 0.0044350773096084595,
+      "action_unit_reference": 0.015447735786437988,
+      "task_fresh_kinematics": 5.662441253662109e-07,
+      "action_fresh_kinematics": 3.9637088775634766e-05
+    },
+    "method": "shared original physical states/actions; raw source builder/actor compared with sim2real semantic views/wrapped actor"
+  },
+  "video": "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/walk/videos/x2_delivered_vs_original.mp4",
+  "commands": {
+    "cwd": "/home/galbot/projects/sim2real",
+    "batch": [
+      "python",
+      "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/run_batch.py",
+      "--robots",
+      "x2",
+      "--clips",
+      "walk",
+      "aiming",
+      "dance2",
+      "gangam",
+      "relaxed",
+      "--variants",
+      "delivered",
+      "original",
+      "small_step_hold"
+    ],
+    "observations": [
+      "uv",
+      "run",
+      "--no-sync",
+      "python",
+      "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/compare_observations.py",
+      "--robot",
+      "x2",
+      "--base",
+      "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/walk"
+    ],
+    "environment": {
+      "PYTHONPATH": "/home/galbot/projects/sim2real",
+      "HF_HUB_OFFLINE": "1",
+      "HF_HUB_DISABLE_TELEMETRY": "1",
+      "SCALETRACK_ROBOT_ASSETS": "/home/galbot/projects/sim2real/third_party",
+      "OMP_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1",
+      "SIM2REAL_ORT_NUM_THREADS": "1"
+    }
+  },
+  "differential_check": {
+    "command": [
+      "python",
+      "/home/galbot/projects/sim2real/outputs/proteus_oli_x2_audit/20261103_171600/check_audit.py"
+    ],
+    "known_bad_control": "--control rejects Q1 acceleration and T800 position/velocity from original delivered captures",
+    "result": "18 local/source comparisons and both same-state observation checks passed",
+    "thresholds": "position > source*1.2+0.005 m; velocity RMSE > source*1.5+0.25 rad/s; acceleration RMS > source*1.5+10 rad/s\u00b2",
+    "scope": "detects observed numerical regression, not absolute tracking quality"
+  }
+}

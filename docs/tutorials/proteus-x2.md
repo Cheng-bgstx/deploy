@@ -280,3 +280,51 @@ All three 10 s videos finished upright (minimum root height 0.620 / 0.641 / 0.62
 These add to the existing relaxed walk and Gangnam dance references. This validates
 these short retargeted motion intervals in simulation, with vendor inertia / training
 mass differences retained; hardware and live PICO quality still need separate tests.
+
+## Original Proteus runtime audit (2026-11-03)
+
+After discovering the Q1/T800 simulation timestep issue, this branch was checked
+against the **unchanged** Proteus `wamseq` runner at `1e0e038`. Both runners use
+the same prepared robot model, shared WAMSeq weights and exact 50-Hz reference
+arrays; these arrays were packed into a native `MotionLibrary` without retargeting.
+Each original run was also invoked through its actual `deploy/sim2sim.py` CLI.
+This controls the model revision; it does not recreate unavailable training assets.
+
+Seed is 0, policy rate 50 Hz. Compare the first physical sample for each shared
+playback frame 1..T-1 over the contract's 14 tracking bodies. The local runner
+retains its 1-s initial policy Hold; the source retains its native start and
+reference velocities. The last column changes only the local physics timestep.
+These matched-frame diagnostics can differ slightly from historical video metrics
+because of sampling phase and, for older OLI experiments, root-reference forcing.
+All runs below use `policy-sim.yaml` with measured world-root translation.
+
+| Reference | Local 5 ms (cm) | Original 0.625 ms (cm) | Local 0.625 ms (cm) |
+| --- | ---: | ---: | ---: |
+| walk | 4.70 | 4.38 | 4.82 |
+| aiming | 3.76 | 3.64 | 3.75 |
+| dance2 | 4.25 | 4.25 | 4.29 |
+| gangam | 8.18 | 8.27 | 8.23 |
+| relaxed | 4.87 | 4.60 | 5.06 |
+
+There is **no analogous timestep-induced oscillation or major runtime gap** on
+these references. The Gangnam dance remains about 8.2 cm in both
+runners; its local/original joint-acceleration RMS is 24.02/24.24 rad/s².
+A smaller local step does not improve mean position accuracy on these references.
+Keep the existing X2 simulation defaults. The previously recorded 0.16487534-kg
+vendor/training mass difference is unchanged.
+
+On 399 shared physical states, proprioception, action history and validity masks
+were checked against the original builder. After evaluating both on fresh FK and
+unit reference quaternions, maximum task/action differences are
+5.66e-07/3.96e-05; action history and masks match exactly.
+The unadjusted source body-transform cache lags qpos by one physics step; this
+small observation-timing difference is retained in the original rollout.
+
+The machine-readable record is `docs/experiments/proteus-x2-runtime-audit.json`:
+source/artifact hashes, exact commands, native CLI results, all three variants and
+observation diagnostics. Debug scripts and actual physical-pose traces/videos are
+archived under `outputs/proteus_oli_x2_audit/20261103_171600/`. The differential
+checker rejects the known bad Q1/T800 captures and accepts all nine OLI/X2
+references in both local resolutions. This detects the observed numerical
+regression; it is not an absolute tracking-quality threshold. Runtime code,
+policy weights and hardware/PICO behavior were not changed by this audit.
