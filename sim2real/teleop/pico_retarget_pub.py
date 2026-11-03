@@ -256,13 +256,13 @@ def _hand_grip_message_from_data(controller_data: object) -> HandGripMessage:
 def _resolve_gmr_target_robot(robot_cfg: RobotCfg) -> str:
     try:
         return {"g1": "unitree_g1", "h2": "unitree_h2", "oli": "limx_oli_edu",
-                "x2": "lingxi_x2"}[robot_cfg.name]
+                "x2": "lingxi_x2", "q1": "primebot_q1"}[robot_cfg.name]
     except KeyError as exc:
         raise ValueError(f"Pico retargeting does not support {robot_cfg.name}") from exc
 
 
 def _register_gmr_robot(robot_cfg: RobotCfg, target_robot: str) -> None:
-    if robot_cfg.name in {"h2", "oli", "x2"}:
+    if robot_cfg.name in {"h2", "oli", "x2", "q1"}:
         from general_motion_retargeting.params import IK_CONFIG_DICT, ROBOT_XML_DICT
         ROBOT_XML_DICT[target_robot] = robot_cfg.resolve_mjcf_path()
         IK_CONFIG_DICT.setdefault("xrobot", {})[target_robot] = (
@@ -285,8 +285,11 @@ class LiveRetargetPublisher:
         human_height = float(args.actual_human_height)
         if not np.isfinite(human_height) or human_height <= 0:
             raise ValueError("actual_human_height must be finite and positive")
-        normalize_height = self.robot_cfg.name in {"oli", "x2"}
+        normalize_height = self.robot_cfg.name in {"oli", "x2", "q1"}
         retarget_type = GMR
+        if self.robot_cfg.name == "q1":
+            from sim2real.teleop.proteus_retarget import ProteusRetargeter
+            retarget_type = ProteusRetargeter
         if self.robot_cfg.name == "x2":
             from sim2real.teleop.x2_retarget import X2Retargeter
             retarget_type = X2Retargeter
@@ -296,7 +299,7 @@ class LiveRetargetPublisher:
             actual_human_height=None if normalize_height else human_height,
             verbose=bool(args.verbose),
         )
-        if self.robot_cfg.name == "x2":
+        if self.robot_cfg.name in {"x2", "q1"}:
             self.retarget.reference_dt = 1.0 / self.publish_hz
         if normalize_height:
             profile = json.loads((Path(__file__).with_name("configs")
@@ -330,7 +333,9 @@ class LiveRetargetPublisher:
                 f"(model.nq={self.retarget.configuration.model.nq}, expected={expected_qpos_size})"
             )
 
-        self.latest_qpos = np.asarray(self.robot_cfg.default_qpos, dtype=np.float32).copy()
+        self.latest_qpos = self._default_mjcf_qpos()
+        if self.robot_cfg.name in {"q1", "t800", "a3"}:
+            self.retarget.configuration.update(self.latest_qpos)
         self.paused_qpos = self.latest_qpos.copy()
         (
             self.paused_joint_pos,
@@ -389,6 +394,14 @@ class LiveRetargetPublisher:
                 raise ValueError(f"Failed to resolve joint name in MJCF: {joint_name}")
             joint_qpos_indices.append(int(self.fk_model.jnt_qposadr[joint_id]))
         return joint_qpos_indices
+
+    def _default_mjcf_qpos(self) -> np.ndarray:
+        # RobotCfg stores policy joint order; A3's native MJCF traverses waist
+        # and arms before legs. Populate addresses by name even while paused.
+        qpos = self.fk_model.qpos0.astype(np.float32).copy()
+        qpos[:7] = np.asarray(self.robot_cfg.default_qpos[:7], dtype=np.float32)
+        qpos[self.joint_qpos_indices] = np.asarray(self.robot_cfg.default_qpos[7:], dtype=np.float32)
+        return qpos
 
     def _resolve_publish_body_names(self) -> list[str]:
         body_names: list[str] = []
@@ -469,7 +482,7 @@ class LiveRetargetPublisher:
 
     def _capture_paused_qpos(self) -> None:
         with ScopedTimer(PAUSE_CAPTURE_TIMER_NAME):
-            paused_qpos = np.asarray(self.robot_cfg.default_qpos, dtype=np.float32).copy()
+            paused_qpos = self._default_mjcf_qpos()
             paused_qpos[:2] = np.asarray(self.latest_qpos[:2], dtype=np.float32)
             paused_qpos[3:7] = yaw_quat(np.asarray(self.latest_qpos[3:7], dtype=np.float32)).astype(
                 np.float32,
@@ -543,7 +556,7 @@ class LiveRetargetPublisher:
         self,
         body_pose_dict: dict[str, list[np.ndarray]],
     ) -> np.ndarray:
-        qpos = np.asarray(self.robot_cfg.default_qpos, dtype=np.float32).copy()
+        qpos = self._default_mjcf_qpos()
         pelvis_pos_no_z, pelvis_quat_yaw = _pelvis_pose_no_z_yaw_from_body_pose_dict(body_pose_dict)
         qpos[0:2] = pelvis_pos_no_z[:2].copy()
         qpos[3:7] = pelvis_quat_yaw.copy()

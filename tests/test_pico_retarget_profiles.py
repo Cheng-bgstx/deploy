@@ -12,7 +12,7 @@ from sim2real.config.robots import get_robot_cfg
 
 ROOT = Path(__file__).resolve().parents[1]
 PROFILES = sorted((ROOT / 'sim2real/teleop/configs').glob('xrobot_to_*.json'))
-PROFILES = [p for p in PROFILES if p.stem.removeprefix('xrobot_to_') in {'oli', 'x2'}]
+PROFILES = [p for p in PROFILES if p.stem.removeprefix('xrobot_to_') in {'oli', 'x2', 'q1'}]
 
 
 @pytest.mark.parametrize('path', PROFILES, ids=lambda p: p.stem)
@@ -122,7 +122,7 @@ def test_pico_retarget_fk_and_named_zmq_buffer(path, human_height, monkeypatch):
     pub = zmq.Context.instance().socket(zmq.PUB)
     controller = PicoController(connect=worker._controller_sock.getsockopt(zmq.LAST_ENDPOINT).decode())
     port = pub.bind_to_random_port('tcp://127.0.0.1')
-    buffer = RealtimeMotionBuffer(robot_cfg=cfg, future_steps=[0, 1, 4, 16],
+    buffer = RealtimeMotionBuffer(robot_cfg=cfg, future_steps=[0, 1, 2, 3, 4, 16],
                                   root_body_name=cfg.body_names[0],
                                   motion_zmq_connect=f'tcp://127.0.0.1:{port}')
     try:
@@ -131,6 +131,7 @@ def test_pico_retarget_fk_and_named_zmq_buffer(path, human_height, monkeypatch):
                                           * profile['human_height_assumption'] / human_height)
         paused = worker.sample_and_retarget()
         assert paused['paused'] and not paused['motion_first_frame']
+        np.testing.assert_allclose(paused['joint_pos'], cfg.default_qpos[7:], atol=1e-6)
         worker.streamer.x = True
         payload = worker.sample_and_retarget()
         assert not payload['paused'] and payload['motion_first_frame']
@@ -140,7 +141,7 @@ def test_pico_retarget_fk_and_named_zmq_buffer(path, human_height, monkeypatch):
                 frames['Left_Wrist'][0] += np.array([0, 0, .25])
             previous = worker.latest_qpos.copy()
             payload = worker.sample_and_retarget()
-            if cfg.name == 'x2':
+            if cfg.name in {'x2', 'q1', 't800', 'a3'}:
                 indices = [model.joint(n).qposadr[0] for n in cfg.joint_names]
                 assert np.max(np.abs(np.asarray(payload['qpos'])[indices] - previous[indices])) <= .40001
         assert not payload['motion_first_frame']
@@ -158,6 +159,8 @@ def test_pico_retarget_fk_and_named_zmq_buffer(path, human_height, monkeypatch):
         assert buffer.latest_timestamp_ns is not None
         obs = buffer.get_obs()
         np.testing.assert_allclose(obs.joint_pos[0, 0], payload['joint_pos'], atol=1e-5)
+        if cfg.name in {'q1', 't800', 'a3'}:
+            _run_streamed_proteus_policy(cfg, buffer, obs, q)
         assert np.isfinite(obs.body_pos_w).all()
         worker.streamer.connected = False
         assert worker.sample_and_retarget() is None
@@ -190,3 +193,59 @@ def test_pico_retarget_fk_and_named_zmq_buffer(path, human_height, monkeypatch):
         buffer._motion_stream_thread.join(timeout=1)
         buffer._motion_stream_socket.close(0)
         pub.close(0)
+
+
+def _run_streamed_proteus_policy(cfg, buffer, motion, qpos):
+    # Real publisher -> ZMQ receiver -> semantic observations -> complete ONNX.
+    # XR hardware is replaced by the known-pose fixture above; the rest is real.
+    from types import SimpleNamespace as NS
+    import yaml
+    import mujoco
+    import subprocess
+    from sim2real.rl_policy.observations import Observation
+    contracts = {'q1': 'primebot_q1', 't800': 'engineai_t800', 'a3': 'agibot_a3'}
+    folder = ROOT / 'checkpoints/proteus/proteus_wamseq_62' / contracts[cfg.name]
+    if not (folder / 'policy.onnx').is_file():
+        pytest.skip('Export the complete ONNX for the streamed policy integration')
+    policy = yaml.safe_load((folder / 'policy.yaml').read_text())
+    model = mujoco.MjModel.from_xml_path(str(cfg.resolve_mjcf_path()))
+    indices = [model.joint(n).qposadr[0] for n in cfg.joint_names]
+    env = NS(robot_cfg=cfg, policy_config=policy, motion_data=motion,
+        motion_body_names=buffer.body_names, motion_future_steps=buffer.future_steps,
+        state_processor=NS(joint_names=list(cfg.joint_names), root_pos_w=qpos[:3],
+            root_quat_w=qpos[3:7], root_ang_vel_b=np.zeros(3), joint_pos=qpos[indices],
+            joint_vel=np.zeros(len(indices))))
+    groups = {key: [Observation.resolve(value['_target_'])(env=env) for value in terms.values()]
+              for key, terms in policy['observation'].items()}
+    # Keep ONNX Runtime in the root project; the teleop environment runs only IK.
+    command = [str(ROOT / '.venv/bin/python'), '-u', '-c', r"""
+import sys,json,numpy as np,onnxruntime as ort
+options=ort.SessionOptions();options.intra_op_num_threads=1
+session=ort.InferenceSession(sys.argv[1],options,providers=['CPUExecutionProvider'])
+for line in sys.stdin:
+    feed={k:np.asarray(v,dtype=np.float32) for k,v in json.loads(line).items()}
+    print(json.dumps([v.tolist() for v in session.run(['action','next_slot_action'],feed)]),flush=True)
+""", str(folder / 'policy.onnx')]
+    actor = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    try:
+        for terms in groups.values():
+            for term in terms:
+                term.reset()
+        previous = np.zeros(31, np.float32)
+        for step in range(12):
+            for terms in groups.values():
+                for term in terms:
+                    term.update({'slot_action': previous})
+            feed = {key: np.concatenate([term.compute() for term in terms], axis=-1).astype(np.float32)
+                    for key, terms in groups.items()}
+            actor.stdin.write(json.dumps({k: v.tolist() for k, v in feed.items()}) + '\n')
+            actor.stdin.flush()
+            action, previous = [np.asarray(v, np.float32) for v in json.loads(actor.stdout.readline())]
+            assert action.shape == (len(cfg.joint_names),) and np.isfinite(action).all()
+            assert previous.shape == (31,) and np.isfinite(previous).all()
+            assert feed['history_valid'].sum() == min(step + 1, 10)
+    finally:
+        actor.stdin.close()
+        actor.wait(timeout=10)
+        actor.stdout.close()
+    assert actor.returncode == 0

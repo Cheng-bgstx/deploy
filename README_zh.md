@@ -64,6 +64,7 @@ uv run sim2real/rl_policy/tracking.py \
 | ScaleBFM | `checkpoints/scalebfm` | [WeishuaiZeng/ScaleBFM](https://huggingface.co/WeishuaiZeng/ScaleBFM) 的 Humanoid Transformer XL 和 M ONNX exports。 |
 | Proteus | `checkpoints/proteus/proteus_60/unitree_g1/policy.yaml` | [ScaleBFM](https://github.com/zengweishuai/ScaleBFM) 的 60 本体 Proteus actor，由 `scripts/export_proteus_onnx.py` 包装成 G1 policy；见 [Run External Policies](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/run-external-policies.md#proteus)。 |
 | Proteus ET1 | `checkpoints/proteus/proteus_60/galbot_et1/policy.yaml` | Galbot ET1（`--robot et1`）上的 Proteus，contract 由 `scripts/build_proteus_contract.py` 从 Unitree R1 的推导而来；见 [Proteus 部署到 Galbot ET1](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-et1.md)。 |
+| Proteus WAMSeq Primebot Q1 | `checkpoints/proteus/proteus_wamseq_62/primebot_q1/policy.yaml` | 22 关节、多条 LAFAN 动作和 PICO；[教程](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-q1.md)。 |
 | BFM-Zero | `checkpoints/bfm-zero/exp_lafan40-100style_update_z10/policy.yaml` | Latent-conditioned motion tracker。 |
 | TeleopIT | `checkpoints/teleopit/policy.yaml` | TeleopIT policy wrapper。 |
 | Humanoid-GPT | `checkpoints/humanoid-gpt/policy.yaml` | Humanoid-GPT policy wrapper。 |

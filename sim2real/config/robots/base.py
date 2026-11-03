@@ -50,6 +50,9 @@ class RobotCfg:
     safe_joint_kd: Mapping[str, float] = field(default_factory=dict)
     joint_armature: Mapping[str, float] = field(default_factory=dict)
     joint_frictionloss: Mapping[str, float] = field(default_factory=dict)
+    # None preserves the asset's contact settings; False enables floor contacts only.
+    self_collisions: bool | None = None
+    ground_friction: float | None = None
     mjcf_path: AssetReference | None = None
     default_qpos: tuple[float, ...] = ()
     qpos_root_size: int = 7

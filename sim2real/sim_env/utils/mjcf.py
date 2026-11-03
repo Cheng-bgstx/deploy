@@ -45,7 +45,17 @@ def _inject_floor_scene_xml(xml_text: str) -> str:
     asset_close = xml_text.find("</asset>")
     if asset_close < 0:
         raise ValueError("Expected </asset> block in MJCF")
-    xml_text = xml_text[:asset_close] + VIEWER_ASSET_XML + xml_text[asset_close:]
+    parsed = ET.fromstring(xml_text)
+    existing = {(e.tag, e.get('name')) for block in parsed.findall('asset') for e in block}
+    has_skybox = any(e.get('type') == 'skybox' for e in parsed.findall('asset/texture'))
+    additions = []
+    for element in ET.fromstring('<asset>' + VIEWER_ASSET_XML + '</asset>'):
+        if (element.tag, element.get('name')) in existing:
+            continue
+        if element.tag == 'texture' and element.get('type') == 'skybox' and has_skybox:
+            continue
+        additions.append(ET.tostring(element, encoding='unicode'))
+    xml_text = xml_text[:asset_close] + ''.join(additions) + xml_text[asset_close:]
 
     worldbody_close = xml_text.find("</worldbody>")
     if worldbody_close < 0:
@@ -168,12 +178,18 @@ def load_sim_model(
         logger.warning("load_sim_model currently ignores non-default ground_rgb={}", ground_rgb)
     with _temp_scene_with_floor(mjcf_path) as scene_mjcf_path:
         spec = mujoco.MjSpec.from_file(str(scene_mjcf_path))
-        if robot_cfg.name in {"oli", "x2"}:
+        if robot_cfg.self_collisions is False:
+            spec.option.integrator = mujoco.mjtIntegrator.mjINT_IMPLICITFAST
+            spec.option.gravity = [0., 0., -9.81]
+        if robot_cfg.self_collisions is False or robot_cfg.name in {"oli", "x2"}:
             # Proteus OLI / X2: floor contact only, no robot self-collisions
             # and no passive joint damping (the controller supplies kd).
             for geom in spec.geoms:
                 if geom.type == mujoco.mjtGeom.mjGEOM_PLANE:
                     geom.contype, geom.conaffinity = 2, 1
+                    if robot_cfg.ground_friction is not None:
+                        geom.friction = [robot_cfg.ground_friction, .005, .0001]
+                        geom.condim = 3
                 elif geom.contype or geom.conaffinity:
                     geom.contype, geom.conaffinity = 1, 2
             for joint in spec.joints:
