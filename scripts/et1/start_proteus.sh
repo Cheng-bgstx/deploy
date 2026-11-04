@@ -7,7 +7,7 @@ repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo"
 python_bin="${SIM2REAL_PYTHON:-$repo/.venv/bin/python}"
 interface="${ET1_INTERFACE:?Set ET1_INTERFACE to the NIC on the ET1 network (192.168.123.x)}"
-policy="${PROTEUS_POLICY_CONFIG:-checkpoints/proteus/proteus_60/galbot_et1/policy-pc.yaml}"
+policy="${PROTEUS_POLICY_CONFIG:-checkpoints/proteus/wsq61/galbot_et1/policy-pc.yaml}"
 motion="${PROTEUS_MOTION_PATH:-checkpoints/galbot_et1/motions/motions/taichi.npz}"
 playback_limit="${PROTEUS_PLAYBACK_LIMIT_S:-8}"
 export HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 PYTHONDONTWRITEBYTECODE=1
@@ -34,7 +34,7 @@ if pgrep -af '(^|/)(loco|gamepad-[a-z]+)( |$)'; then
   exit 1
 fi
 [[ -f "$policy" ]] || "$python_bin" scripts/g1/prepare_proteus_deployment.py --robot et1 \
-  --policy-config checkpoints/proteus/proteus_60/galbot_et1/policy.yaml
+  --policy-config checkpoints/proteus/wsq61/galbot_et1/policy.yaml
 "$python_bin" -c 'import sys, yaml; import unitree_sdk2py.core.channel; from sim2real.config.robots import ET1_CFG; from sim2real.rl_policy.utils.motion import MotionDataset; c = yaml.safe_load(open(sys.argv[1])); assert c["proteus"]["reference_forcing"] and c.get("soft_joint_pos_limits"); assert ET1_CFG.mjcf_path.is_file(); MotionDataset.create_from_path(sys.argv[2], robot_cfg=ET1_CFG); print("SDK2, ET1 MJCF, policy overlay and motion ready")' "$policy" "$motion"
 run="${PROTEUS_RUN_DIR:-$repo/outputs/proteus-et1/$(date +%Y%m%d_%H%M%S)}"
 mkdir -p "$run"

@@ -35,15 +35,15 @@ if pgrep -af '^([^ ]*/)?g1_29dof_controller([[:space:]]|$)'; then
   echo 'An existing G1 controller must be stopped before starting another writer.' >&2
   exit 1
 fi
-proteus_policy=checkpoints/proteus/proteus_60/unitree_g1/policy-pc.yaml
+proteus_policy=checkpoints/proteus/wsq61/unitree_g1/policy-pc.yaml
 [[ -f "$proteus_policy" ]] || "$proteus_python" scripts/g1/prepare_proteus_deployment.py
 if [[ "$proteus_motion" == "$proteus_default_motion" && ! -e "$proteus_motion" ]]; then
   "$proteus_python" scripts/g1/prepare_proteus_motion.py --output-dir "$proteus_motion"
 fi
 "$proteus_python" .agents/skills/configure-g1-sim2real/scripts/verify_install.py \
-  --profile root-cpu --onnx checkpoints/proteus/proteus_60/unitree_g1/policy.onnx \
+  --profile root-cpu --onnx checkpoints/proteus/wsq61/unitree_g1/policy.onnx \
   --asset hf://elijahgalahad/g1_xmls@main/g1-mode_13_15.xml
-"$proteus_python" -c 'import sys; import cyclonedds; import unitree_sdk2py.core.channel; import yaml; from sim2real.config.robots import G1_CFG; from sim2real.rl_policy.utils.motion import MotionDataset; c=yaml.safe_load(open("checkpoints/proteus/proteus_60/unitree_g1/policy-pc.yaml")); assert c["proteus"]["reference_forcing"]; MotionDataset.create_from_path(sys.argv[1], robot_cfg=G1_CFG); print("PC SDK2, ONNX and offline motion ready")' "$proteus_motion"
+"$proteus_python" -c 'import sys; import cyclonedds; import unitree_sdk2py.core.channel; import yaml; from sim2real.config.robots import G1_CFG; from sim2real.rl_policy.utils.motion import MotionDataset; c=yaml.safe_load(open("checkpoints/proteus/wsq61/unitree_g1/policy-pc.yaml")); assert c["proteus"]["reference_forcing"]; MotionDataset.create_from_path(sys.argv[1], robot_cfg=G1_CFG); print("PC SDK2, ONNX and offline motion ready")' "$proteus_motion"
 proteus_run="${PROTEUS_RUN_DIR:-$proteus_repo/outputs/proteus-pc/$(date +%Y%m%d_%H%M%S)}"
 mkdir -p "$proteus_run"
 printf 'Logs: %s\n' "$proteus_run"

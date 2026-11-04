@@ -1,5 +1,17 @@
 # Proteus G1 外接电脑部署
 
+## 默认 checkpoint（2026-11-04）
+
+准备与启动脚本现默认使用 **wsq61**（`wsq61_wam_61robots_30000.pt`），
+策略目录为 `checkpoints/proteus/wsq61/unitree_g1/`。
+使用 `policy.yaml` 进行真机部署、`policy-sim.yaml` 进行测量根位置的仿真；
+G1/ET1 PC 与 ET1 板载部署使用本分支生成的 `policy-pc.yaml`。
+actor 使用十步 WAMSeq 历史窗口与有效位掩码，关节/形态合约保持原样。
+将完整策略目录（ONNX、YAML、合约 JSON）随代码一起复制到部署机器；原动作库路径保持不变。
+checkpoint SHA256：`1d1c65ddf5706b940744d87e2f86f7cea453c9240bcccc12d31923211f694bba`。
+来源记录在 `checkpoints/proteus/wsq61/source/export.json`，已有数值比较及短时仿真记录在
+`docs/experiments/proteus-wsq61.json`。下文旧版本的性能和真机记录不能作为 wsq61 的验收数据。
+
 PC 上运行 50 Hz 的 CPU ONNX Tracking 和 200 Hz 的 Python SDK2 Bridge。Tracking 从本地缓存读取 NPZ 参考动作；G1 通过 DDS 接收关节位置、速度目标、前馈力矩和 PD 增益。沿用现有 Python 3.10、SDK2、CycloneDDS 和 ZMQ 环境，无需 aarch64 inline 路径的 `unitree_interface`。
 
 启动器默认将 ONNX、OpenMP 和 BLAS 限制为一个 CPU 线程。未限制的 ONNX 线程池可能在 50 Hz 推理间隔期间占用多个核心，与 DDS 回调竞争。之前的日志也记录过一次 174 ms 的指令发送延迟。启动器现将统一 I/O 超时窗口从 100 ms 改为 250 ms，短时间隔不会锁定停止。这两项设置在新进程启动时生效，现有进程不会读取启动脚本的修改。真机测试期间不要并行运行策略基准测试或仿真。
@@ -27,7 +39,7 @@ export SIM2REAL_PYTHON=/absolute/path/to/existing/.venv/bin/python
 
 ```bash
 "$SIM2REAL_PYTHON" scripts/g1/validate_proteus_deployment.py \
-  --policy-config checkpoints/proteus/proteus_60/unitree_g1/policy-pc.yaml \
+  --policy-config checkpoints/proteus/wsq61/unitree_g1/policy-pc.yaml \
   --npz-playback-limit-s 3
 ```
 

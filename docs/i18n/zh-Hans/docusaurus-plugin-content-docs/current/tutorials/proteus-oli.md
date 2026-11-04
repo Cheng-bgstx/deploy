@@ -5,6 +5,18 @@ slug: /tutorials/proteus-oli
 
 # 在 LimX OLI 上部署 Proteus WAMSeq
 
+## 默认 checkpoint（2026-11-04）
+
+准备与启动脚本现默认使用 **wsq61**（`wsq61_wam_61robots_30000.pt`），
+策略目录为 `checkpoints/proteus/wsq61/limx_oli_edu/`。
+使用 `policy.yaml` 进行真机部署、`policy-sim.yaml` 进行测量根位置的仿真；
+G1/ET1 PC 与 ET1 板载部署使用本分支生成的 `policy-pc.yaml`。
+actor 使用十步 WAMSeq 历史窗口与有效位掩码，关节/形态合约保持原样。
+将完整策略目录（ONNX、YAML、合约 JSON）随代码一起复制到部署机器；原动作库路径保持不变。
+checkpoint SHA256：`1d1c65ddf5706b940744d87e2f86f7cea453c9240bcccc12d31923211f694bba`。
+来源记录在 `checkpoints/proteus/wsq61/source/export.json`，已有数值比较及短时仿真记录在
+`docs/experiments/proteus-wsq61.json`。下文旧版本的性能和真机记录不能作为 wsq61 的验收数据。
+
 本适配面向 **HU_D04_01 / limx_oli_edu，31 个虚拟 PR 关节**，使用 Proteus 的
 `wamseq` 分支、本仓库的 Tracking / 集成 sim2sim 运行时和
 [LimX 官方 SDK](https://github.com/limxdynamics/limxsdk-lowlevel)。

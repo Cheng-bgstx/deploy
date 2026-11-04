@@ -14,7 +14,7 @@ joint slots. sim2real's BasePolicy feeds unbatched observation groups and reads 
   ``next_slot_action[S]``, every slot action (the action history holds the unmasked actor output, as IsaacLab's
   ``last_action`` does in training).
 
-For ``--release proteus_wamseq_62`` (or ``proteus_wamseq_62_full``), the contract selects WAMSeq:
+The default ``--release wsq61`` uses ``wsq61_wam_61robots_30000.pt``. The contract selects WAMSeq:
 ``proprioception[W, 6+2S]``, ``action_history[W, S]``, ``history_valid[W]`` and the same ``task``.
 The window is oldest first, invalid steps are zero, and its previous action precedes the observation.
 
@@ -23,12 +23,12 @@ The wrapper keeps the actor's ONNX IR and opset (ORT 1.16 on the G1 loads them) 
 actor on random inputs. Output directory: ``policy.onnx``, ``policy.yaml``, ``comparison.json`` and a verbatim
 copy of the contract.
 
-    uv run python scripts/export_proteus_onnx.py --proteus-root ../Proteus --contract unitree_g1 --robot g1
+    uv run python scripts/export_proteus_onnx.py --contract unitree_g1 --robot g1
 
 A robot outside the release gets its contract from ``scripts/build_proteus_contract.py``; ``--contract-dir``
 reads it from there (the actor stays the released one):
 
-    uv run python scripts/export_proteus_onnx.py --contract galbot_et1 --robot et1 \\
+    uv run python scripts/export_proteus_onnx.py --proteus-root ../Proteus --release proteus_60 --contract galbot_et1 --robot et1 \\
         --contract-dir checkpoints/proteus/contracts
 """
 
@@ -37,6 +37,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -49,9 +50,21 @@ from onnx import TensorProto, helper, numpy_helper
 from sim2real.config.robots import get_robot_cfg
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_PROTEUS_ROOT = REPO_ROOT.parent / "Proteus"
-EXPORT_SUBDIR = Path("ScaleTrack") / "checkpoints" / "proteus_60"
-DEFAULT_OUTPUT_ROOT = REPO_ROOT / "checkpoints" / "proteus" / "proteus_60"
+
+
+def _default_proteus_root() -> Path:
+    try:
+        common = subprocess.check_output(
+            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            cwd=REPO_ROOT, text=True, stderr=subprocess.DEVNULL,
+        ).strip()
+        return Path(common).parent.parent / "Proteus-wamseq"
+    except (OSError, subprocess.CalledProcessError):
+        return REPO_ROOT.parent / "Proteus-wamseq"
+
+
+DEFAULT_PROTEUS_ROOT = _default_proteus_root()
+DEFAULT_OUTPUT_ROOT = REPO_ROOT / "checkpoints" / "proteus" / "wsq61"
 DEFAULT_FAR_OFFSET = 16  # the far reference frame of deployment (ScaleBridge's proteus.yaml)
 NUM_SAMPLES = 64
 TOLERANCE = 1.0e-6
@@ -317,7 +330,7 @@ def export_policy(
     num_samples: int = NUM_SAMPLES,
     seed: int = 0,
     contract_dir: Path | None = None,
-    release: str = "proteus_60",
+    release: str = "wsq61",
 ) -> Path:
     """Export one robot's policy; returns the output directory."""
     export_dir = Path(proteus_root) / "ScaleTrack" / "checkpoints" / release
@@ -389,7 +402,7 @@ def export_policy(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--proteus-root", type=Path, default=DEFAULT_PROTEUS_ROOT)
-    parser.add_argument("--release", default="proteus_60", help="Directory name under ScaleTrack/checkpoints")
+    parser.add_argument("--release", default="wsq61", help="Directory name under ScaleTrack/checkpoints")
     parser.add_argument("--contract", nargs="+", default=["unitree_g1"], help="contract names in the selected release")
     parser.add_argument("--robot", default="g1", help="sim2real robot config of the contracts")
     parser.add_argument(
