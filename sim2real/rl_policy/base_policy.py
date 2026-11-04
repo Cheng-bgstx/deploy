@@ -69,6 +69,11 @@ class BasePolicy:
             model_path = str(Path(args.policy_config).parent / str(model_path))
         self.policy_config = policy_config
         self.model_path = model_path
+        self.shaping_gravity = None
+        gravity_options = policy_config.get('shaping_gravity_compensation')
+        if gravity_options is not None:
+            from sim2real.rl_policy.utils.shaping_gravity import ShapingGravity
+            self.shaping_gravity = ShapingGravity(self.robot_cfg, **gravity_options)
         # initialize robot related processes
         self.joint_names_simulation = list(policy_config["joint_names_simulation"])
         self.body_names_simulation = list(policy_config["body_names_simulation"])
@@ -191,6 +196,10 @@ class BasePolicy:
         self._record_start_time_ns: int | None = None
 
     def prepare_policy_config(self, policy_config):
+        for key in ('policy_entry_max_joint_error_rad', 'policy_entry_max_joint_velocity_rad_s'):
+            value = policy_config.get(key)
+            if value is not None and (not np.isfinite(float(value)) or float(value) <= 0):
+                raise ValueError(f'{key} must be finite and positive')
         return policy_config
 
     def _create_robot_io(self) -> RobotIO:
@@ -337,11 +346,18 @@ class BasePolicy:
 
     def get_init_target(self):
         shaping_steps = round(10.0 / self.rl_dt)
+        if self.init_count == shaping_steps and self.shaping_gravity is not None:
+            w, x, y, z = self.state_processor.root_quat_w
+            roll = np.degrees(np.arctan2(2 * (w*x + y*z), 1 - 2 * (x*x + y*y)))
+            pitch = np.degrees(np.arcsin(np.clip(2 * (w*y - z*x), -1., 1.)))
+            logger.info('Supported Shaping: measured pelvis roll/pitch = {:.1f}/{:.1f} deg.', roll, pitch)
         if self.init_count == shaping_steps and self.joystick_controller is not None:
             if getattr(self.joystick_controller, "_g1_controls", True):
                 logger.info("Joystick: Shaping complete; press A for Hold, then Start to run.")
             else:
                 logger.info("Joystick: Shaping complete; press R1 for Hold, then B to run.")
+        elif self.init_count == shaping_steps:
+            logger.info("Shaping interpolation complete; check the pose, then request policy Hold (keyboard: ]).")
         if self.init_count > shaping_steps:
             self.init_count = shaping_steps
 
@@ -372,6 +388,25 @@ class BasePolicy:
         logger.info(f"Control mode set to zero via {source}")
 
     def set_policy_mode(self, *, source: str) -> None:
+        tolerance = self.policy_config.get('policy_entry_max_joint_error_rad')
+        if tolerance is not None:
+            if self.state_dict.get('control_mode') != 'init' or self.init_count <= round(10.0 / self.rl_dt):
+                logger.warning('Policy Hold ignored: complete Shaping first (keyboard: i, wait 10 s, then ]).')
+                return
+            target = self.default_dof_angles if self.shaping_target is None else self.shaping_target
+            error = np.abs(self.state_processor.joint_pos - target)
+            if not np.isfinite(error).all() or np.max(error) > float(tolerance):
+                index = int(np.argmax(error))
+                logger.warning('Policy Hold ignored: {} error {:.3f} rad exceeds {:.3f} rad '
+                               '(measured {:.3f}, target {:.3f}).',
+                               self.state_processor.joint_names[index], float(error[index]), float(tolerance),
+                               float(self.state_processor.joint_pos[index]), float(target[index]))
+                return
+            max_velocity = self.policy_config.get('policy_entry_max_joint_velocity_rad_s')
+            velocity = np.abs(self.state_processor.joint_vel)
+            if max_velocity is not None and (not np.isfinite(velocity).all() or np.max(velocity) > float(max_velocity)):
+                logger.warning('Policy Hold ignored: joints are still moving; wait for settling.')
+                return
         self._control_generation = time.monotonic_ns()
         self.reset()
         self.state_dict["control_mode"] = "policy"
@@ -526,6 +561,7 @@ class BasePolicy:
                 "frame_count": int(len(frames)),
                 "recorded_at_unix_ns": int(time.time_ns()),
                 "record_start_unix_ns": int(self._record_start_time_ns or 0),
+                "shaping_gravity_compensation": self.policy_config.get('shaping_gravity_compensation'),
                 **self._record_metadata_fields(),
             },
             "robot": {
@@ -679,6 +715,10 @@ class BasePolicy:
                         cmd_q = q_target
                         cmd_dq = np.zeros(self.num_dofs)
                         cmd_tau = np.zeros(self.num_dofs)
+                        if control_mode == 'init' and self.shaping_gravity is not None:
+                            cmd_tau = self.shaping_gravity.compute(
+                                self.state_processor.joint_pos, self.state_processor.root_quat_w,
+                                max(0, self.init_count - 1) * self.rl_dt)
 
                     with ScopedTimer(
                         "rl_policy.step.rule_based_control_flow.send_command"

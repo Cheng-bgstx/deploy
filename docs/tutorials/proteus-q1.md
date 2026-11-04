@@ -18,7 +18,7 @@ refer to the earlier release unless explicitly marked wsq61; those measurements 
 not validate wsq61. Local wsq61 export provenance and per-robot comparisons are in
 `checkpoints/proteus/wsq61/source/export.json` and `<robot>/comparison.json`.
 
-Branch `feat/proteus-wamseq-primebot-q1` targets **`primebot_q1` (22 policy joints)**. Robot aliases are `q1` and `primebot_q1`. It specializes the released shared actor; no training or fine-tuning is required. Model, named file tracking, PICO IK/ZMQ and inline hardware I/O are included. **Software and MuJoCo are tested; physical robot and live headset operation are untested.**
+Branch `feat/proteus-wamseq-primebot-q1` targets **`primebot_q1` (22 policy joints)**. Robot aliases are `q1` and `primebot_q1`. It specializes the released shared actor; no training or fine-tuning is required. Model, named file tracking, PICO IK/ZMQ and inline hardware I/O are included. **Software, MuJoCo and read-only physical feedback are tested. An initial hardware Shaping trial produced crossed legs; the command-order correction has offline coverage but has not passed another hardware trial. Policy takeover and live headset operation remain unvalidated.**
 
 ## Prepare
 
@@ -90,17 +90,88 @@ simulation numerical stability and does not establish physical-robot performance
 
 ## Hardware entry
 
-The public V3 MJCF matches the training mass, limits and all joint axes. No wrist or head motor is invented for the 22-joint policy. The Q1 HAL uses one named full-body `aimdk_msgs/JointStateArray` / `JointCommandArray` on `/aima/hal/joint/state` and `/aima/hal/joint/command`; commands run at 1000 Hz. The public SDK does **not** document a root IMU topic. `Q1RobotIO` therefore requires `SIM2REAL_Q1_IMU_TOPIC` or `robot_io_options.imu_topic` to name a verified `sensor_msgs/Imu` pelvis stream, and fails before connecting if absent. Configure `imu_to_pelvis_wxyz` from the sensor installation. No physical IMU address or calibration has been verified in this adaptation.
+The Q1 HAL uses 22 named joints in `aimdk_msgs/JointStateArray` / `JointCommandArray` on `/aima/hal/joint/state` and `/aima/hal/joint/command`. The public V3 model matches the training contract; physical zero offsets and limits still need checking on each robot. On 2026-11-04, the local robot supplied `sensor_msgs/Imu` on **`/aima/hal/imu/state`** and all 22 joint names matched. A 501-tick read-only wsq61 probe completed without stale feedback or non-finite values (observation plus ONNX mean 3.66 ms). No motor commands were sent.
+
+The official V3 model explicitly places `imu_0` directly on **`pelvis`**, with no rotation relative to that body: [site definition](https://github.com/PrimebotTech/primebot-q1-urdf/blob/9657817ba375f41b0e5d2b62d8d6b72b757cdf4f/xml/q1_v3_mc.xml#L40-L41). Its [orientation, gyro and accelerometer sensors](https://github.com/PrimebotTech/primebot-q1-urdf/blob/9657817ba375f41b0e5d2b62d8d6b72b757cdf4f/xml/q1_v3_mc.xml#L270-L276) all reference this site. Loading the vendor MJCF confirms body `pelvis`, local position `[0, 0, 0]` and quaternion `[1, 0, 0, 0]`. Accordingly, use `imu_to_pelvis_wxyz: [1, 0, 0, 0]`; this matches the current local configuration and requires no waist-joint compensation. The public SDK text does not separately specify whether the live ROS IMU frame follows that model frame, so hardware/driver consistency remains to be verified. This gap does not make the model's IMU body unknown. Do not cancel the robot's current lean to manufacture an upright reading.
+
+Prepare a separate hardware overlay; the exported actor, contract, default pose and PD gains remain unchanged:
 
 ```bash
 source /opt/ros/humble/setup.bash
 source /path/to/vendor_workspace/install/setup.bash
-# Configure the verified pelvis IMU topic before either hardware launcher.
-export SIM2REAL_Q1_IMU_TOPIC=/your/verified/pelvis_imu_topic
+export HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1
+# Official V3 model: imu_0 is aligned with pelvis.
+uv run --no-sync python -m scripts.q1.prepare_deployment \
+  --imu-topic /aima/hal/imu/state --imu-to-pelvis-wxyz 1 0 0 0 --manual-policy-entry
+# On the inspected PC, source outputs/q1/source_env.sh for its wired DDS settings.
 bash scripts/q1/start_proteus.sh checkpoints/primebot_q1/motions/motions/walk1_subject1.npz
 ```
 
-[Vendor SDK/interface source](https://github.com/PrimebotTech/primebot-q1-sdk). Policy inference is 50 Hz on CPU; a separate ROS timer holds the latest command. Fresh joint/IMU feedback, finite commands and nonnegative gains are required. Stale commands/feedback (>250 ms), errors and zero mode replace stiffness, velocity and feedforward torque with zero and retain damping. Q1 uses damping 5 and a 0.2 rad per-publish position step bound. Normal shutdown sends damping repeatedly. These are process-level checks; no claim is made about firmware protection after process kill or power loss. IMU quaternion and angular velocity are converted to pelvis WXYZ/body coordinates with an explicit extrinsic. Changing control generation invalidates old commands. Keys: `i` shapes to frame 0 over 10 s, `]` enables policy Hold, Space plays/pauses, `o` damps, Ctrl+C exits. Use `PROTEUS_POLICY_CONFIG=/path/to/custom.yaml` to select a deployment config.
+`start_proteus.sh` selects `checkpoints/proteus/wsq61/primebot_q1/policy-pc.yaml`. `PROTEUS_POLICY_CONFIG` overrides it. The overlay supplies the soft joint limits required by `shaping_target: motion_first_frame` and a 15 rad/s policy target rate bound. The command above explicitly selects **manual policy entry**, as requested for the local robot: `]` enters paused policy Hold directly, without requiring Shaping completion, joint error below 0.10 rad, or speed below 0.5 rad/s. `i` remains an optional ten-second Shaping command. Startup remains disarmed; feedback checks, timeout damping, target limits and `o` stop remain active. This is operator-controlled commissioning, not hardware validation.
+
+Gravity feedforward is **off by default**. The latest hardware recording contained nonzero commanded feedforward, but reported efforts tracked the PD term alone and shoulder sag remained. Offline SDK/CDR serialization preserved `effort`; where the hardware path or reporting differs is not yet established. `--enable-shaping-gravity` explicitly enables the experimental, bounded model feedforward (two-second ramp, 10% of joint effort limits, Shaping only). Omitting `--manual-policy-entry` restores the Shaping/pose/speed entry gates. Neither option changes the exported actor or PD gains.
+
+### Hardware command-order incident (2026-11-04)
+
+A real `i`-only Shaping attempt produced crossed legs; the operator damped and exited without entering policy. The adapter serialized legs-first policy order, while the observed full-body HAL feedback is arms-first. The vendor's `publish_full_command` example preserves feedback order. Several post-stop joint readings were close to the targets occupying their array slots instead of their named targets (left shoulder yaw: measured 0.0545, wrong-slot target 0.0515, intended target -0.5864 rad). This strongly suggests slot-based consumption in the hardware path; firmware behavior has not been independently verified.
+
+Q1 now preserves the latest validated full-body feedback order for **every command field**, including damping commands. Observations and policy outputs still use name-based mapping internally. The new regression feeds that measured layout into the real serializer and a slot-consuming receiver. The offline rehearsal now includes serialization too; the earlier rehearsal applied named codec values directly to MuJoCo and missed this interface fault. Passing the revised rehearsal does **not** establish that the physical fault is fixed. Do not repeat full-body Shaping as the next commissioning step: first verify a measured-pose hold and small isolated joint responses with support, known controller ownership and a stop available.
+
+### Optional measured-pose hold and joint commissioning
+
+Keep the vendor controller in Advanced / low-level development mode and stop other command programs. With actuation damped, ensure the gantry carries the robot's weight, the legs are uncrossed and the feet cannot constrain the test. These low gains cannot support standing. Keep the vendor stop accessible; a host keyboard cannot stop a robot across a broken network link.
+
+```bash
+cd /home/galbot/projects/sim2real  # inspected PC
+source outputs/q1/source_env.sh
+uv run --no-sync python -m scripts.q1.commission_joints --joint left_elbow_joint
+```
+
+This entry point uses the production Q1 transport and feedback-order serializer without loading a policy. It starts disarmed and sends no motor commands until **`h`**. Wait for fresh feedback and `publishers=1`, then:
+
+1. Press **`h`** to capture and hold the measured joint positions. Stiffness ramps from zero to 5 over two seconds; damping is 2. It does not move toward the motion's first frame. Observe for at least three seconds. Any unexpected twist is a reason to press **`o`** immediately.
+2. If the supported pose remains steady, press **`j`**. Only the selected joint target changes: `+0.03 → 0 → -0.03 → 0` rad relative to the captured pose over eight seconds (about ±1.7°). Left/right refer to the robot. Confirm physical joint identity and direction as well as encoder feedback. Other joints retain their captured targets.
+3. The script damps and exits one second after the cycle; **`o`**, **Space**, **`q`**, **Esc** or **Ctrl+C** stop it earlier. **Space means stop only in this diagnostic; in the policy launcher Space starts/pauses reference playback.**
+
+Arming is refused if joints are moving or another command publisher is visible. During the test, stale feedback, a changed wire layout/publisher count, displacement over 0.10 rad or joint speed over 0.5 rad/s stops the session. The armed deadline is 25 seconds. A probe is refused near the selected joint's model limits or if the low-gain hold drifts; do not increase gains to force it through. Publisher discovery does not replace releasing the vendor controller.
+
+Each run saves targets, measured positions/velocities, wire order and stop reason under `outputs/q1/commission/`. `--read-only --duration-s 15` checks feedback without arming. Finishing a cycle does not automatically mark hardware validation passed. Inspect the log and physical response before testing another joint (`--joint right_elbow_joint`, then the waist/hip joints implicated in the incident). Complete joint identity/direction checks before resuming full-body Shaping and policy entry.
+
+### Read-only IMU consistency check
+
+```bash
+source outputs/q1/source_env.sh  # inspected PC only; elsewhere source the ROS/vendor environment
+uv run --no-sync python -m scripts.q1.inspect_imu --duration-s 30
+```
+
+This creates only a subscriber and uses the official model's aligned pelvis frame by default. It is an optional hardware/driver consistency check, not a prerequisite for choosing the documented model transform. The live frame label `q1_imu_state` does not itself specify a transform, and no usable IMU-to-pelvis TF arrived during the eight-second local check; neither observation overrides the vendor model definition.
+
+For a sensor rigidly attached to the pelvis, verify the physical axes against the model: x forward, y left, z up. With actuation stopped and the robot securely supported, known small rotations should primarily appear on the corresponding gyro axis: right lean (left side up) on +x, forward lean on +y, left turn on +z. In a physically level pelvis pose, correctly transformed roll/pitch should be near zero and stationary specific force near `[0, 0, +9.81]` m/s². Gravity alone cannot identify the mounting yaw; check physical axis markings or more than one known rotation axis. Conventions: [ROS REP 103](https://github.com/ros-infrastructure/rep/blob/master/rep-0103.rst), [IMU REP 145](https://github.com/ros-infrastructure/rep/blob/master/rep-0145.rst).
+
+The captured raw IMU reported about 18.9° pitch; quaternion-predicted and measured gravity directions differed by 0.25°. This is internal consistency, not mounting calibration. The inspector's `assumed_pelvis_*` values use the supplied `--imu-to-pelvis-wxyz` and never mark it verified or change deployment configuration. Do not subtract that 18.9° merely because the torso looks upright in a photograph.
+
+The manual-entry operator sequence (the preparation command above) is:
+
+1. Start with the gantry carrying the robot and the vendor high-level controller released, in Advanced / low-level development mode. Before the first **`i` or `]`**, Q1 emits no motor commands, including on exit.
+2. Optionally press **`i`** for ten-second Shaping. With gravity feedforward disabled, static sag may remain. The program does not require this step in manual-entry mode.
+3. Press **`]`** to enter **policy Hold** directly. Histories reset, target rate limiting starts from measured joint positions, and the reference remains at frame 0. Hold is active policy control, not damping; limbs can move even while reference playback is paused.
+4. Keep gantry protection for the first Hold trial. **`o`** enters damping; **Ctrl+C** exits. **Space plays/pauses reference motion; it is not a motor stop.** Start playback only after supported Hold and foot contact have been assessed. Manual mode also permits `]` after damping without another `i`.
+
+[Vendor interface source](https://github.com/PrimebotTech/primebot-q1-sdk). Policy inference runs at 50 Hz; the ROS timer requests 1000 Hz command publication. Once armed, stale commands/feedback (>250 ms), errors and zero mode use zero stiffness, velocity and feedforward torque with damping 5. The per-publish position step bound is 0.2 rad. Normal shutdown sends damping repeatedly after arming. These are process checks, not verified firmware protection after process kill or power loss. Developer mode and an empty ROS command-publisher list do not by themselves prove the vendor internal controller has released ownership.
+
+The actual Tracking startup, command codec and Shaping-to-Hold transition can be rehearsed without connecting to ROS:
+
+```bash
+HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 SIM2REAL_ORT_NUM_THREADS=1 \
+  uv run --no-sync python -m scripts.q1.validate_deployment
+# Optional: --initial-feedback outputs/q1/preflight-20261104/ros-readonly.json
+# Or: --initial-tracking-record <local-tracking-record.npz>
+# Add --no-use-recorded-orientation to compare against the motion's root orientation.
+```
+
+The earlier root-reset rehearsal was invalid for supported gravity: resetting a floating root's pose every substep does not supply support forces, and missed the shoulder sag. The rehearsal now uses a mocap weld carrying body weight, the real command serializer, and 0.625 ms physics steps. Replaying the 2026-11-04 hardware joint pose and approximately 19° pelvis pitch reproduced a 0.305 rad pre-entry error without compensation; compensation reduced that error to 0.002 rad. That tilted run entered Hold but failed the free-support-release criteria (minimum height 0.280 m, upright cosine 0.776). With the same initial joints and the reference root orientation, it passed: Hold at 10.4 s, zero first-target jump, minimum free root height 0.405 m and upright cosine 0.993. These are offline results; the weld still idealizes cable mechanics and does not certify hardware release.
+
+The corresponding hardware recording showed sustained shoulder sag (left roll 0.340 rad at kp 4.2032), with measured effort close to the model's gravity torque. Both ankle pitch errors increased after lowering before policy entry; right ankle error reached 0.351 rad while pelvis pitch increased to about 27°. A later attempt with feedforward still showed shoulder sag and never entered policy. The operator subsequently chose manual entry with feedforward disabled, bypassing the optional 0.10 rad entry gate; the earlier simulation results do not validate this new manual-entry trial.
 
 ## PICO
 

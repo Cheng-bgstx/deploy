@@ -17,4 +17,5 @@ class Q1RobotIO(NamedRosRobotIO):
         super().__init__(cfg, groups={'body': cfg.joint_names},
             topics={'body': ('/aima/hal/joint/state', '/aima/hal/joint/command')},
             types=(JointCommandArray, JointCommand, JointStateArray), imu_topic=imu_topic,
-            publish_hz=publish_hz, damping=5., max_position_step=.2, **options)
+            publish_hz=publish_hz, damping=5., max_position_step=.2,
+            start_disarmed=True, allow_init_from_measured=True, preserve_feedback_order=True, **options)

@@ -343,6 +343,83 @@ def test_planner_mode_takes_shaping_target_from_the_given_motion(make_rig, motio
     np.testing.assert_allclose(commands[-1], SHAPING_TARGET, atol=1e-6)
 
 
+def test_policy_entry_waits_for_shaping_and_measured_pose(make_rig, motion_files):
+    motion_files['take1512'] = motion_dataset(MOTION_FRAME0)
+    rig = make_rig(tracking_config(
+        soft_joint_pos_limits=SHAPING_SOFT_LIMITS, shaping_target='motion_first_frame',
+        policy_entry_max_joint_error_rad=.1, policy_entry_max_joint_velocity_rad_s=.5,
+    ), policy_cls=Tracking, args_cls=TrackingArgs, motion_path='take1512')
+    rig.tick(mode='policy')
+    assert rig.policy.state_dict['control_mode'] == 'zero'
+    rig.tick(mode='init')
+    rig.tick(mode='policy', measured=SHAPING_TARGET)
+    assert rig.policy.state_dict['control_mode'] == 'init'
+    for _ in range(499):
+        rig.tick()
+    # Time elapsed is insufficient when a blocked joint has not reached its target.
+    rig.tick(mode='policy', measured=SHAPING_TARGET + .2)
+    assert rig.policy.state_dict['control_mode'] == 'init'
+    # A measured pose near the target still cannot enter Hold while moving.
+    original_read = rig.robot.read_state
+    def moving_state():
+        from dataclasses import replace
+        state = original_read()
+        return replace(state, qvel=np.full_like(state.qvel, 1.))
+    rig.robot.read_state = moving_state
+    rig.tick(mode='policy', measured=SHAPING_TARGET)
+    assert rig.policy.state_dict['control_mode'] == 'init'
+    rig.robot.read_state = original_read
+    rig.tick(mode='policy', measured=SHAPING_TARGET)
+    assert rig.policy.state_dict['control_mode'] == 'policy'
+    assert rig.policy.state_dict['paused']
+    rig.tick(mode='zero')
+    rig.tick(mode='policy', measured=SHAPING_TARGET)
+    assert rig.policy.state_dict['control_mode'] == 'zero'
+
+
+def test_manual_entry_enters_paused_hold_without_shaping_or_gravity(make_rig, motion_files):
+    motion_files['take1512'] = motion_dataset(MOTION_FRAME0)
+    rig = make_rig(tracking_config(
+        soft_joint_pos_limits=SHAPING_SOFT_LIMITS, shaping_target='motion_first_frame',
+        max_target_velocity_rad_s=15., reference_entry_s=0.,
+    ), policy_cls=Tracking, args_cls=TrackingArgs, motion_path='take1512')
+    command = rig.tick(mode='policy', measured=SHAPING_TARGET + .45)
+    assert rig.policy.state_dict['control_mode'] == 'policy'
+    assert rig.policy.state_dict['paused']
+    assert rig.policy.init_count == 0
+    assert rig.policy.shaping_gravity is None
+    assert np.isfinite(command).all()
+    np.testing.assert_array_equal(rig.policy.action_manager.cmd_tau, 0.)
+    rig.tick(mode='zero')
+    assert rig.policy.state_dict['control_mode'] == 'zero'
+
+
+def test_shaping_feedforward_is_removed_on_policy_stop_and_restarts_from_zero(make_rig):
+    rig = make_rig(policy_config())
+    sent = []
+    original = rig.robot.write_command
+    def capture(**command):
+        sent.append({k: np.asarray(v).copy() for k, v in command.items()})
+        original(**command)
+    rig.robot.write_command = capture
+    # Exercise mode selection and the real ActionManager command path. The
+    # gravity model's physical correctness/cap is checked separately.
+    rig.policy.shaping_gravity = SimpleNamespace(compute=lambda q, quat, elapsed:
+        np.full(len(G1_JOINTS), min(elapsed / 2., 1.)))
+    rig.tick(mode='init')
+    np.testing.assert_array_equal(sent[-1]['tau_ff'], 0.)
+    rig.tick()
+    assert np.all(sent[-1]['tau_ff'] > 0.)
+    np.testing.assert_array_equal(sent[-1]['kp'], 40.)
+    np.testing.assert_array_equal(sent[-1]['kd'], 2.)
+    rig.tick(mode='policy')
+    np.testing.assert_array_equal(sent[-1]['tau_ff'], 0.)
+    rig.tick(mode='zero')
+    np.testing.assert_array_equal(sent[-1]['tau_ff'], 0.)
+    rig.tick(mode='init')
+    np.testing.assert_array_equal(sent[-1]['tau_ff'], 0.)
+
+
 
 def make_integrated_runtime(tmp_path, monkeypatch, config: dict):
     network = ScriptedNetwork()
