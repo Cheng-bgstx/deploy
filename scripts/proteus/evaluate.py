@@ -27,7 +27,7 @@ def evaluate(robot, policy, dataset, output, seed=0, sim_dt=None):
     # The gains include stiff/light joints: a 5-ms external PD update can
     # oscillate even with implicitfast physics. Use 32 updates per 20-ms policy tick.
     if sim_dt is None:
-        sim_dt = .000625 if get_robot_cfg(robot).name in {'q1', 't800'} else .005
+        sim_dt = .000625 if get_robot_cfg(robot).name in {'q1', 't800', 'pm01'} else .005
     cfg = yaml.safe_load(policy.read_text())
     if cfg['proteus']['reference_forcing']:
         raise ValueError('Use policy-sim.yaml with measured world root for evaluation')
@@ -99,6 +99,6 @@ if __name__ == '__main__':
     p.add_argument('--dataset', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--seed', type=int, default=0)
-    p.add_argument('--sim-dt', type=float, help='Physics timestep; Q1/T800 default to 0.000625 s')
+    p.add_argument('--sim-dt', type=float, help='Physics timestep; Q1/T800/PM01 default to 0.000625 s')
     a = p.parse_args()
     evaluate(a.robot, a.policy_config, a.dataset, a.output, a.seed, a.sim_dt)

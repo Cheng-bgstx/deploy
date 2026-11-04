@@ -1,0 +1,13 @@
+"""Standard 24-joint PM01/pm_v2, using the released engineai_pm01 contract."""
+from sim2real.config.robots.proteus_spec import from_proteus_spec
+
+PM01_CFG = from_proteus_spec("pm01", "engineai_pm01", (
+    "LINK_BASE", "LINK_HIP_PITCH_L", "LINK_HIP_ROLL_L", "LINK_HIP_YAW_L",
+    "LINK_KNEE_PITCH_L", "LINK_ANKLE_PITCH_L", "LINK_ANKLE_ROLL_L", "LINK_FOOT_L",
+    "LINK_HIP_PITCH_R", "LINK_HIP_ROLL_R", "LINK_HIP_YAW_R", "LINK_KNEE_PITCH_R",
+    "LINK_ANKLE_PITCH_R", "LINK_ANKLE_ROLL_R", "LINK_FOOT_R", "LINK_TORSO_YAW",
+    "LINK_SHOULDER_PITCH_L", "LINK_SHOULDER_ROLL_L", "LINK_SHOULDER_YAW_L",
+    "LINK_ELBOW_PITCH_L", "LINK_ELBOW_YAW_L", "LINK_ELBOW_END_L",
+    "LINK_SHOULDER_PITCH_R", "LINK_SHOULDER_ROLL_R", "LINK_SHOULDER_YAW_R",
+    "LINK_ELBOW_PITCH_R", "LINK_ELBOW_YAW_R", "LINK_ELBOW_END_R", "LINK_HEAD_YAW",
+))

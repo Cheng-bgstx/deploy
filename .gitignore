@@ -102,3 +102,5 @@ MANIFEST
 !/tests/test_proteus_transport.py
 
 !/tests/test_proteus_sim_resolution.py
+
+!/tests/test_pm01.py

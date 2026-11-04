@@ -49,6 +49,7 @@ const sidebars: SidebarsConfig = {
         'tutorials/proteus-oli',
         'tutorials/proteus-x2',
         'tutorials/proteus-t800',
+        'tutorials/proteus-pm01',
       ],
     },
     'faq',

@@ -66,6 +66,7 @@ Currently supported adapted / distributed checkpoint families:
 | Proteus | `checkpoints/proteus/wsq61/unitree_g1/policy.yaml` | The 61-robot Proteus wsq61 WAMSeq actor from [ScaleBFM](https://github.com/zengweishuai/ScaleBFM), wrapped for the G1 by `scripts/export_proteus_onnx.py`; see [Run External Policies](./docs/tutorials/run-external-policies.md#proteus). |
 | Proteus ET1 | `checkpoints/proteus/wsq61/galbot_et1/policy.yaml` | Proteus on the Galbot ET1 (`--robot et1`), with a contract built from the Unitree R1's by `scripts/build_proteus_contract.py`; see [Proteus on Galbot ET1](./docs/tutorials/proteus-et1.md). |
 | Proteus WAMSeq EngineAI T800 | `checkpoints/proteus/proteus_wamseq_62/engineai_t800/policy.yaml` | 25 joints, multiple LAFAN motions and PICO; [guide](./docs/tutorials/proteus-t800.md). |
+| Proteus WAMSeq EngineAI PM01 | `checkpoints/proteus/wsq61/engineai_pm01/policy.yaml` | 24-joint PM01/pm_v2, legacy ROS interface, LAFAN motions and PICO; [guide](./docs/tutorials/proteus-pm01.md). |
 | BFM-Zero | `checkpoints/bfm-zero/exp_lafan40-100style_update_z10/policy.yaml` | Latent-conditioned motion tracker. |
 | TeleopIT | `checkpoints/teleopit/policy.yaml` | TeleopIT policy wrapper. |
 | Humanoid-GPT | `checkpoints/humanoid-gpt/policy.yaml` | Humanoid-GPT policy wrapper. |

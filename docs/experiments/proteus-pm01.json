@@ -1,0 +1,261 @@
+{
+  "date": "2026-11-04",
+  "branch": "feat/proteus-wamseq-engineai-pm01",
+  "base_commit": "3248f60cb312f71a38ab22b7cea02b070656bd2e",
+  "robot": "pm01",
+  "contract": "engineai_pm01",
+  "release": "wsq61",
+  "sources": {
+    "Proteus-wamseq": "1e0e0381bdec73652f8aa90b871f2980586bb52a",
+    "GMR-engineai": "71e02c0598f6d6c6fe1514bf1d69bc24e82f801e",
+    "engineai_ros2_workspace": "c41043f64ca1d308be187ebdcc2eaae40884f59c",
+    "ubisoft-laforge-animation-dataset": "94084601bacdf9cc3764b5c73daaeccae6035fac"
+  },
+  "onboard_inspection": {
+    "host": "user@192.168.0.163",
+    "architecture": "x86_64",
+    "vendor_release": "76445d09e967a16eb191d10aa05fe2ac5df6c19f",
+    "vendor_release_date": "2025-10-16",
+    "service": "robotics.service",
+    "service_state": "inactive",
+    "service_start_command": "/bin/bash /apps/engineai_robotics/run_robot.sh pm_v2",
+    "movable_joints": 24,
+    "urdf_sha256": "03286142e3ee27fad795fd1bf140b32aa2ce9ae45ea82a129aa0da6a61db4e79",
+    "urdf_comparison": "All 28 joint XML elements (24 movable, 4 fixed) exactly match the vendor ROS repository serial_pm_v2.urdf.",
+    "motion_state_fields": {
+      "current_motion_task_name": "string"
+    },
+    "joint_command_parser": "RL_PARSER=1",
+    "message_hashes": {
+      "JointState.msg": "b9811c89eb8533d74283e75d21c6f7ff70135269aeb6c291c10aabee1008ff28",
+      "ImuInfo.msg": "1f9ba48f3301b9f4919148cb5952219160472d2c09f45624c5f12c4cd5c9b9ea",
+      "JointCommand.msg": "fb10e2e699600f2567c511500c3b4cd02600915c4b7d0b58e517c6ecace555fd",
+      "MotionState.msg": "5e9bc7fc54917af04184b988faf0de16b9a98d8538c7646b2ab2978109587b13",
+      "NodeControl.msg": "b30d5cc6fc27185448d4483910da009d5053d72940ff15c730e2d9354704d23a",
+      "Heartbeat.msg": "c4a8a995c4d1f2141a671d9bcee8861394b28346ea6c0afe239a2f7139f893fd",
+      "GamepadKeys.msg": "d4fa73809ba8aee4b5e036d97f98629c69a3dca1713866575c481fab20576313",
+      "MotorDebug.msg": "ed1e3af7ec8932da81d62dbbc2b6e2376800eee708b7f308ad91a5fdfde1f914",
+      "BodyVelCmd.msg": "4a0647637d41f515ce66e46816fbb85da9ea75a7fa5596d012b09c2c94f803c9",
+      "ParallelParserType.msg": "f567fb55e53970efb59aacef36c6a9b382418cc6c7d7f413413e26fcad31c43f"
+    },
+    "read_only_preflight": {
+      "ready": false,
+      "joint_state_count": 0,
+      "imu_count": 0,
+      "motion_state_count": 0,
+      "command_subscribers": 0
+    },
+    "motor_commands_sent": false,
+    "service_started": false
+  },
+  "commands": {
+    "prepare": "HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --no-sync python -m scripts.pm01.prepare",
+    "ros_messages": "bash scripts/pm01/prepare_ros.sh user@192.168.0.163",
+    "preflight": "source scripts/pm01/env.sh && uv run --no-sync python -m scripts.pm01.check_robot --duration 3",
+    "evaluate": "HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --no-sync python -m scripts.proteus.evaluate --robot pm01 --policy-config checkpoints/proteus/wsq61/engineai_pm01/policy-sim.yaml --dataset checkpoints/engineai_pm01/motions --output outputs/pm01/wsq61-eval-01",
+    "runtime_tests": "source scripts/pm01/env.sh && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 uv run --no-sync python -m pytest tests/test_pm01.py tests/test_proteus_transport.py tests/test_proteus_observations.py tests/test_robot_io.py tests/test_command_sender.py -q",
+    "pico_tests": "HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --project venv/pico --no-sync python -m pytest tests/test_pico_retarget_profiles.py -q -k pm01"
+  },
+  "validation": {
+    "robot": "pm01",
+    "contract": "engineai_pm01",
+    "source_xml": "/home/galbot/projects/GMR-engineai/assets/engineai_pm01/pm_v2.xml",
+    "source_xml_sha256": "a6ba73d3afe744e7a4e4adf43a171a28f1e4e24588e8828b4503cb9747a3e83b",
+    "spec_sha256": "ccdf4082901a766731f3971cce087e25ae0ad73e89225f38c6067265553639b8",
+    "vendor_mass_kg": 40.922811,
+    "training_mass_kg": 40.923,
+    "mass_difference_kg": -0.0001889999999988845,
+    "max_joint_axis_error": 8.759508864311649e-05,
+    "joint_axis_tolerance": 0.0001,
+    "joint_limit_overrides": {},
+    "joints_fixed_at_zero": [],
+    "prepared_xml_sha256": "bcbaa5c24f83716b48a035aa98d38606623fde311adf1c0bff5868eae16a4d91"
+  },
+  "onnx_comparison": {
+    "release": "wsq61",
+    "actor_kind": "wam_seq",
+    "contract": "engineai_pm01",
+    "robot": "pm01",
+    "far_offset": 16,
+    "passed": true,
+    "max_abs_error": 0.0,
+    "tolerance": 1e-06,
+    "num_samples": 64,
+    "seed": 0,
+    "method": "standard-normal inputs in sim2real layout; the released actor gets them with a batch axis and the contract's morph; action is compared with actions[driven slots], next_slot_action with actions",
+    "sources": {
+      "proteus_actor.onnx": "418908bde5a1909d78219bc1d53775d4f557c1e4d176136270926fdbf8884671",
+      "engineai_pm01.json": "45c14ba2d26ff715a2eebc574ea2a78a3c8427d6657072c249df1197c4b49b11"
+    },
+    "artifact": {
+      "policy.onnx": {
+        "sha256": "a89fe6583736e20ed409de05303babdf19f36bffaebd835401c7294c28372838",
+        "ir_version": 8,
+        "opset": {
+          "ai.onnx": 17
+        },
+        "inputs": {
+          "proprioception": [
+            10,
+            68
+          ],
+          "task": [
+            6,
+            253
+          ],
+          "action_history": [
+            10,
+            31
+          ],
+          "history_valid": [
+            10
+          ]
+        },
+        "outputs": {
+          "action": [
+            24
+          ],
+          "next_slot_action": [
+            31
+          ]
+        }
+      }
+    },
+    "versions": {
+      "onnx": "1.17.0",
+      "onnxruntime": "1.23.2"
+    }
+  },
+  "evaluation": {
+    "robot": "pm01",
+    "policy": "/home/galbot/projects/sim2real/checkpoints/proteus/wsq61/engineai_pm01/policy-sim.yaml",
+    "dataset": "/home/galbot/projects/sim2real/checkpoints/engineai_pm01/motions",
+    "passed": true,
+    "motions": [
+      {
+        "motion": "/home/galbot/projects/sim2real/checkpoints/engineai_pm01/motions/motions/aiming1_subject1.npz",
+        "policy": "/home/galbot/projects/sim2real/checkpoints/proteus/wsq61/engineai_pm01/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "8bf16547ce80f5d5b392c7a96c55708f4e150fb9250b30e29edbc896254347bc",
+        "policy_yaml_sha256": "61e3fdb9f4998850e366a3827635c439eb1725a5e6cac98bd2c52371a4c43442",
+        "onnx_sha256": "a89fe6583736e20ed409de05303babdf19f36bffaebd835401c7294c28372838",
+        "manifest_sha256": "e650f550dea38b8ba4e1384d5f8bd5db05e94baa455d185f6edb2bbea05636a9",
+        "prepared_mjcf_sha256": "bcbaa5c24f83716b48a035aa98d38606623fde311adf1c0bff5868eae16a4d91",
+        "sim_dt_s": 0.000625,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.026025934144854546,
+        "max_frame_world_body_error_m": 0.04484350234270096,
+        "mean_local_body_error_m": 0.017050104215741158,
+        "world_root_endpoint_error_m": 0.03970785439014435,
+        "separate_start_frame_root_error_m": 0.04488568380475044,
+        "min_playback_root_height_m": 0.7941538691520691,
+        "root_trajectory": "outputs/pm01/wsq61-eval-01/aiming1_subject1.root.npz",
+        "trajectory": "outputs/pm01/wsq61-eval-01/aiming1_subject1.trajectory.npz",
+        "passed": true
+      },
+      {
+        "motion": "/home/galbot/projects/sim2real/checkpoints/engineai_pm01/motions/motions/dance2_subject1.npz",
+        "policy": "/home/galbot/projects/sim2real/checkpoints/proteus/wsq61/engineai_pm01/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "4778c89938e5ac2e3643667885ea1a9ae587532aade0155ba93c5b17e3db37ed",
+        "policy_yaml_sha256": "61e3fdb9f4998850e366a3827635c439eb1725a5e6cac98bd2c52371a4c43442",
+        "onnx_sha256": "a89fe6583736e20ed409de05303babdf19f36bffaebd835401c7294c28372838",
+        "manifest_sha256": "e650f550dea38b8ba4e1384d5f8bd5db05e94baa455d185f6edb2bbea05636a9",
+        "prepared_mjcf_sha256": "bcbaa5c24f83716b48a035aa98d38606623fde311adf1c0bff5868eae16a4d91",
+        "sim_dt_s": 0.000625,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.030005238950252533,
+        "max_frame_world_body_error_m": 0.07208903878927231,
+        "mean_local_body_error_m": 0.01978667452931404,
+        "world_root_endpoint_error_m": 0.02291792631149292,
+        "separate_start_frame_root_error_m": 0.039082128554582596,
+        "min_playback_root_height_m": 0.7537701725959778,
+        "root_trajectory": "outputs/pm01/wsq61-eval-01/dance2_subject1.root.npz",
+        "trajectory": "outputs/pm01/wsq61-eval-01/dance2_subject1.trajectory.npz",
+        "passed": true
+      },
+      {
+        "motion": "/home/galbot/projects/sim2real/checkpoints/engineai_pm01/motions/motions/fightAndSports1_subject4.npz",
+        "policy": "/home/galbot/projects/sim2real/checkpoints/proteus/wsq61/engineai_pm01/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "39f53c445ce97112a2ea04c1e7ab6009a5f61933b051000a4774114b699ac910",
+        "policy_yaml_sha256": "61e3fdb9f4998850e366a3827635c439eb1725a5e6cac98bd2c52371a4c43442",
+        "onnx_sha256": "a89fe6583736e20ed409de05303babdf19f36bffaebd835401c7294c28372838",
+        "manifest_sha256": "e650f550dea38b8ba4e1384d5f8bd5db05e94baa455d185f6edb2bbea05636a9",
+        "prepared_mjcf_sha256": "bcbaa5c24f83716b48a035aa98d38606623fde311adf1c0bff5868eae16a4d91",
+        "sim_dt_s": 0.000625,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.047727327793836594,
+        "max_frame_world_body_error_m": 0.19239595532417297,
+        "mean_local_body_error_m": 0.02012382447719574,
+        "world_root_endpoint_error_m": 0.0700572207570076,
+        "separate_start_frame_root_error_m": 0.0751071572303772,
+        "min_playback_root_height_m": 0.6503437161445618,
+        "root_trajectory": "outputs/pm01/wsq61-eval-01/fightAndSports1_subject4.root.npz",
+        "trajectory": "outputs/pm01/wsq61-eval-01/fightAndSports1_subject4.trajectory.npz",
+        "passed": true
+      },
+      {
+        "motion": "/home/galbot/projects/sim2real/checkpoints/engineai_pm01/motions/motions/walk1_subject1.npz",
+        "policy": "/home/galbot/projects/sim2real/checkpoints/proteus/wsq61/engineai_pm01/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "d89d0677bfe4566f91b8739082f786ba2904f54e45c91f7a57a268077d50857f",
+        "policy_yaml_sha256": "61e3fdb9f4998850e366a3827635c439eb1725a5e6cac98bd2c52371a4c43442",
+        "onnx_sha256": "a89fe6583736e20ed409de05303babdf19f36bffaebd835401c7294c28372838",
+        "manifest_sha256": "e650f550dea38b8ba4e1384d5f8bd5db05e94baa455d185f6edb2bbea05636a9",
+        "prepared_mjcf_sha256": "bcbaa5c24f83716b48a035aa98d38606623fde311adf1c0bff5868eae16a4d91",
+        "sim_dt_s": 0.000625,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.022976834326982498,
+        "max_frame_world_body_error_m": 0.03565734624862671,
+        "mean_local_body_error_m": 0.018456485122442245,
+        "world_root_endpoint_error_m": 0.024171283468604088,
+        "separate_start_frame_root_error_m": 0.1234191283583641,
+        "min_playback_root_height_m": 0.7797582745552063,
+        "root_trajectory": "outputs/pm01/wsq61-eval-01/walk1_subject1.root.npz",
+        "trajectory": "outputs/pm01/wsq61-eval-01/walk1_subject1.trajectory.npz",
+        "passed": true
+      }
+    ]
+  },
+  "tests": {
+    "runtime_passed": 47,
+    "runtime_skipped": 1,
+    "skip_reason": "Q1-specific test on PM01/T800 branch",
+    "pm01_pico_passed": 4,
+    "pico_heights_m": [
+      1.6,
+      1.8,
+      2.0
+    ],
+    "ros_round_trip": {
+      "passed": true,
+      "domain": 171,
+      "localhost_only": true,
+      "schema": "onboard legacy",
+      "command_timeout_s": 0.25
+    }
+  },
+  "hardware_policy_tracking_validated": false,
+  "real_xr_device_validated": false
+}

@@ -65,6 +65,7 @@ uv run sim2real/rl_policy/tracking.py \
 | Proteus | `checkpoints/proteus/wsq61/unitree_g1/policy.yaml` | [ScaleBFM](https://github.com/zengweishuai/ScaleBFM) 的 61 本体 Proteus wsq61 WAMSeq actor，由 `scripts/export_proteus_onnx.py` 包装成 G1 policy；见 [Run External Policies](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/run-external-policies.md#proteus)。 |
 | Proteus ET1 | `checkpoints/proteus/wsq61/galbot_et1/policy.yaml` | Galbot ET1（`--robot et1`）上的 Proteus，contract 由 `scripts/build_proteus_contract.py` 从 Unitree R1 的推导而来；见 [Proteus 部署到 Galbot ET1](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-et1.md)。 |
 | Proteus WAMSeq EngineAI T800 | `checkpoints/proteus/proteus_wamseq_62/engineai_t800/policy.yaml` | 25 关节、多条 LAFAN 动作和 PICO；[教程](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-t800.md)。 |
+| Proteus WAMSeq EngineAI PM01 | `checkpoints/proteus/wsq61/engineai_pm01/policy.yaml` | 24 关节 PM01/pm_v2、旧版 ROS 接口、LAFAN 动作和 PICO；[教程](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-pm01.md)。 |
 | BFM-Zero | `checkpoints/bfm-zero/exp_lafan40-100style_update_z10/policy.yaml` | Latent-conditioned motion tracker。 |
 | TeleopIT | `checkpoints/teleopit/policy.yaml` | TeleopIT policy wrapper。 |
 | Humanoid-GPT | `checkpoints/humanoid-gpt/policy.yaml` | Humanoid-GPT policy wrapper。 |
