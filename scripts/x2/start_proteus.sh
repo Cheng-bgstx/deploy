@@ -10,6 +10,6 @@ export SIM2REAL_ORT_NUM_THREADS="${SIM2REAL_ORT_NUM_THREADS:-1}"
 # Source ROS 2 Humble and AimDK before invoking this launcher. It does not stop
 # the native mc service; release ownership on the robot explicitly before use.
 exec uv run --no-sync python -m sim2real.rl_policy.tracking \
-  --robot x2 --robot-io inline --policy-config "${2:-checkpoints/proteus/proteus_wamseq_62/lingxi_x2/policy.yaml}" \
+  --robot x2 --robot-io inline --policy-config "${2:-checkpoints/proteus/wsq61/lingxi_x2/policy.yaml}" \
   --rl-rate 50 --inference-backend onnx-cpu --controller keyboard \
   --motion-backend npz --motion-path "$1"

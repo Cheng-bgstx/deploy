@@ -16,10 +16,10 @@ case "$mode" in
     publisher_ip="127.0.0.1"
     if [[ $# -gt 0 && "$1" != -* ]]; then publisher_ip="$1"; shift; fi
     io_args=(--robot-io zmq)
-    policy="checkpoints/proteus/proteus_wamseq_62/engineai_t800/policy-sim.yaml"
+    policy="checkpoints/proteus/wsq61/engineai_t800/policy-sim.yaml"
     if [[ "$mode" == robot ]]; then
       io_args=(--robot-io inline)
-      policy="checkpoints/proteus/proteus_wamseq_62/engineai_t800/policy.yaml"
+      policy="checkpoints/proteus/wsq61/engineai_t800/policy.yaml"
     fi
     hold="checkpoints/engineai_t800/pico_hold"
     if [[ ! -f "$hold/manifest.json" ]]; then

@@ -5,6 +5,19 @@ slug: /tutorials/proteus-t800
 
 # Proteus WAMSeq on EngineAI T800
 
+## Default checkpoint (2026-11-04)
+
+The launchers now use **wsq61**, `wsq61_wam_61robots_30000.pt` from
+[ModelScope Hzzzz001/Proteus](https://modelscope.cn/datasets/Hzzzz001/Proteus).
+The current policy is `checkpoints/proteus/wsq61/engineai_t800/policy.yaml`;
+use `policy-sim.yaml` for measured-root simulation.
+The checkpoint SHA256 is `1d1c65ddf5706b940744d87e2f86f7cea453c9240bcccc12d31923211f694bba`.
+The original joint/morphology contract is retained; the actor uses a ten-step WAMSeq window.
+Existing artifacts remain available. The recipes and performance measurements below
+refer to the earlier release unless explicitly marked wsq61; those measurements do
+not validate wsq61. Local wsq61 export provenance and per-robot comparisons are in
+`checkpoints/proteus/wsq61/source/export.json` and `<robot>/comparison.json`.
+
 Branch `feat/proteus-wamseq-engineai-t800` targets **`engineai_t800` (25 policy joints)**. Robot aliases are `t800` and `engineai_t800`. It specializes the released shared actor; no training or fine-tuning is required. Model, named file tracking, PICO IK/ZMQ and inline hardware I/O are included. **Software and MuJoCo are tested; physical robot and live headset operation are untested.**
 
 ## Prepare
@@ -16,7 +29,7 @@ git -C "$sources_root/Proteus" worktree add --detach "$sources_root/Proteus-wams
 gh repo clone engineai-robotics/GMR "$sources_root/GMR-engineai" -- --depth 1
 gh repo clone YanjieZe/GMR "$sources_root/GMR" -- --depth 1
 gh repo clone ubisoft/ubisoft-laforge-animation-dataset "$sources_root/ubisoft-laforge-animation-dataset" -- --depth 1
-uv run --no-sync python -m scripts.t800.prepare --sources-root "$sources_root"
+uv run --no-sync python -m scripts.t800.prepare --release proteus_wamseq_62 --sources-root "$sources_root"
 ```
 
 `--sources-root /path/to/projects` overrides the common checkout parent (also works from git worktrees). `--proteus-root` selects an existing `wamseq` checkout. `--skip-motions` prepares only model/policy/PICO hold. Use the established root environment for inference and `venv/pico` for teleop. The preparation script launches the offline IK subprocess in `venv/pico`; it does not install robot SDKs. Set up those environments using the existing Getting Started pages before running this recipe. `--no-sync` reuses the local environments.
