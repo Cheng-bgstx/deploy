@@ -1,0 +1,643 @@
+{
+  "date": "2026-11-04",
+  "checkpoint": {
+    "dataset": "Hzzzz001/Proteus",
+    "revision": "475b2bd7339aab5134fa74cb5bdae1a703e993d0",
+    "file": "checkpoints/wsq61_wam_61robots_30000.pt",
+    "checkpoint_sha256": "1d1c65ddf5706b940744d87e2f86f7cea453c9240bcccc12d31923211f694bba",
+    "iteration": 30000,
+    "proteus_commit": "1e0e0381bdec73652f8aa90b871f2980586bb52a",
+    "architecture_source": "ScaleTrack/source/scaletrack/scaletrack/tasks/tracking/config/{g1_29dof,multi_robot}/agents; strict state dict load",
+    "sequence_config": {
+      "model_type": "wam_seq",
+      "seq_history": 50,
+      "seq_actor_window": 10,
+      "seq_far_stride": 5,
+      "seq_ff_dim": 1024,
+      "seq_imagine_exec_noise": false,
+      "context_decoder_weight": 0.1,
+      "seq_checkpointing": false
+    },
+    "inputs": {
+      "obs_window": [
+        10,
+        68
+      ],
+      "prev_actions": [
+        10,
+        31
+      ],
+      "valid": [
+        10
+      ],
+      "policy_task": [
+        6,
+        253
+      ],
+      "morph": [
+        722
+      ]
+    },
+    "export_vs_act_inference_max_abs_diff": 0.0,
+    "onnx_vs_torch_max_abs_diff": 1.5020370483398438e-05,
+    "actor_sha256": "418908bde5a1909d78219bc1d53775d4f557c1e4d176136270926fdbf8884671",
+    "contract_source": "Unchanged morphology/joint contracts from proteus_wamseq_62; existing galbot_et1 contract with WAMSeq fields"
+  },
+  "comparisons": {
+    "agibot_a3": {
+      "release": "wsq61",
+      "actor_kind": "wam_seq",
+      "contract": "agibot_a3",
+      "robot": "a3",
+      "far_offset": 16,
+      "passed": true,
+      "max_abs_error": 0.0,
+      "tolerance": 1e-06,
+      "num_samples": 64,
+      "seed": 0,
+      "method": "standard-normal inputs in sim2real layout; the released actor gets them with a batch axis and the contract's morph; action is compared with actions[driven slots], next_slot_action with actions",
+      "sources": {
+        "proteus_actor.onnx": "418908bde5a1909d78219bc1d53775d4f557c1e4d176136270926fdbf8884671",
+        "agibot_a3.json": "e9f68603166c0bf16276baa1db426eabd93b65d7150e1fcf681ea29a23700a71"
+      },
+      "artifact": {
+        "policy.onnx": {
+          "sha256": "9c2a7108421a331b2bbb07749d1a28baf8d734d2b4d1cc663453d5e089fdc53d",
+          "ir_version": 8,
+          "opset": {
+            "ai.onnx": 17
+          },
+          "inputs": {
+            "proprioception": [
+              10,
+              68
+            ],
+            "task": [
+              6,
+              253
+            ],
+            "action_history": [
+              10,
+              31
+            ],
+            "history_valid": [
+              10
+            ]
+          },
+          "outputs": {
+            "action": [
+              30
+            ],
+            "next_slot_action": [
+              31
+            ]
+          }
+        }
+      },
+      "versions": {
+        "onnx": "1.17.0",
+        "onnxruntime": "1.23.2"
+      }
+    },
+    "engineai_t800": {
+      "release": "wsq61",
+      "actor_kind": "wam_seq",
+      "contract": "engineai_t800",
+      "robot": "t800",
+      "far_offset": 16,
+      "passed": true,
+      "max_abs_error": 0.0,
+      "tolerance": 1e-06,
+      "num_samples": 64,
+      "seed": 0,
+      "method": "standard-normal inputs in sim2real layout; the released actor gets them with a batch axis and the contract's morph; action is compared with actions[driven slots], next_slot_action with actions",
+      "sources": {
+        "proteus_actor.onnx": "418908bde5a1909d78219bc1d53775d4f557c1e4d176136270926fdbf8884671",
+        "engineai_t800.json": "50892110948098ae52cf4fffd2071dd6e7b79be0f271dad08e163d7c76985ab1"
+      },
+      "artifact": {
+        "policy.onnx": {
+          "sha256": "794b6e950aca02cf8e6151a665753f563a7d81e7e011de86d962b4f0a5002df6",
+          "ir_version": 8,
+          "opset": {
+            "ai.onnx": 17
+          },
+          "inputs": {
+            "proprioception": [
+              10,
+              68
+            ],
+            "task": [
+              6,
+              253
+            ],
+            "action_history": [
+              10,
+              31
+            ],
+            "history_valid": [
+              10
+            ]
+          },
+          "outputs": {
+            "action": [
+              25
+            ],
+            "next_slot_action": [
+              31
+            ]
+          }
+        }
+      },
+      "versions": {
+        "onnx": "1.17.0",
+        "onnxruntime": "1.23.2"
+      }
+    },
+    "galbot_et1": {
+      "release": "wsq61",
+      "actor_kind": "wam_seq",
+      "contract": "galbot_et1",
+      "robot": "et1",
+      "far_offset": 16,
+      "passed": true,
+      "max_abs_error": 0.0,
+      "tolerance": 1e-06,
+      "num_samples": 64,
+      "seed": 0,
+      "method": "standard-normal inputs in sim2real layout; the released actor gets them with a batch axis and the contract's morph; action is compared with actions[driven slots], next_slot_action with actions",
+      "sources": {
+        "proteus_actor.onnx": "418908bde5a1909d78219bc1d53775d4f557c1e4d176136270926fdbf8884671",
+        "galbot_et1.json": "028a18fbcc1c264c88cce5a998890c72ef95512ea1d743f78674b50bd08219f8"
+      },
+      "artifact": {
+        "policy.onnx": {
+          "sha256": "a07eff6d3acd2b801953616b968a9e7f1651bf63cd32d50337a391012cb3d892",
+          "ir_version": 8,
+          "opset": {
+            "ai.onnx": 17
+          },
+          "inputs": {
+            "proprioception": [
+              10,
+              68
+            ],
+            "task": [
+              6,
+              253
+            ],
+            "action_history": [
+              10,
+              31
+            ],
+            "history_valid": [
+              10
+            ]
+          },
+          "outputs": {
+            "action": [
+              24
+            ],
+            "next_slot_action": [
+              31
+            ]
+          }
+        }
+      },
+      "versions": {
+        "onnx": "1.17.0",
+        "onnxruntime": "1.23.2"
+      }
+    },
+    "limx_oli_edu": {
+      "release": "wsq61",
+      "actor_kind": "wam_seq",
+      "contract": "limx_oli_edu",
+      "robot": "oli",
+      "far_offset": 16,
+      "passed": true,
+      "max_abs_error": 0.0,
+      "tolerance": 1e-06,
+      "num_samples": 64,
+      "seed": 0,
+      "method": "standard-normal inputs in sim2real layout; the released actor gets them with a batch axis and the contract's morph; action is compared with actions[driven slots], next_slot_action with actions",
+      "sources": {
+        "proteus_actor.onnx": "418908bde5a1909d78219bc1d53775d4f557c1e4d176136270926fdbf8884671",
+        "limx_oli_edu.json": "e73aeab1f868ab3d3331192603ede236dee8d67b4e17160aff6e73426f5d69fb"
+      },
+      "artifact": {
+        "policy.onnx": {
+          "sha256": "d36f317c1bf9299abdab0f8b8da7bf26c47381cd250b62645614b0205d78b838",
+          "ir_version": 8,
+          "opset": {
+            "ai.onnx": 17
+          },
+          "inputs": {
+            "proprioception": [
+              10,
+              68
+            ],
+            "task": [
+              6,
+              253
+            ],
+            "action_history": [
+              10,
+              31
+            ],
+            "history_valid": [
+              10
+            ]
+          },
+          "outputs": {
+            "action": [
+              31
+            ],
+            "next_slot_action": [
+              31
+            ]
+          }
+        }
+      },
+      "versions": {
+        "onnx": "1.17.0",
+        "onnxruntime": "1.23.2"
+      }
+    },
+    "lingxi_x2": {
+      "release": "wsq61",
+      "actor_kind": "wam_seq",
+      "contract": "lingxi_x2",
+      "robot": "x2",
+      "far_offset": 16,
+      "passed": true,
+      "max_abs_error": 0.0,
+      "tolerance": 1e-06,
+      "num_samples": 64,
+      "seed": 0,
+      "method": "standard-normal inputs in sim2real layout; the released actor gets them with a batch axis and the contract's morph; action is compared with actions[driven slots], next_slot_action with actions",
+      "sources": {
+        "proteus_actor.onnx": "418908bde5a1909d78219bc1d53775d4f557c1e4d176136270926fdbf8884671",
+        "lingxi_x2.json": "e5b87d9b7f00718ffab19f57438f6499813304a5e7ac54e32220c43f6c6f4022"
+      },
+      "artifact": {
+        "policy.onnx": {
+          "sha256": "6a64eb3c66851d4c86cdae5f3ba20648bc4f977cbad7eca0a7c85bd79a88191e",
+          "ir_version": 8,
+          "opset": {
+            "ai.onnx": 17
+          },
+          "inputs": {
+            "proprioception": [
+              10,
+              68
+            ],
+            "task": [
+              6,
+              253
+            ],
+            "action_history": [
+              10,
+              31
+            ],
+            "history_valid": [
+              10
+            ]
+          },
+          "outputs": {
+            "action": [
+              31
+            ],
+            "next_slot_action": [
+              31
+            ]
+          }
+        }
+      },
+      "versions": {
+        "onnx": "1.17.0",
+        "onnxruntime": "1.23.2"
+      }
+    },
+    "primebot_q1": {
+      "release": "wsq61",
+      "actor_kind": "wam_seq",
+      "contract": "primebot_q1",
+      "robot": "q1",
+      "far_offset": 16,
+      "passed": true,
+      "max_abs_error": 0.0,
+      "tolerance": 1e-06,
+      "num_samples": 64,
+      "seed": 0,
+      "method": "standard-normal inputs in sim2real layout; the released actor gets them with a batch axis and the contract's morph; action is compared with actions[driven slots], next_slot_action with actions",
+      "sources": {
+        "proteus_actor.onnx": "418908bde5a1909d78219bc1d53775d4f557c1e4d176136270926fdbf8884671",
+        "primebot_q1.json": "6d79d3784198740b5c2ab3e43edb05f257a6290f0741498468a5ee34f713bfc1"
+      },
+      "artifact": {
+        "policy.onnx": {
+          "sha256": "f202188ea512d05a2100fa3b70803d333fba35dde442d6fcf82579e179d4e817",
+          "ir_version": 8,
+          "opset": {
+            "ai.onnx": 17
+          },
+          "inputs": {
+            "proprioception": [
+              10,
+              68
+            ],
+            "task": [
+              6,
+              253
+            ],
+            "action_history": [
+              10,
+              31
+            ],
+            "history_valid": [
+              10
+            ]
+          },
+          "outputs": {
+            "action": [
+              22
+            ],
+            "next_slot_action": [
+              31
+            ]
+          }
+        }
+      },
+      "versions": {
+        "onnx": "1.17.0",
+        "onnxruntime": "1.23.2"
+      }
+    },
+    "unitree_g1": {
+      "release": "wsq61",
+      "actor_kind": "wam_seq",
+      "contract": "unitree_g1",
+      "robot": "g1",
+      "far_offset": 16,
+      "passed": true,
+      "max_abs_error": 0.0,
+      "tolerance": 1e-06,
+      "num_samples": 64,
+      "seed": 0,
+      "method": "standard-normal inputs in sim2real layout; the released actor gets them with a batch axis and the contract's morph; action is compared with actions[driven slots], next_slot_action with actions",
+      "sources": {
+        "proteus_actor.onnx": "418908bde5a1909d78219bc1d53775d4f557c1e4d176136270926fdbf8884671",
+        "unitree_g1.json": "a185dcb0c51d820182e8f8411c53f4b3db698f6bdb9de86ff82f7cc0aa35e8db"
+      },
+      "artifact": {
+        "policy.onnx": {
+          "sha256": "116e5c3646cb243a041e3ca32265f424d2816483218dcc7660b5f1377b848711",
+          "ir_version": 8,
+          "opset": {
+            "ai.onnx": 17
+          },
+          "inputs": {
+            "proprioception": [
+              10,
+              68
+            ],
+            "task": [
+              6,
+              253
+            ],
+            "action_history": [
+              10,
+              31
+            ],
+            "history_valid": [
+              10
+            ]
+          },
+          "outputs": {
+            "action": [
+              29
+            ],
+            "next_slot_action": [
+              31
+            ]
+          }
+        }
+      },
+      "versions": {
+        "onnx": "1.17.0",
+        "onnxruntime": "1.23.2"
+      }
+    }
+  },
+  "smoke_tests": [
+    {
+      "robot": "a3",
+      "checkpoint": "wsq61_wam_61robots_30000.pt",
+      "policy": "/home/galbot/projects/sim2real/checkpoints/proteus/wsq61/agibot_a3/policy-sim.yaml",
+      "source_motion": "/home/galbot/projects/sim2real-wt/a3/checkpoints/agibot_a3/motions/motions/walk1_subject1.npz",
+      "motion": "/home/galbot/projects/sim2real/outputs/proteus-wsq61/a3/motion",
+      "seed": 0,
+      "sim_dt": 0.005,
+      "initial_pause_s": 1,
+      "final_hold_s": 1,
+      "simulated_seconds": 2.9649999141693115,
+      "motion_length": 100,
+      "final_motion_frame": 99,
+      "final_frame_hold": true,
+      "min_root_height_m": 1.0753285884857178,
+      "final_root_height_m": 1.0754708051681519,
+      "root_final_error_m": 0.008736289106309414,
+      "robot_relative_final_pos": [
+        -0.009658575989305973,
+        -0.011474696919322014,
+        -0.0008543093572370708
+      ],
+      "motion_relative_final_pos": [
+        -0.003832948626950383,
+        -0.004964579828083515,
+        -0.0009107842342928052
+      ]
+    },
+    {
+      "robot": "et1",
+      "checkpoint": "wsq61_wam_61robots_30000.pt",
+      "policy": "/home/galbot/projects/sim2real/checkpoints/proteus/wsq61/galbot_et1/policy-sim.yaml",
+      "source_motion": "synthetic stationary reference using contract default joint positions",
+      "motion": "/home/galbot/projects/sim2real/outputs/proteus-wsq61/et1/motion",
+      "seed": 0,
+      "sim_dt": 0.005,
+      "initial_pause_s": 1,
+      "final_hold_s": 1,
+      "simulated_seconds": 2.984999895095825,
+      "motion_length": 101,
+      "final_motion_frame": 100,
+      "final_frame_hold": true,
+      "min_root_height_m": 0.7378596067428589,
+      "final_root_height_m": 0.7385181784629822,
+      "root_final_error_m": 0.00584095623344183,
+      "robot_relative_final_pos": [
+        -0.005228717345744371,
+        -0.0002832117897924036,
+        -0.002587871626019478
+      ],
+      "motion_relative_final_pos": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "robot": "g1",
+      "checkpoint": "wsq61_wam_61robots_30000.pt",
+      "policy": "/home/galbot/projects/sim2real/checkpoints/proteus/wsq61/unitree_g1/policy-sim.yaml",
+      "source_motion": "synthetic stationary reference using contract default joint positions",
+      "motion": "/home/galbot/projects/sim2real/outputs/proteus-wsq61/g1/motion",
+      "seed": 0,
+      "sim_dt": 0.005,
+      "initial_pause_s": 1,
+      "final_hold_s": 1,
+      "simulated_seconds": 2.984999895095825,
+      "motion_length": 101,
+      "final_motion_frame": 100,
+      "final_frame_hold": true,
+      "min_root_height_m": 0.7798432111740112,
+      "final_root_height_m": 0.7798432111740112,
+      "root_final_error_m": 0.002244710922241211,
+      "robot_relative_final_pos": [
+        -0.0014314621221274137,
+        -0.0017057976219803095,
+        -0.0002826613490469754
+      ],
+      "motion_relative_final_pos": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "robot": "oli",
+      "checkpoint": "wsq61_wam_61robots_30000.pt",
+      "policy": "/home/galbot/projects/sim2real/checkpoints/proteus/wsq61/limx_oli_edu/policy-sim.yaml",
+      "source_motion": "/home/galbot/projects/sim2real/outputs/oli/lafan_suite/walk/motions/walk1_subject1.npz",
+      "motion": "/home/galbot/projects/sim2real/outputs/proteus-wsq61/oli/motion",
+      "seed": 0,
+      "sim_dt": 0.005,
+      "initial_pause_s": 1,
+      "final_hold_s": 1,
+      "simulated_seconds": 2.9649999141693115,
+      "motion_length": 100,
+      "final_motion_frame": 99,
+      "final_frame_hold": true,
+      "min_root_height_m": 0.9066320061683655,
+      "final_root_height_m": 0.9066320061683655,
+      "root_final_error_m": 0.03324183076620102,
+      "robot_relative_final_pos": [
+        0.0346967987716198,
+        -0.0029259587172418833,
+        0.0012195538729429245
+      ],
+      "motion_relative_final_pos": [
+        0.0015159136382862926,
+        -0.0036054900847375393,
+        -0.0006742361001670361
+      ]
+    },
+    {
+      "robot": "q1",
+      "checkpoint": "wsq61_wam_61robots_30000.pt",
+      "policy": "/home/galbot/projects/sim2real/checkpoints/proteus/wsq61/primebot_q1/policy-sim.yaml",
+      "source_motion": "/home/galbot/projects/sim2real-wt/q1/checkpoints/primebot_q1/motions/motions/walk1_subject1.npz",
+      "motion": "/home/galbot/projects/sim2real/outputs/proteus-wsq61/q1/motion",
+      "seed": 0,
+      "sim_dt": 0.000625,
+      "initial_pause_s": 1,
+      "final_hold_s": 1,
+      "simulated_seconds": 2.960624933242798,
+      "motion_length": 100,
+      "final_motion_frame": 99,
+      "final_frame_hold": true,
+      "min_root_height_m": 0.4159833490848541,
+      "final_root_height_m": 0.4164242148399353,
+      "root_final_error_m": 0.0033077397383749485,
+      "robot_relative_final_pos": [
+        0.00015156912559177727,
+        -0.004753071814775467,
+        -0.0009280435624532402
+      ],
+      "motion_relative_final_pos": [
+        -0.0015765969874337316,
+        -0.0020419061183929443,
+        -0.00015076342970132828
+      ]
+    },
+    {
+      "robot": "t800",
+      "checkpoint": "wsq61_wam_61robots_30000.pt",
+      "policy": "/home/galbot/projects/sim2real/checkpoints/proteus/wsq61/engineai_t800/policy-sim.yaml",
+      "source_motion": "/home/galbot/projects/sim2real-wt/t800/checkpoints/engineai_t800/motions/motions/walk1_subject1.npz",
+      "motion": "/home/galbot/projects/sim2real/outputs/proteus-wsq61/t800/motion",
+      "seed": 0,
+      "sim_dt": 0.000625,
+      "initial_pause_s": 1,
+      "final_hold_s": 1,
+      "simulated_seconds": 2.960624933242798,
+      "motion_length": 100,
+      "final_motion_frame": 99,
+      "final_frame_hold": true,
+      "min_root_height_m": 1.002217411994934,
+      "final_root_height_m": 1.0044245719909668,
+      "root_final_error_m": 0.006226910278201103,
+      "robot_relative_final_pos": [
+        -0.001387957134284079,
+        0.0006122566410340369,
+        0.0017371340654790401
+      ],
+      "motion_relative_final_pos": [
+        -0.0005818630452267826,
+        -0.0055378880351781845,
+        0.0011890965979546309
+      ]
+    },
+    {
+      "robot": "x2",
+      "checkpoint": "wsq61_wam_61robots_30000.pt",
+      "policy": "/home/galbot/projects/sim2real/checkpoints/proteus/wsq61/lingxi_x2/policy-sim.yaml",
+      "source_motion": "/home/galbot/projects/sim2real/outputs/x2/relaxed_walk/motions/relaxed_walk.npz",
+      "motion": "/home/galbot/projects/sim2real/outputs/proteus-wsq61/x2/motion",
+      "seed": 0,
+      "sim_dt": 0.005,
+      "initial_pause_s": 1,
+      "final_hold_s": 1,
+      "simulated_seconds": 2.984999895095825,
+      "motion_length": 101,
+      "final_motion_frame": 100,
+      "final_frame_hold": true,
+      "min_root_height_m": 0.6349769830703735,
+      "final_root_height_m": 0.6349769830703735,
+      "root_final_error_m": 0.042138684540987015,
+      "robot_relative_final_pos": [
+        0.6642974019050598,
+        0.18564152717590332,
+        -0.015781408175826073
+      ],
+      "motion_relative_final_pos": [
+        0.6320269703865051,
+        0.20859012007713318,
+        -0.03019147738814354
+      ]
+    }
+  ],
+  "verification": {
+    "pytest": "18 passed: tests/test_proteus_observations.py tests/test_et1_proteus.py",
+    "syntax": "Modified Python and shell scripts passed with the root environment (uv --no-sync) and bash -n.",
+    "scope": "Local artifacts and default launchers, including a3/q1/t800/oli worktrees. No hardware controller started.",
+    "limits": "Short two-second motion excerpts for x2/oli/a3/q1/t800; synthetic standing for g1/et1. One-second policy-active initial and final holds. This is a smoke test, not full motion or hardware qualification."
+  },
+  "commands": {
+    "export": "HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --no-sync --with gitpython python checkpoints/proteus/wsq61/source/rebuild_export.py",
+    "main_smoke": "HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 MUJOCO_GL=egl SIM2REAL_ORT_NUM_THREADS=1 OMP_NUM_THREADS=1 uv run --no-sync python checkpoints/proteus/wsq61/source/validate_smoke.py g1 et1 x2 oli",
+    "worktree_smoke": "From each robot worktree, use the same environment and root script with the robot name (a3/q1/t800).",
+    "default_specialize": "HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --no-sync python scripts/export_proteus_onnx.py --contract unitree_g1 --robot g1"
+  }
+}

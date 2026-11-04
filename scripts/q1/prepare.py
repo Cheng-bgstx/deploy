@@ -19,7 +19,7 @@ def main():
     common = Path(subprocess.check_output(['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'], cwd=ROOT, text=True).strip())
     p.add_argument('--sources-root', type=Path, default=common.parent.parent)
     p.add_argument('--proteus-root', type=Path)
-    p.add_argument('--release', default='proteus_wamseq_62')
+    p.add_argument('--release', default='wsq61')
     p.add_argument('--skip-motions', action='store_true')
     a = p.parse_args()
     sources = a.sources_root.resolve()

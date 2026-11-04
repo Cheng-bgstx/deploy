@@ -88,7 +88,7 @@ class SimTracking(Tracking):
 
 @dataclass
 class Args:
-    policy_config: str = "checkpoints/proteus/proteus_60/unitree_g1/policy.yaml"
+    policy_config: str = "checkpoints/proteus/wsq61/unitree_g1/policy.yaml"
     motion_path: str = "hf://elijahgalahad/any4hdmi-g1-lafan/motions/walk1_subject1.npz"
     output: str = "outputs/proteus-deployment-rehearsal"
     seed: int = 0

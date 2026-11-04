@@ -5,6 +5,18 @@ slug: /tutorials/proteus-et1
 
 # Proteus 部署到 Galbot ET1
 
+## 默认 checkpoint（2026-11-04）
+
+准备与启动脚本现默认使用 **wsq61**（`wsq61_wam_61robots_30000.pt`），
+策略目录为 `checkpoints/proteus/wsq61/galbot_et1/`。
+使用 `policy.yaml` 进行真机部署、`policy-sim.yaml` 进行测量根位置的仿真；
+G1/ET1 PC 与 ET1 板载部署使用本分支生成的 `policy-pc.yaml`。
+actor 使用十步 WAMSeq 历史窗口与有效位掩码，关节/形态合约保持原样。
+将完整策略目录（ONNX、YAML、合约 JSON）随代码一起复制到部署机器；原动作库路径保持不变。
+checkpoint SHA256：`1d1c65ddf5706b940744d87e2f86f7cea453c9240bcccc12d31923211f694bba`。
+来源记录在 `checkpoints/proteus/wsq61/source/export.json`，已有数值比较及短时仿真记录在
+`docs/experiments/proteus-wsq61.json`。下文旧版本的性能和真机记录不能作为 wsq61 的验收数据。
+
 本教程用 sim2real 自己的运行时（而不是 et1-dep 的 Loco），把多机器人
 [Proteus](https://github.com/zengweishuai/ScaleBFM/tree/main/ScaleTrack#multi-robot-training-proteus)
 actor 部署到 Galbot ET1 上。内容包括：适配了什么、为什么这样适配，产物生成，
@@ -76,7 +88,7 @@ uv sync --extra inference-cpu
    ```bash
    uv run python scripts/build_proteus_contract.py \
      --robot et1 --name galbot_et1 --template unitree_r1
-   uv run python scripts/export_proteus_onnx.py \
+   uv run python scripts/export_proteus_onnx.py --proteus-root ../Proteus --release proteus_60 \
      --contract galbot_et1 --robot et1 --contract-dir checkpoints/proteus/contracts
    ```
 

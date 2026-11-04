@@ -63,8 +63,8 @@ Currently supported adapted / distributed checkpoint families:
 | SONIC v1.1 | `checkpoints/sonic/v1_1/g1/policy.yaml` | G1 policy with heading-normalized reference orientation. |
 | GRIT v0.0.1 | `checkpoints/grit/v0_0_1/policy.yaml` | Nine-frame reference context and ten-frame proprioceptive history. |
 | ScaleBFM | `checkpoints/scalebfm` | ScaleBFM Humanoid Transformer XL and M ONNX exports from [WeishuaiZeng/ScaleBFM](https://huggingface.co/WeishuaiZeng/ScaleBFM). |
-| Proteus | `checkpoints/proteus/proteus_60/unitree_g1/policy.yaml` | The 60-robot Proteus actor from [ScaleBFM](https://github.com/zengweishuai/ScaleBFM), wrapped for the G1 by `scripts/export_proteus_onnx.py`; see [Run External Policies](./docs/tutorials/run-external-policies.md#proteus). |
-| Proteus ET1 | `checkpoints/proteus/proteus_60/galbot_et1/policy.yaml` | Proteus on the Galbot ET1 (`--robot et1`), with a contract built from the Unitree R1's by `scripts/build_proteus_contract.py`; see [Proteus on Galbot ET1](./docs/tutorials/proteus-et1.md). |
+| Proteus | `checkpoints/proteus/wsq61/unitree_g1/policy.yaml` | The 61-robot Proteus wsq61 WAMSeq actor from [ScaleBFM](https://github.com/zengweishuai/ScaleBFM), wrapped for the G1 by `scripts/export_proteus_onnx.py`; see [Run External Policies](./docs/tutorials/run-external-policies.md#proteus). |
+| Proteus ET1 | `checkpoints/proteus/wsq61/galbot_et1/policy.yaml` | Proteus on the Galbot ET1 (`--robot et1`), with a contract built from the Unitree R1's by `scripts/build_proteus_contract.py`; see [Proteus on Galbot ET1](./docs/tutorials/proteus-et1.md). |
 | Proteus WAMSeq Primebot Q1 | `checkpoints/proteus/proteus_wamseq_62/primebot_q1/policy.yaml` | 22 joints, multiple LAFAN motions and PICO; [guide](./docs/tutorials/proteus-q1.md). |
 | BFM-Zero | `checkpoints/bfm-zero/exp_lafan40-100style_update_z10/policy.yaml` | Latent-conditioned motion tracker. |
 | TeleopIT | `checkpoints/teleopit/policy.yaml` | TeleopIT policy wrapper. |

@@ -5,6 +5,18 @@ slug: /tutorials/proteus-x2
 
 # 在智元灵犀 X2 上部署 Proteus WAMSeq
 
+## 默认 checkpoint（2026-11-04）
+
+准备与启动脚本现默认使用 **wsq61**（`wsq61_wam_61robots_30000.pt`），
+策略目录为 `checkpoints/proteus/wsq61/lingxi_x2/`。
+使用 `policy.yaml` 进行真机部署、`policy-sim.yaml` 进行测量根位置的仿真；
+G1/ET1 PC 与 ET1 板载部署使用本分支生成的 `policy-pc.yaml`。
+actor 使用十步 WAMSeq 历史窗口与有效位掩码，关节/形态合约保持原样。
+将完整策略目录（ONNX、YAML、合约 JSON）随代码一起复制到部署机器；原动作库路径保持不变。
+checkpoint SHA256：`1d1c65ddf5706b940744d87e2f86f7cea453c9240bcccc12d31923211f694bba`。
+来源记录在 `checkpoints/proteus/wsq61/source/export.json`，已有数值比较及短时仿真记录在
+`docs/experiments/proteus-wsq61.json`。下文旧版本的性能和真机记录不能作为 wsq61 的验收数据。
+
 本适配针对 Proteus **`lingxi_x2` 31 关节合约**，使用公开的 X2 Ultra v1.3 模型，
 接入本仓库的 Tracking 和集成 sim2sim。机器人别名为 `x2`、`lingxi_x2`、`agibot_x2`。
 策略是原始共享 WAMSeq actor，使用合约中的形态描述和带符号动作映射固定为 X2，无需
@@ -20,7 +32,7 @@ git -C ../Proteus worktree add --detach ../Proteus-wamseq origin/wamseq
 gh repo clone AgibotTech/agibot_x2_urdf ../agibot_x2_urdf -- --depth 1
 uv run --no-sync python scripts/x2/prepare_assets.py \
   --description-root ../agibot_x2_urdf --proteus-root ../Proteus-wamseq
-uv run --no-sync python scripts/x2/export_policy.py --proteus-root ../Proteus-wamseq
+uv run --no-sync python scripts/x2/export_policy.py --release proteus_wamseq_62 --proteus-root ../Proteus-wamseq
 ```
 
 已有工作区直接复用，不必重复克隆。本次验证版本：Proteus `1e0e038`、官方模型

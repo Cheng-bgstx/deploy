@@ -1,6 +1,6 @@
 """Create a PC deployment overlay without modifying the exported actor contract.
 
-G1 by default; ``--robot et1 --policy-config checkpoints/proteus/proteus_60/galbot_et1/policy.yaml`` for the
+G1 by default; ``--robot et1 --policy-config checkpoints/proteus/wsq61/galbot_et1/policy.yaml`` for the
 Galbot ET1, which has a waist roll but no waist pitch joint.
 """
 from dataclasses import dataclass
@@ -14,7 +14,7 @@ from sim2real.config.robots import get_robot_cfg
 
 @dataclass
 class Args:
-    policy_config: str = "checkpoints/proteus/proteus_60/unitree_g1/policy.yaml"
+    policy_config: str = "checkpoints/proteus/wsq61/unitree_g1/policy.yaml"
     output_name: str = "policy-pc.yaml"
     robot: str = "g1"
     limit_inset: float = 0.05

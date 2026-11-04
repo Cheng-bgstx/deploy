@@ -5,6 +5,19 @@ slug: /tutorials/proteus-q1
 
 # 启元 Q1 上的 Proteus WAMSeq
 
+## 默认 checkpoint（2026-11-04）
+
+启动脚本现默认使用 **wsq61**，即
+[ModelScope Hzzzz001/Proteus](https://modelscope.cn/datasets/Hzzzz001/Proteus)
+中的 `wsq61_wam_61robots_30000.pt`。当前策略路径为
+`checkpoints/proteus/wsq61/primebot_q1/policy.yaml`，使用测得根位置的仿真选择
+`policy-sim.yaml`。
+checkpoint SHA256 为 `1d1c65ddf5706b940744d87e2f86f7cea453c9240bcccc12d31923211f694bba`。
+保留原关节/形态合约，actor 使用十步 WAMSeq 窗口。旧产物仍可使用。
+下文配方及性能数据除特别标明 wsq61 外均对应旧版本，不能作为 wsq61 的验收数据。
+本地 wsq61 导出来源和逐机器人对比记录位于
+`checkpoints/proteus/wsq61/source/export.json` 与 `<robot>/comparison.json`。
+
 分支 `feat/proteus-wamseq-primebot-q1` 对应 **`primebot_q1`（22 个策略关节）**，机器人别名为 `q1`、`primebot_q1`。使用已发布的跨本体共享 actor，不需要训练或微调。包含模型、带名文件 tracking、PICO IK/ZMQ 和 inline 真机接口。**已验证软件与 MuJoCo，未连接真机或真实头显测试。**
 
 ## 准备
@@ -16,7 +29,7 @@ git -C "$sources_root/Proteus" worktree add --detach "$sources_root/Proteus-wams
 gh repo clone PrimebotTech/primebot-q1-urdf "$sources_root/primebot-q1-urdf" -- --depth 1
 gh repo clone YanjieZe/GMR "$sources_root/GMR" -- --depth 1
 gh repo clone ubisoft/ubisoft-laforge-animation-dataset "$sources_root/ubisoft-laforge-animation-dataset" -- --depth 1
-uv run --no-sync python -m scripts.q1.prepare --sources-root "$sources_root"
+uv run --no-sync python -m scripts.q1.prepare --release proteus_wamseq_62 --sources-root "$sources_root"
 ```
 
 可用 `--sources-root /path/to/projects` 指定源仓库父目录（兼容 git worktree），`--proteus-root` 指定已有 `wamseq` 检出。`--skip-motions` 只准备模型、策略和 PICO 静态参考。推理用根环境，遥操用 `venv/pico`；准备脚本会在 `venv/pico` 子进程中生成 IK 数据，不负责安装真机 SDK。先按已有 Getting Started 页面配置两个环境；`--no-sync` 复用本机环境。

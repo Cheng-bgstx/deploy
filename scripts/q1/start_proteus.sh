@@ -7,6 +7,6 @@ motion="checkpoints/primebot_q1/motions/motions/walk1_subject1.npz"
 if [[ $# -gt 0 && "$1" != -* ]]; then motion="$1"; shift; fi
 exec uv run --no-sync python -m sim2real.rl_policy.tracking \
   --robot q1 --robot-io inline \
-  --policy-config "${PROTEUS_POLICY_CONFIG:-checkpoints/proteus/proteus_wamseq_62/primebot_q1/policy.yaml}" \
+  --policy-config "${PROTEUS_POLICY_CONFIG:-checkpoints/proteus/wsq61/primebot_q1/policy.yaml}" \
   --rl-rate 50 --inference-backend onnx-cpu --controller keyboard \
   --motion-backend npz --motion-path "$motion" "$@"
