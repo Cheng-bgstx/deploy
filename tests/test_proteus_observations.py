@@ -209,3 +209,35 @@ def test_forcing_needs_offset_zero_first(tmp_path):
     env.policy_config["proteus"]["future_offsets"] = [1, 2]
     with pytest.raises(ValueError, match="offset 0"):
         _observations(env)
+
+
+@pytest.mark.parametrize("window", [1, 3, 10])
+def test_wam_episode_window_pairs_previous_actions_and_clears_resets(tmp_path, window):
+    env = _env(tmp_path)
+    env.policy_config["proteus"].update(actor_kind="wam_seq", seq_window=window)
+    obs = _observations(env)
+    obs["valid_history"] = [Observation.resolve("proteus.proteus_valid_history")(env=env)]
+    episodes = []
+    for step in range(30):
+        reset = step in {0, 5, 6, 19}
+        if reset:
+            _reset(obs)
+            episodes = []
+        env.state_processor.root_ang_vel_b = np.array([step + 1, 0.0, 0.0])
+        # Deliberately pass stale action on reset: the episode-start action is zero.
+        previous = np.full(4, step + 10.0, np.float32)
+        _update(obs, {"slot_action": previous, "paused": step % 2 == 0})
+        episodes.append((float(step + 1), np.zeros(4) if reset else previous.copy()))
+        kept = episodes[-window:]
+        expected_valid = np.zeros(window, np.float32)
+        expected_prop = np.zeros(window, np.float32)
+        expected_actions = np.zeros((window, 4), np.float32)
+        expected_valid[-len(kept):] = 1
+        expected_prop[-len(kept):] = [entry[0] for entry in kept]
+        expected_actions[-len(kept):] = [entry[1] for entry in kept]
+        out = _compute(obs)
+        assert out["proprioception"].shape == (window, 14)
+        np.testing.assert_array_equal(out["valid_history"], expected_valid)
+        np.testing.assert_array_equal(out["proprioception"][:, 3], expected_prop)
+        np.testing.assert_array_equal(out["action_history"], expected_actions)
+        assert not out["proprioception"][expected_valid == 0].any()

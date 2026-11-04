@@ -9,10 +9,14 @@ Every term is a view of one core per runtime, configured by the policy YAML's ``
                                    body, rotations relative to the anchor and to each robot body (tangent/normal),
                                    the frame offset
     action_history  (H, S)         the actor's last H slot actions (unmasked, as IsaacLab's last_action)
+    valid_history   (H,)           WAM only: frames from the current episode, not packet validity
 
 H history steps oldest first, S canonical slots, B tracked bodies (anchor first), F reference frames. Positions are
 divided by the robot's length scale. After a reset the proprioception history holds copies of the current state and
-the action history zeros, as IsaacLab's history buffers.
+the action history zeros, as IsaacLab's history buffers. WAM instead uses
+``seq_window`` frames, zero-pads observations/actions before the episode, and
+pairs every observation with the action before it; ``valid_history`` masks
+episode boundaries. Pause/communication gaps do not define new episodes.
 
 The tracked robot bodies come from MuJoCo forward kinematics at the measured root orientation and joint angles. The
 root position is the reference anchor's (``reference_forcing``, local tracking: the real robot has no root position)
@@ -68,7 +72,13 @@ class _ProteusCore:
         cfg = dict(env.policy_config["proteus"])
         self.env = env
         self.num_slots = int(cfg["num_slots"])
-        self.history = int(cfg["history"])
+        self.actor_kind = cfg.get("actor_kind", "separate")
+        if self.actor_kind not in {"separate", "wam_seq"}:
+            raise ValueError(f"Unsupported Proteus actor_kind: {self.actor_kind}")
+        self.seq = self.actor_kind == "wam_seq"
+        self.history = int(cfg["seq_window"] if self.seq else cfg["history"])
+        if self.history <= 0:
+            raise ValueError("Proteus history/window must be positive")
         self.joint_vel_scale = float(cfg["joint_vel_scale"])
         self.length_scale = float(cfg["length_scale"])
         self.body_names = [str(name) for name in cfg["body_names"]]
@@ -98,6 +108,12 @@ class _ProteusCore:
         self.prop_dim = 6 + 2 * self.num_slots
         self.prop_hist = np.zeros((self.history, self.prop_dim), dtype=np.float32)
         self.action_hist = np.zeros((self.history, self.num_slots), dtype=np.float32)
+        # WAM pairs o_i with a_{i-1}; one extra validity bit masks the
+        # previous action at the beginning of the episode (upstream ActingWindow).
+        self._seq_states = np.zeros((self.history + 1, self.prop_dim), dtype=np.float32)
+        self._seq_actions = np.zeros_like(self.action_hist)
+        self._seq_valid = np.zeros(self.history + 1, dtype=bool)
+        self.valid_hist = np.zeros(self.history, dtype=np.float32)
         F, B = len(self.future_offsets), len(self.body_names)
         self.target_body_pos = np.zeros((F, 3 * B), dtype=np.float32)
         self.target_body_pos_rel = np.zeros((F, 3 * B), dtype=np.float32)
@@ -225,7 +241,14 @@ class _ProteusCore:
     def reset(self) -> None:
         root_quat, joint_pos, joint_vel = self._robot()
         self._reset_alignment(root_quat)
-        self.prop_hist[:] = self._proprioception(root_quat, joint_pos, joint_vel)
+        if self.seq:
+            self.prop_hist.fill(0.0)
+            self._seq_states.fill(0.0)
+            self._seq_actions.fill(0.0)
+            self._seq_valid.fill(False)
+            self.valid_hist.fill(0.0)
+        else:
+            self.prop_hist[:] = self._proprioception(root_quat, joint_pos, joint_vel)
         self.action_hist.fill(0.0)
         self._update_task(root_quat, joint_pos)
         # The runtimes read a new state after the reset; the first update restarts the history from it.
@@ -234,7 +257,19 @@ class _ProteusCore:
     def update(self, data: Dict[str, Any]) -> None:
         root_quat, joint_pos, joint_vel = self._robot()
         prop = self._proprioception(root_quat, joint_pos, joint_vel)
-        if self._fill_on_update:
+        if self.seq:
+            episode_start = self._fill_on_update
+            prev_action = np.asarray(data.get("slot_action", np.zeros(self.num_slots)), dtype=np.float32)
+            if episode_start:
+                prev_action = np.zeros(self.num_slots, dtype=np.float32)
+            self._seq_states = np.concatenate([self._seq_states[1:], prop[None]])
+            self._seq_actions = np.concatenate([self._seq_actions[1:], prev_action[None]])
+            self._seq_valid = np.concatenate([self._seq_valid[1:] & (not episode_start), [True]])
+            self.prop_hist = np.where(self._seq_valid[1:, None], self._seq_states[1:], 0.0)
+            self.action_hist = np.where(self._seq_valid[:-1, None], self._seq_actions, 0.0)
+            self.valid_hist = self._seq_valid[1:].astype(np.float32)
+            self._fill_on_update = False
+        elif self._fill_on_update:
             self.prop_hist[:] = prop
             self.action_hist.fill(0.0)
             self._fill_on_update = False
@@ -315,3 +350,7 @@ class proteus_frame_offsets(_ProteusObservation):
 
 class proteus_slot_action_history(_ProteusObservation):
     output_name = "action_hist"
+
+
+class proteus_valid_history(_ProteusObservation):
+    output_name = "valid_hist"

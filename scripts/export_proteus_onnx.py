@@ -19,6 +19,11 @@ The wrapper keeps the actor's ONNX IR and opset (ORT 1.16 on the G1 loads them) 
 actor on random inputs. Output directory: ``policy.onnx``, ``policy.yaml``, ``comparison.json`` and a verbatim
 copy of the contract.
 
+For ``actor_kind=wam_seq``, ``seq_window`` replaces the legacy three-frame
+history. The wrapper also forwards ``valid_history[W]`` to ``valid`` and maps
+the observation/action windows to ``obs_window`` / ``prev_actions``. Use
+``--checkpoint-dir`` to select a WAM release; the original export stays available.
+
     uv run python scripts/export_proteus_onnx.py --proteus-root ../Proteus --contract unitree_g1 --robot g1
 """
 
@@ -48,6 +53,8 @@ TOLERANCE = 1.0e-6
 
 # released actor I/O -> wrapper I/O
 SOURCE_INPUTS = {"policy": "proprioception", "policy_task": "task", "action": "action_history"}
+WAM_SOURCE_INPUTS = {"obs_window": "proprioception", "policy_task": "task",
+                     "prev_actions": "action_history", "valid": "valid_history"}
 SOURCE_MORPH = "morph"
 SOURCE_OUTPUT = "actions"
 INTERNAL_PREFIX = "proteus_actor/"
@@ -80,9 +87,21 @@ def driven_joints(contract: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def input_shapes(contract: dict[str, Any], far_offset: int) -> dict[str, tuple[int, ...]]:
-    H, S = int(contract["history"]), int(contract["num_slots"])
+    seq = contract.get("actor_kind", "separate") == "wam_seq"
+    H = int(contract["seq_window"] if seq else contract["history"])
+    S = int(contract["num_slots"])
     F, B = len(resolved_offsets(contract, far_offset)), len(contract["body_names"])
-    return {"proprioception": (H, 6 + 2 * S), "task": (F, 18 * B + 1), "action_history": (H, S)}
+    shapes = {"proprioception": (H, 6 + 2 * S), "task": (F, 18 * B + 1), "action_history": (H, S)}
+    if seq:
+        shapes["valid_history"] = (H,)
+    return shapes
+
+
+def source_inputs(contract: dict[str, Any]) -> dict[str, str]:
+    kind = contract.get("actor_kind", "separate")
+    if kind not in {"separate", "wam_seq"}:
+        raise ValueError(f"Unsupported Proteus actor_kind: {kind}")
+    return WAM_SOURCE_INPUTS if kind == "wam_seq" else SOURCE_INPUTS
 
 
 # ---------------------------------------------------------------------------
@@ -100,23 +119,25 @@ def wrap_actor(source: onnx.ModelProto, contract: dict[str, Any], far_offset: in
     graph = model.graph
     S = int(contract["num_slots"])
     shapes = input_shapes(contract, far_offset)
+    mapping = source_inputs(contract)
     morph = np.asarray(contract["morph"], dtype=np.float32)[None]
 
     inputs = {i.name: i for i in graph.input}
-    expected = {"policy": shapes["proprioception"], "policy_task": shapes["task"], "action": shapes["action_history"],
-                SOURCE_MORPH: morph.shape[1:]}  # fmt: skip
+    expected = {old: shapes[new] for old, new in mapping.items()} | {SOURCE_MORPH: morph.shape[1:]}
+    if set(inputs) != set(expected):
+        raise ValueError(f"Proteus actor inputs {set(inputs)} != {set(expected)}")
     for name, shape in expected.items():
         if name not in inputs or tuple(_shape(inputs[name])[1:]) != tuple(shape):
             raise ValueError(f"Proteus actor input {name} != [batch, {shape}]: {[(i.name, _shape(i)) for i in graph.input]}")
     if [o.name for o in graph.output] != [SOURCE_OUTPUT] or _shape(graph.output[0])[1:] != [S]:
         raise ValueError(f"Proteus actor output != {SOURCE_OUTPUT}[batch, {S}]")
     tensor_names = {t for n in graph.node for t in (*n.input, *n.output)} | {i.name for i in graph.initializer}
-    clashes = sorted(tensor_names & {*SOURCE_INPUTS.values(), "action", "next_slot_action"} - set(SOURCE_INPUTS))
+    clashes = sorted(tensor_names & {*mapping.values(), "action", "next_slot_action"} - set(mapping))
     if clashes or any(n.op_type in {"If", "Loop", "Scan"} for n in graph.node):
         raise ValueError(f"Cannot rename the actor's inputs safely (clashes: {clashes})")
 
     # the released inputs become internal tensors
-    rename = {name: INTERNAL_PREFIX + name for name in (*SOURCE_INPUTS, SOURCE_MORPH)}
+    rename = {name: INTERNAL_PREFIX + name for name in (*mapping, SOURCE_MORPH)}
     for node in graph.node:
         node.input[:] = [rename.get(name, name) for name in node.input]
     for value_info in graph.value_info:
@@ -131,7 +152,7 @@ def wrap_actor(source: onnx.ModelProto, contract: dict[str, Any], far_offset: in
     ])  # fmt: skip
     unsqueeze = [
         helper.make_node("Unsqueeze", [new, INTERNAL_PREFIX + "batch_axis"], [rename[old]], name=f"unsqueeze_{new}")
-        for old, new in SOURCE_INPUTS.items()
+        for old, new in mapping.items()
     ]
     nodes = unsqueeze + list(graph.node) + [
         helper.make_node("Squeeze", [SOURCE_OUTPUT, INTERNAL_PREFIX + "batch_axis"], ["next_slot_action"],
@@ -141,7 +162,7 @@ def wrap_actor(source: onnx.ModelProto, contract: dict[str, Any], far_offset: in
     ]  # fmt: skip
     del graph.node[:]
     graph.node.extend(nodes)
-    graph.input.extend(helper.make_tensor_value_info(name, TensorProto.FLOAT, shapes[name]) for name in SOURCE_INPUTS.values())
+    graph.input.extend(helper.make_tensor_value_info(name, TensorProto.FLOAT, shapes[name]) for name in mapping.values())
     del graph.output[:]
     graph.output.extend([
         helper.make_tensor_value_info("action", TensorProto.FLOAT, [len(slots)]),
@@ -161,6 +182,7 @@ def compare_with_source(
 ) -> float:
     """Max |wrapper - released actor| over random inputs (the released actor gets the batch axis and the morph)."""
     options = ort.SessionOptions()
+    options.intra_op_num_threads = options.inter_op_num_threads = 1
     options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
     wrapper = ort.InferenceSession(wrapped.SerializeToString(), options, providers=["CPUExecutionProvider"])
     source = ort.InferenceSession(str(source_path), options, providers=["CPUExecutionProvider"])
@@ -168,11 +190,21 @@ def compare_with_source(
     morph = np.asarray(contract["morph"], dtype=np.float32)[None]
     rng = np.random.default_rng(seed)
     max_err = 0.0
-    for _ in range(num_samples):
+    for sample in range(num_samples):
         feeds = {name: rng.normal(size=shape).astype(np.float32) for name, shape in input_shapes(contract, far_offset).items()}
+        if "valid_history" in feeds:
+            # Cover startup, partially populated episodes and full windows.
+            count = sample % (len(feeds["valid_history"]) + 1)
+            valid = (np.arange(len(feeds["valid_history"])) >= len(feeds["valid_history"]) - count)
+            feeds["valid_history"] = valid.astype(np.float32)
+            feeds["proprioception"][~valid] = 0.0
+            prev_valid = np.concatenate([[False], valid[:-1]])
+            feeds["action_history"][~prev_valid] = 0.0
         action, next_slot_action = wrapper.run(["action", "next_slot_action"], feeds)
-        source_feeds = {old: feeds[new][None] for old, new in SOURCE_INPUTS.items()} | {SOURCE_MORPH: morph}
+        source_feeds = {old: feeds[new][None] for old, new in source_inputs(contract).items()} | {SOURCE_MORPH: morph}
         (actions,) = source.run([SOURCE_OUTPUT], source_feeds)
+        if not all(np.isfinite(value).all() for value in (actions, action, next_slot_action)):
+            raise RuntimeError("Proteus export comparison produced non-finite actions")
         max_err = max(max_err, float(np.abs(next_slot_action - actions[0]).max()),
                       float(np.abs(action - actions[0, slots]).max()))  # fmt: skip
     return max_err
@@ -207,7 +239,7 @@ def policy_yaml(contract: dict[str, Any], robot: str, far_offset: int) -> dict[s
     def term(name: str) -> dict[str, str]:
         return {"_target_": f"proteus.proteus_{name}"}
 
-    return {
+    cfg = {
         "model_path": "policy.onnx",
         "observation": {
             "proprioception": {
@@ -253,6 +285,10 @@ def policy_yaml(contract: dict[str, Any], robot: str, far_offset: int) -> dict[s
             "motion_dt_s": float(contract["control_dt"]),
         },
     }
+    if contract.get("actor_kind", "separate") == "wam_seq":
+        cfg["proteus"].update(actor_kind="wam_seq", seq_window=int(contract["seq_window"]))
+        cfg["observation"]["valid_history"] = {"valid": term("valid_history")}
+    return cfg
 
 
 # ---------------------------------------------------------------------------
@@ -269,9 +305,10 @@ def export_policy(
     output_dir: Path | None = None,
     num_samples: int = NUM_SAMPLES,
     seed: int = 0,
+    checkpoint_dir: Path | None = None,
 ) -> Path:
     """Export one robot's policy; returns the output directory."""
-    export_dir = Path(proteus_root) / EXPORT_SUBDIR
+    export_dir = Path(checkpoint_dir) if checkpoint_dir is not None else Path(proteus_root) / EXPORT_SUBDIR
     contract_path = export_dir / f"{contract_name}.json"
     contract_bytes = contract_path.read_bytes()
     contract = load_contract(contract_path)
@@ -301,6 +338,7 @@ def export_policy(
     comparison = {
         "contract": contract_name,
         "robot": robot,
+        "actor_kind": contract.get("actor_kind", "separate"),
         "far_offset": far_offset,
         "passed": True,
         "max_abs_error": max_err,
@@ -309,7 +347,8 @@ def export_policy(
         "seed": seed,
         "method": (
             "standard-normal inputs in sim2real layout; the released actor gets them with a batch axis and the "
-            "contract's morph; action is compared with actions[driven slots], next_slot_action with actions"
+            "contract's morph; WAM includes binary startup/partial/full validity masks and zero episode padding; "
+            "action is compared with actions[driven slots], next_slot_action with actions"
         ),
         "sources": {
             contract["actor"]: sha256_file(source_path),
@@ -333,6 +372,7 @@ def export_policy(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--proteus-root", type=Path, default=DEFAULT_PROTEUS_ROOT)
+    parser.add_argument("--checkpoint-dir", type=Path, help="Released actor and contracts directory (e.g. proteus_wamseq_62)")
     parser.add_argument("--contract", nargs="+", default=["unitree_g1"], help="contract names in proteus_60/")
     parser.add_argument("--robot", default="g1", help="sim2real robot config of the contracts")
     parser.add_argument("--far-offset", type=int, default=DEFAULT_FAR_OFFSET)
@@ -355,6 +395,7 @@ def main() -> int:
             output_dir=args.output_root / name,
             num_samples=args.num_samples,
             seed=args.seed,
+            checkpoint_dir=args.checkpoint_dir,
         )
         comparison = json.loads((output_dir / "comparison.json").read_text(encoding="utf-8"))
         print(f"{name}: {output_dir} max|d|={comparison['max_abs_error']:.3g} over {comparison['num_samples']} samples")
