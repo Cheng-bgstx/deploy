@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from sim2real.config.robots import G1_CFG
-from sim2real.rl_policy.robot_io.bridge_safety import BridgeSafety
+from sim2real.rl_policy.robot_io.bridge_safety import PROTEUS_TARGET_MARGIN_RAD, BridgeSafety
 from sim2real.utils.common import LowCmdMessage, LowStateMessage
 
 
@@ -15,8 +15,8 @@ def command(t, seq=1, mode="zero", generation=0):
                          source_time_ns=t, sequence=seq, control_mode=mode, control_generation=generation)
 
 
-def armed(*, timeout_s=0.1):
-    g = BridgeSafety(G1_CFG, timeout_s)
+def armed(*, timeout_s=0.1, target_margin_rad=0.0, hold_through_gaps=False):
+    g = BridgeSafety(G1_CFG, timeout_s, target_margin_rad, hold_through_gaps)
     g.observe_state(state(), 0, 1_000_000_000)
     assert g.accept_command(command(1_000_000_000), 1_000_000_000)
     assert g.output(1_000_000_000) is None
@@ -164,6 +164,90 @@ def test_bad_commands_latch_fault(failure):
     assert not g.accept_command(cmd, 1_030_000_000)
     assert g.latched and g.fault
     assert (g.output(1_030_000_000).kp == 0).all()
+
+
+def test_policy_targets_may_point_past_the_joint_range_by_the_margin():
+    # Proteus drives the G1 ankles up to ~0.8 rad past their range; training never clips targets.
+    j = G1_CFG.joint_names.index("left_ankle_pitch_joint")
+    upper = G1_CFG.joint_pos_upper_limit["left_ankle_pitch_joint"]
+    g = armed(target_margin_rad=PROTEUS_TARGET_MARGIN_RAD)
+    cmd = command(1_030_000_000, 3, "policy", 2)
+    cmd.q_target[j] = upper + 0.8
+    assert g.accept_command(cmd, 1_030_000_000) and not g.latched
+    cmd = command(1_040_000_000, 4, "policy", 2)
+    cmd.q_target[j] = upper + PROTEUS_TARGET_MARGIN_RAD + 0.1
+    assert not g.accept_command(cmd, 1_040_000_000) and g.fault
+
+
+def test_hold_through_gaps_keeps_the_last_targets_and_resumes():
+    g = armed(hold_through_gaps=True)
+    cmd = command(1_030_000_000, 3, "policy", 2)
+    cmd.q_target[0] += 0.1
+    assert g.accept_command(cmd, 1_030_000_000)
+    # A 340 ms LowState gap (the Tracker keeps sending on its cached state): no damping, same PD targets.
+    out = g.output(1_370_000_000)
+    assert not g.latched and g.reason.startswith("LowState gap")
+    assert out.q_target[0] == cmd.q_target[0] and (out.kp == 20).all()
+    # Commands that arrive late after the gap are dropped without a stop.
+    assert not g.accept_command(command(1_030_000_000, 4, "policy", 2), 1_370_000_000)
+    assert not g.latched
+    # Fresh state and commands resume control without a new A.
+    g.observe_state(state(9), 0, 1_380_000_000)
+    assert g.accept_command(command(1_380_000_000, 5, "policy", 2), 1_380_000_000)
+    assert g.output(1_380_000_000).control_mode == "policy" and g.reason == "active"
+    # A Tracker command gap holds the last targets as well.
+    g.observe_state(state(10), 0, 1_600_000_000)
+    out = g.output(1_600_000_000)
+    assert not g.latched and g.reason.startswith("Tracker command gap") and (out.kp == 20).all()
+
+
+def test_hold_through_gaps_never_resumes_after_a_long_silence_or_robot_restart():
+    # A rebooting robot: silent for over a second, then back with a restarted tick. Old targets must not resume.
+    g = armed(hold_through_gaps=True)
+    assert g.accept_command(command(1_030_000_000, 3, "policy", 2), 1_030_000_000)
+    g.output(1_500_000_000)
+    assert not g.latched
+    g.output(2_100_000_000)
+    assert g.latched and g.fault and (g.output(2_100_000_000).kp == 0).all()
+    g = armed(hold_through_gaps=True)
+    assert g.accept_command(command(1_030_000_000, 3, "policy", 2), 1_030_000_000)
+    g.observe_state(state(1), 0, 1_040_000_000)  # tick went back from 2
+    assert g.latched and g.fault
+
+
+def test_hold_through_gaps_still_stops_on_invalid_commands_and_select():
+    g = armed(hold_through_gaps=True)
+    bad = command(1_030_000_000, 3, "policy", 2)
+    bad.q_target[0] = np.nan
+    assert not g.accept_command(bad, 1_030_000_000) and g.fault
+    g = armed(hold_through_gaps=True)
+    g.observe_state(state(3), 1 << 3, 1_030_000_000)
+    assert g.latched and not g.fault
+
+
+def test_g1_overlay_bounds_targets_by_what_the_bridge_accepts(tmp_path):
+    import importlib.util
+    import sys
+    from pathlib import Path
+
+    import yaml
+
+    path = Path(__file__).resolve().parents[1] / "scripts/g1/prepare_proteus_deployment.py"
+    spec = importlib.util.spec_from_file_location(path.stem, path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    names = list(G1_CFG.joint_names)
+    policy = tmp_path / "policy.yaml"
+    policy.write_text(yaml.safe_dump(dict(
+        proteus=dict(reference_forcing=True), joint_names_simulation=names, policy_joint_names=names,
+        default_joint_pos={n: 0.0 for n in names}, joint_kp={n: 1.0 for n in names}, joint_kd={n: 0.1 for n in names},
+    )))  # fmt: skip
+    module.main(module.Args(policy_config=str(policy)))
+    limits = yaml.safe_load((tmp_path / "policy-pc.yaml").read_text())["soft_joint_pos_limits"]
+    for n in names:
+        assert limits[n] == pytest.approx([G1_CFG.joint_pos_lower_limit[n] - PROTEUS_TARGET_MARGIN_RAD,
+                                           G1_CFG.joint_pos_upper_limit[n] + PROTEUS_TARGET_MARGIN_RAD])
 
 
 def test_select_pulse_during_mode_release_prevents_policy_output():

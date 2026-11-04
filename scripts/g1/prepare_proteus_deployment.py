@@ -6,6 +6,7 @@ import tyro
 import yaml
 
 from sim2real.config.robots import get_robot_cfg
+from sim2real.rl_policy.robot_io.bridge_safety import PROTEUS_TARGET_MARGIN_RAD
 
 
 @dataclass
@@ -39,8 +40,12 @@ def main(args):
     cfg["soft_joint_pos_limits"] = {}
     for n in robot_cfg.joint_names:
         low, high = robot_cfg.joint_pos_lower_limit[n], robot_cfg.joint_pos_upper_limit[n]
-        inset = .05 * (high - low)
-        cfg["soft_joint_pos_limits"][n] = [low + inset, high - inset]
+        if robot_cfg.name == "g1":
+            # Proteus trains without target clipping; bound targets only by what the G1 Bridge accepts.
+            cfg["soft_joint_pos_limits"][n] = [low - PROTEUS_TARGET_MARGIN_RAD, high + PROTEUS_TARGET_MARGIN_RAD]
+        else:
+            inset = .05 * (high - low)
+            cfg["soft_joint_pos_limits"][n] = [low + inset, high - inset]
     # A zero-width soft limit clips the policy's target to the default pose; the
     # observation still reports the measured joint, as for any other joint.
     locked = DEFAULT_LOCKED_JOINTS.get(robot_cfg.name, ()) if args.locked_joints is None else args.locked_joints
@@ -50,7 +55,9 @@ def main(args):
     output = path.with_name(args.output_name)
     gains = "waist roll/pitch PD 100/2.5, arms-down " if robot_cfg.name == "g1" else ""
     lock = f"{', '.join(locked)} locked, " if locked else ""
-    output.write_text(f"# Deployment overlay: {gains}default standing pose, {lock}5% joint-limit margins, 15 rad/s target slew.\n"
+    margins = (f"targets up to {PROTEUS_TARGET_MARGIN_RAD:g} rad past the joint limits" if robot_cfg.name == "g1"
+               else "5% joint-limit margins")
+    output.write_text(f"# Deployment overlay: {gains}default standing pose, {lock}{margins}, 15 rad/s target slew.\n"
                       + yaml.safe_dump(cfg, sort_keys=False))
     print(output.resolve())
 

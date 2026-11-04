@@ -12,15 +12,31 @@ from sim2real.config.robots.base import RobotCfg
 from sim2real.utils.common import LowCmdMessage, LowStateMessage
 from sim2real.utils.strings import resolve_matching_names_values
 
+# Proteus trains without clipping position targets: the G1 ankles push them up to about 0.8 rad past the
+# joint range to get torque. A target past a mechanical stop only raises the PD torque, which the motor bounds.
+PROTEUS_TARGET_MARGIN_RAD = 1.0
+# Holding through a gap is for dropped samples; a longer silence (a robot reboot took 117 s) needs a fresh A.
+MAX_HOLD_GAP_NS = 1_000_000_000
+
 
 class BridgeSafety:
-    def __init__(self, cfg: RobotCfg, timeout_s: float = 0.1):
+    def __init__(self, cfg: RobotCfg, timeout_s: float = 0.1, target_margin_rad: float = 0.0,
+                 hold_through_gaps: bool = False):
+        """``target_margin_rad``: how far past the joint range a position target may point.
+        ``hold_through_gaps``: once active, a LowState or Tracker command gap keeps sending the last command (its PD
+        targets) instead of latching damping, and control resumes when fresh data returns; late or repeated commands
+        are dropped. A gap longer than ``MAX_HOLD_GAP_NS`` or a restarted robot tick still latches: the robot may have
+        rebooted, and old targets must never resume on it. Invalid states and commands, Select and shutdown still
+        stop."""
         if not 0 < timeout_s <= 1:
             raise ValueError("timeout_s must be in (0, 1]")
+        if not 0 <= target_margin_rad <= 1.5:
+            raise ValueError("target_margin_rad must be in [0, 1.5]")
         self.count = len(cfg.joint_names)
         self.timeout_ns = int(timeout_s * 1e9)
-        self.lower = np.array([cfg.joint_pos_lower_limit[n] for n in cfg.joint_names])
-        self.upper = np.array([cfg.joint_pos_upper_limit[n] for n in cfg.joint_names])
+        self.hold_through_gaps = hold_through_gaps
+        self.lower = np.array([cfg.joint_pos_lower_limit[n] for n in cfg.joint_names]) - target_margin_rad
+        self.upper = np.array([cfg.joint_pos_upper_limit[n] for n in cfg.joint_names]) + target_margin_rad
         # An unspecified velocity limit permits only a zero velocity target.
         self.velocity = np.array([cfg.joint_velocity_limit.get(n, 0.0) for n in cfg.joint_names])
         self.effort = np.array([cfg.joint_effort_limit[n] for n in cfg.joint_names])
@@ -67,6 +83,8 @@ class BridgeSafety:
         if not valid:
             self.latch("invalid LowState")
             return
+        if self.state is not None and state.tick < self.state.tick:
+            self.latch("robot LowState tick restarted")
         if self.state is None or state.tick != self.state.tick:
             self.state_time_ns = now_ns
         self.state = state
@@ -105,12 +123,15 @@ class BridgeSafety:
                  and np.all((cmd.kp >= 0) & (cmd.kp <= 400))
                  and np.all((cmd.kd >= 0) & (cmd.kd <= 10))
                  and cmd.control_mode in {"zero", "init", "policy"}
-                 and cmd.source_time_ns is not None
+                 and cmd.source_time_ns is not None)
+        fresh = (valid
                  and 0 <= now_ns - cmd.source_time_ns <= self.timeout_ns
                  and cmd.source_time_ns > self.last_source_ns
                  and (cmd.sequence > self.last_sequence
                       or (self.latched and cmd.control_mode == "zero")))
-        if not valid:
+        if valid and not fresh and self.hold_through_gaps:
+            return False  # A late or repeated command after a gap; the newer one stays in force.
+        if not fresh:
             self.latch("invalid, expired or out-of-order command")
             return False
         self.command = cmd
@@ -141,9 +162,18 @@ class BridgeSafety:
 
     def output(self, now_ns: int) -> LowCmdMessage | None:
         if self.active or self.arm_pending:
-            if self.state is None or now_ns - self.state_time_ns > self.timeout_ns:
+            state_late = self.state is None or now_ns - self.state_time_ns > self.timeout_ns
+            command_late = self.command is None or now_ns - self.command.source_time_ns > self.timeout_ns
+            state_lost = self.state is None or now_ns - self.state_time_ns > MAX_HOLD_GAP_NS
+            command_lost = self.command is None or now_ns - self.command.source_time_ns > MAX_HOLD_GAP_NS
+            if (self.hold_through_gaps and self.active and not self.latched
+                    and not state_lost and not command_lost):
+                # Keep the last PD targets through the gap; fresh data resumes control without a new A.
+                self.reason = ("LowState gap: holding last targets" if state_late
+                               else "Tracker command gap: holding last targets" if command_late else "active")
+            elif state_late:
                 self.latch("LowState timeout")
-            elif self.command is None or now_ns - self.command.source_time_ns > self.timeout_ns:
+            elif command_late:
                 self.latch("Tracker command timeout")
         if not self.active:
             return None

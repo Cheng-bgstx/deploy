@@ -16,24 +16,28 @@ from loguru import logger
 
 from sim2real.config.robots import get_robot_cfg
 from sim2real.config.robots.base import RobotCfg, get_unitree_dds_family
-from sim2real.rl_policy.robot_io.bridge_safety import BridgeSafety
+from sim2real.rl_policy.robot_io.bridge_safety import PROTEUS_TARGET_MARGIN_RAD, BridgeSafety
 from sim2real.utils.common import LowCmdMessage, LowStateMessage, UNITREE_LEGGED_CONST
 from sim2real.utils.sdk_shutdown import close_sdk_channel, exit_after_sdk_timeout
 
 UNITREE_INTERFACE = "eth0"
 UNITREE_DOMAIN_ID = 0
+RECEPTION_GAP_LOG_NS = 30_000_000  # LowState normally arrives every 1 ms
 
 
 class RealBridge:
     def __init__(self, robot_cfg: RobotCfg, rate_hz=200, interface=UNITREE_INTERFACE,
-                 *, read_only=False, timeout_s=0.1):
+                 *, read_only=False, timeout_s=0.1, target_margin_rad=PROTEUS_TARGET_MARGIN_RAD,
+                 hold_through_gaps=False):
         if rate_hz <= 0:
             raise ValueError("rate_hz must be positive")
         self.robot_cfg, self.interface = robot_cfg, interface
         self.dt = 1.0 / rate_hz
         self.read_only = read_only
-        self.guard = BridgeSafety(robot_cfg, timeout_s)
+        self.guard = BridgeSafety(robot_cfg, timeout_s, target_margin_rad, hold_through_gaps)
         self.lock = threading.Lock()
+        self._latest = self._observed = None
+        self._reception_gaps = []
         self._takeover_thread = None
         self._takeover_result = None
         self._last_reason = None
@@ -86,8 +90,23 @@ class RealBridge:
         self.low_cmd_zmq_sub.connect(f"tcp://{self.robot_cfg.low_cmd_host}:{self.robot_cfg.low_cmd_port}")
 
     def _on_low_state(self, msg):
+        # The DDS listener only hands over the newest sample (no lock, no decoding), so a busy loop step can
+        # never hold up reception; it also notes arrival gaps for the loop to log.
         if self._closing:
             return
+        now_ns = time.monotonic_ns()
+        if self._latest is not None and now_ns - self._latest[1] > RECEPTION_GAP_LOG_NS:
+            self._reception_gaps.append((now_ns - self._latest[1], int(msg.tick) - int(self._latest[0].tick)))
+        self.samples += 1
+        self._latest = (msg, now_ns)
+
+    def _observe_latest(self):
+        """Decode the newest LowState for the guard; called under the lock at every loop step."""
+        latest = self._latest
+        if latest is None or latest is self._observed:
+            return
+        self._observed = latest
+        msg, received_ns = latest
         count = self.guard.count
         state = LowStateMessage(
             quaternion=np.array(msg.imu_state.quaternion),
@@ -99,11 +118,9 @@ class RealBridge:
         )
         payload = bytes(getattr(msg, "wireless_remote", b""))
         keys = struct.unpack_from("<H", payload, 2)[0] if len(payload) == 40 else 0
-        with self.lock:
-            self.samples += 1
-            self.guard.observe_state(state, keys, time.monotonic_ns())
-            if hasattr(msg, "mode_machine") and msg.mode_machine != 5:
-                self.guard.latch("unexpected G1 mode_machine")
+        self.guard.observe_state(state, keys, received_ns)
+        if hasattr(msg, "mode_machine") and msg.mode_machine != 5:
+            self.guard.latch("unexpected G1 mode_machine")
 
     def _release_mode(self):
         # Only runs on an explicit, ready A -> init request, before motor writes.
@@ -148,6 +165,10 @@ class RealBridge:
 
     def _step(self):
         with self.lock:
+            self._observe_latest()
+            while self._reception_gaps:
+                gap_ns, ticks = self._reception_gaps.pop(0)
+                logger.warning("LowState reception gap {:.0f} ms ({} robot ticks)", gap_ns / 1e6, ticks)
             try:
                 data = self.low_cmd_zmq_sub.recv(flags=zmq.DONTWAIT)
             except zmq.Again:
@@ -228,6 +249,10 @@ class Args:
     interface: str = UNITREE_INTERFACE
     read_only: bool = False
     timeout_s: float = 0.1
+    target_margin_rad: float = PROTEUS_TARGET_MARGIN_RAD
+    """How far past the joint range a policy target may point; the policy YAML's soft limits must stay inside."""
+    hold_through_gaps: bool = False
+    """Keep the last PD targets through LowState / command gaps instead of latching damping."""
     max_runtime_s: float | None = None
     state_log: str | None = None
 
@@ -238,7 +263,8 @@ def main(args: Args):
 
     signal.signal(signal.SIGTERM, stop_on_signal)
     cfg = replace(get_robot_cfg(args.robot), low_state_bind_addr="127.0.0.1", low_cmd_host="127.0.0.1")
-    bridge = RealBridge(cfg, args.rate, args.interface, read_only=args.read_only, timeout_s=args.timeout_s)
+    bridge = RealBridge(cfg, args.rate, args.interface, read_only=args.read_only, timeout_s=args.timeout_s,
+                        target_margin_rad=args.target_margin_rad, hold_through_gaps=args.hold_through_gaps)
     bridge.run(args.max_runtime_s, args.state_log)
     exit_after_sdk_timeout(bridge._sdk_close_timed_out)
 
