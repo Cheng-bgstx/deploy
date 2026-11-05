@@ -119,6 +119,7 @@ MuJoCo / Real Robot
      - `soft_joint_pos_limits`（关节名 → `[lower, upper]`，须覆盖 `policy_joint_names` 中的每个关节）：先把 `q_target` 裁剪到 soft 限位
      - `max_target_velocity_rad_s`：再把每拍的目标变化限制在 `max_target_velocity_rad_s / rl_rate` 以内；进入 `policy` 模式（`reset()`）后的第一拍以实测关节角作为上一拍目标
      - 公式与 Scalecar 的 `PositionController` 相同，实现在 `sim2real/rl_policy/utils/joint_targets.py`，`integrated_sim2sim.py` 中也做同样的处理
+     - `shaping_joint_pos_limits`（格式同 `soft_joint_pos_limits`）不参与这一步，只裁剪进入策略前的姿态目标（见 3.3）。注意 robot IO 层可能还会再裁剪：Q1 等使用 `NamedJointCodec` 的机器人会把每条命令裁到模型关节范围内。此时只设这个键会让限速器的内部目标越过关节范围，而实际发出的命令仍停在限位上
 
 4. 规则式控制流收尾
    - 若处于 `get_ready_state`，则插值回默认站姿
@@ -143,7 +144,7 @@ self.command_sender.send_command(cmd_q, cmd_dq, cmd_tau)
 
 2. `get_ready_state = True`
    - 从当前姿态插值回 `default_joint_pos`
-   - 若策略 YAML 设置了 `shaping_target: motion_first_frame`，插值目标改为 Motion 第 0 帧的关节角，并按 `soft_joint_pos_limits` 裁剪；`npz` 以外的 backend 也要用 `--motion-path` 提供这个 Motion
+   - 若策略 YAML 设置了 `shaping_target: motion_first_frame`，插值目标改为 Motion 第 0 帧的关节角，并按 `shaping_joint_pos_limits` 裁剪（未设置时用 `soft_joint_pos_limits`，两者都没有则启动报错）；`reference_entry_s` 过渡的目标也按同样的规则裁剪；`npz` 以外的 backend 也要用 `--motion-path` 提供这个 Motion
 
 3. `use_policy_action = True`
    - 使用策略输出的 `q_target`

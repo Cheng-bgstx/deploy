@@ -138,6 +138,13 @@ class BasePolicy:
             policy_joint_names=self.policy_joint_names,
             control_dt=self.rl_dt,
         )
+        # Clip-only limits for pose targets before policy control (Shaping,
+        # reference entry): shaping_joint_pos_limits, else soft_joint_pos_limits.
+        self.pose_target_limits = JointTargetPostprocessor.pose_limits_from_policy_config(
+            policy_config,
+            joint_names=self.action_manager.joint_names,
+            policy_joint_names=self.policy_joint_names,
+        )
 
         self.init_count = 0
         self._init_start_pos = None
@@ -330,12 +337,12 @@ class BasePolicy:
                 "shaping_target must be 'default_joint_pos' or 'motion_first_frame', "
                 f"got {shaping_target!r}"
             )
-        if self.policy_config.get("soft_joint_pos_limits") is None:
+        if self.pose_target_limits is None:
             raise ValueError(
                 "shaping_target: motion_first_frame clips the Motion's first frame "
-                "to soft_joint_pos_limits; set them in the policy YAML"
+                "to shaping_joint_pos_limits (or soft_joint_pos_limits); set one in the policy YAML"
             )
-        return self.target_postprocessor.clip(self.motion_first_frame_joint_pos())
+        return self.pose_target_limits.clip(self.motion_first_frame_joint_pos())
 
     def motion_first_frame_joint_pos(self) -> np.ndarray:
         """Joint positions of the Motion's first frame, in robot joint order."""

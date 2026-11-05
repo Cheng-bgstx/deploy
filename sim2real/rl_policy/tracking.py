@@ -476,8 +476,8 @@ class Tracking(BasePolicy):
             logger.warning("Reference pose transition is still running; wait for Hold ready.")
             return
         target = self.motion_first_frame_joint_pos()
-        if self.target_postprocessor is not None:
-            target = self.target_postprocessor.clip(target)
+        if self.pose_target_limits is not None:
+            target = self.pose_target_limits.clip(target)
         self._reference_entry_target = target.copy()
         self._reference_entry_start = self.state_processor.joint_pos.copy()
         self._reference_entry_count = 0

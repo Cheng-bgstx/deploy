@@ -394,6 +394,58 @@ def test_manual_entry_enters_paused_hold_without_shaping_or_gravity(make_rig, mo
     assert rig.policy.state_dict['control_mode'] == 'zero'
 
 
+def test_shaping_limits_clip_the_shaping_target_but_not_policy_targets(make_rig, motion_files):
+    """Q1 overlay: the joint range bounds where Shaping goes, never what the policy commands."""
+    motion_files["take1512"] = motion_dataset(MOTION_FRAME0)
+    rig = make_rig(
+        tracking_config(
+            shaping_joint_pos_limits=SHAPING_SOFT_LIMITS,
+            max_target_velocity_rad_s=15.0,
+            shaping_target="motion_first_frame",
+        ),
+        policy_cls=Tracking,
+        args_cls=TrackingArgs,
+        motion_path="take1512",
+    )
+
+    shaping = run_shaping(rig, g1_vector(left_knee=1.0), ticks=501)
+    np.testing.assert_allclose(shaping[-1], SHAPING_TARGET, atol=1e-6)
+
+    # Raw knee target 0.5 * -0.2 = -0.1 lies below the -0.0131 shaping limit and is
+    # sent as is (0.087 rad from measured, within the 0.3 rad rate step).
+    command = rig.tick(mode="policy", measured=SHAPING_TARGET, action=tracker_action(left_knee=-0.2))
+    assert command[KNEE] == pytest.approx(-0.1, abs=1e-6)
+
+
+def test_shaping_limits_take_precedence_over_soft_limits_for_pose_targets(make_rig, motion_files):
+    motion_files["take1512"] = motion_dataset(MOTION_FRAME0)
+    rig = make_rig(
+        tracking_config(
+            soft_joint_pos_limits=soft_limits(),  # [-1, 1]: would clip wrist pitch 1.6 to 1.0
+            shaping_joint_pos_limits=SHAPING_SOFT_LIMITS,
+            shaping_target="motion_first_frame",
+            reference_entry_s=1.0,
+        ),
+        policy_cls=Tracking,
+        args_cls=TrackingArgs,
+        motion_path="take1512",
+    )
+
+    np.testing.assert_allclose(run_shaping(rig, MOTION_FRAME0, ticks=501)[-1], SHAPING_TARGET, atol=1e-6)
+    rig.tick(mode="zero")
+    rig.tick(mode="policy")
+    np.testing.assert_allclose(rig.policy._reference_entry_target, SHAPING_TARGET, atol=1e-6)
+
+    # soft_joint_pos_limits still clips policy targets: raw hip pitch 0.5 * 4 = 2 -> 1.
+    for _ in range(60):
+        if rig.policy._reference_entry_target is None:
+            break
+        rig.tick()
+    assert rig.policy.state_dict["control_mode"] == "policy"
+    command = rig.tick(action=tracker_action(left_hip_pitch=4.0))
+    assert command[HIP_PITCH] == pytest.approx(1.0)
+
+
 def test_shaping_feedforward_is_removed_on_policy_stop_and_restarts_from_zero(make_rig):
     rig = make_rig(policy_config())
     sent = []
@@ -491,6 +543,7 @@ def _without(limits: dict, joint: str) -> dict:
         ({"shaping_target": "frame0"}, "shaping_target"),
         ({"soft_joint_pos_limits": _without(soft_limits(), "left_knee_joint")}, "left_knee_joint"),
         ({"soft_joint_pos_limits": soft_limits(left_knee=(0.5, -0.5))}, "left_knee_joint"),
+        ({"shaping_joint_pos_limits": _without(soft_limits(), "left_knee_joint")}, "shaping_joint_pos_limits.*left_knee_joint"),
         ({"max_target_velocity_rad_s": 0.0}, "max_target_velocity_rad_s"),
     ],
 )
