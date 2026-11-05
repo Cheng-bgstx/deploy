@@ -7,13 +7,14 @@ proteus_python="${SIM2REAL_PYTHON:-$proteus_repo/.venv/bin/python}"
 proteus_interface="${G1_INTERFACE:-enp5s0}"
 # Stand -> straight forward walk -> stand clips at source speed (scripts/g1/prepare_proteus_motion.py), so Hold
 # freezes a stand: walk_straight_short (5.1 s, 2.2 m) or walk_forward_to_stand (8.6 s, 3.6 m); in-place dances
-# dance_in_place (6 s, feet down) or dance_steps (8 s, two steps).
+# dance_in_place (6 s, feet down) or dance_steps (8 s, two steps); jump_once (3.2 s, one jump in place).
 proteus_clip="${PROTEUS_CLIP:-walk_straight_short}"
 case "$proteus_clip" in
   walk_straight_short) proteus_clip_s=5.1 ;;
   walk_forward_to_stand) proteus_clip_s=8.63 ;;
   dance_steps) proteus_clip_s=8.0 ;;
   dance_in_place) proteus_clip_s=6.0 ;;
+  jump_once) proteus_clip_s=3.16 ;;
   *) echo "Unknown PROTEUS_CLIP: $proteus_clip" >&2; exit 1 ;;
 esac
 proteus_default_motion="$proteus_repo/checkpoints/proteus/proteus_60/unitree_g1/motions/$proteus_clip"

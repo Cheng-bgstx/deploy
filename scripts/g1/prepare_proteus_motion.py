@@ -31,12 +31,16 @@ CLIPS = {
     "dance_in_place": ("dance1_subject3", 345, 525),
     # dance_steps: 8 s with two steps (0.21 m range); Hold afterwards moved up to 0.55 m in simulation.
     "dance_steps": ("dance1_subject3", 165, 405),
+    # jump_once: 3.2 s, one vertical jump in place (0.23 s in the air, about 7 cm lift) from a stand to a stand, the
+    # first of five in jumps1_subject5. No fall in simulation with the measured friction and 0.15 m/s pushes up to
+    # 40 ms command delay (wsq62 and ht500); the next jump (0.33 s air) already fell at 30 ms, so it is left out.
+    "jump_once": ("jumps1_subject5", 6490, 6585),
 }
 
 
 @dataclass
 class Args:
-    clip: Literal["walk_straight_short", "walk_forward_to_stand", "dance_in_place", "dance_steps"] = \
+    clip: Literal["walk_straight_short", "walk_forward_to_stand", "dance_in_place", "dance_steps", "jump_once"] = \
         "walk_straight_short"
     output_dir: str | None = None
     """Defaults to MOTION_ROOT/<clip>."""
