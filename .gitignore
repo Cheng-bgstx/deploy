@@ -107,3 +107,6 @@ MANIFEST
 !/tests/test_pm01_launch.py
 !/tests/test_pm01_bench.py
 !/tests/test_pm01_policy_bridge.py
+
+# Local policy tracking recordings
+policy_tracking_record_*.npz
