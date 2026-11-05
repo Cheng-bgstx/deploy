@@ -29,12 +29,14 @@ export MKL_NUM_THREADS="${MKL_NUM_THREADS:-1}"
 export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-1}"
 # A bounded I/O jitter window; cached feedback and the latest command stay active.
 export SIM2REAL_IO_TIMEOUT_S="${PROTEUS_IO_TIMEOUT_S:-0.25}"
-export PYTHONPATH="$proteus_repo"
+# Prepended, so an onboard environment (scripts/g1/start_proteus_onboard.sh) keeps its offline packages.
+export PYTHONPATH="$proteus_repo${PYTHONPATH:+:$PYTHONPATH}"
 # Keep the 50 Hz loop on performance cores: on the i9-14900HX PC, efficiency cores (16-31) stretched the Proteus
 # observation to 10-35 ms, overrunning about 8% of steps; pinned to performance cores none overran. The Bridge
 # and the LowState gap monitor get the other performance cores, so DDS reception is not squeezed onto two.
 proteus_bridge_cpus="${PROTEUS_BRIDGE_CPUS:-0-3,6-15}"
 proteus_tracker_cpus="${PROTEUS_TRACKER_CPUS:-4,5}"
+proteus_monitor_cpus="${PROTEUS_MONITOR_CPUS:-$proteus_bridge_cpus}"
 # 1: a LowState or Tracker command gap keeps the last PD targets and control resumes with fresh data, instead of
 # latching kp=0 damping (which dropped the robot during a 343 ms reception gap). 0 restores the damping latch.
 proteus_hold_through_gaps="${PROTEUS_HOLD_THROUGH_GAPS:-1}"
@@ -69,7 +71,8 @@ mkdir -p "$proteus_run"
 printf 'Logs: %s\n' "$proteus_run"
 printf 'Policy: %s\n' "$proteus_policy"
 printf 'Motion: %s; reference playback limit: %s s\n' "$proteus_motion" "$proteus_playback_limit"
-printf 'ONNX CPU threads: %s; Bridge CPUs %s, Tracker CPUs %s\n' "$SIM2REAL_ORT_NUM_THREADS" "$proteus_bridge_cpus" "$proteus_tracker_cpus"
+printf 'ONNX CPU threads: %s; Bridge CPUs %s, Tracker CPUs %s, monitor CPUs %s\n' "$SIM2REAL_ORT_NUM_THREADS" \
+  "$proteus_bridge_cpus" "$proteus_tracker_cpus" "$proteus_monitor_cpus"
 if [[ "$proteus_hold_through_gaps" == 1 ]]; then
   printf 'I/O gaps over %s s: hold the last PD targets and resume with fresh data (no damping).\n' "$SIM2REAL_IO_TIMEOUT_S"
 else
@@ -79,7 +82,7 @@ printf 'Wait for Tracker and LowState ready. A arms-down stand -> A 2s reference
 bridge_args=()
 [[ "$proteus_hold_through_gaps" != 1 ]] || bridge_args+=(--hold-through-gaps)
 if [[ "${PROTEUS_READ_ONLY:-0}" == 1 ]]; then
-  bridge_args+=(--read-only --max-runtime-s 5)
+  bridge_args+=(--read-only --max-runtime-s "${PROTEUS_READ_ONLY_S:-5}")
 fi
 bridge_pid='' tracker_pid='' monitor_pid=''
 cleanup() {
@@ -97,11 +100,11 @@ taskset -c "$proteus_bridge_cpus" "$proteus_python" -u scripts/g1/real_bridge.py
   --timeout-s "$SIM2REAL_IO_TIMEOUT_S" --state-log "$proteus_run/bridge-state.json" "${bridge_args[@]}" > "$proteus_run/bridge.log" 2>&1 &
 bridge_pid=$!
 # Read-only: tells robot/network gaps (seen here too) from Bridge-process gaps (only in bridge.log).
-taskset -c "$proteus_bridge_cpus" "$proteus_python" -u scripts/g1/lowstate_gap_monitor.py --interface "$proteus_interface" \
+taskset -c "$proteus_monitor_cpus" nice -n "${PROTEUS_MONITOR_NICE:-0}" "$proteus_python" -u scripts/g1/lowstate_gap_monitor.py --interface "$proteus_interface" \
   > "$proteus_run/lowstate-monitor.log" 2>&1 &
 monitor_pid=$!
 taskset -c "$proteus_tracker_cpus" "$proteus_python" -u sim2real/rl_policy/tracking.py --robot g1 --robot-io zmq \
-  --inference-backend onnx-cpu --controller joystick --robot-interface "$proteus_interface" \
+  --inference-backend onnx-cpu --controller "${PROTEUS_CONTROLLER:-joystick}" --robot-interface "$proteus_interface" \
   --policy-config "$proteus_policy" \
   --npz-playback-limit-s "$proteus_playback_limit" \
   --motion-path "$proteus_motion" \

@@ -322,6 +322,7 @@ def test_actual_zmq_bridge_arms_on_a_and_detects_tracker_exit(monkeypatch):
     from dataclasses import replace
     from types import SimpleNamespace
     from scripts.g1.real_bridge import RealBridge
+    from sim2real.rl_policy.controllers.bridge_joystick import BridgeJoystickController
     from sim2real.rl_policy.robot_io.zmq import ZMQRobotIO
 
     def port():
@@ -345,8 +346,10 @@ def test_actual_zmq_bridge_arms_on_a_and_detects_tracker_exit(monkeypatch):
 
     monkeypatch.setattr(RealBridge, "_init_channels", init_channels)
     monkeypatch.setattr(RealBridge, "_release_mode", release)
-    bridge = RealBridge(cfg)
+    gamepad_port = port()
+    bridge = RealBridge(cfg, gamepad_port=gamepad_port)
     io = ZMQRobotIO(cfg)
+    handset = BridgeJoystickController({}, port=gamepad_port)
     tick = 0
 
     def pump(keys=0, send=True, mode="zero", generation=0, duration=.04):
@@ -373,6 +376,8 @@ def test_actual_zmq_bridge_arms_on_a_and_detects_tracker_exit(monkeypatch):
         assert not writes and not releases
         pump(1 << 8, mode="init", generation=1, duration=.08)
         assert releases == [True] and writes and bridge.guard.active
+        # The Bridge re-publishes the handset for a Tracker without its own DDS subscription.
+        assert handset.state is not None and handset.state.A
         pump(mode="policy", generation=2)
         pump(send=False, duration=.15)  # Inference process exits; DDS remains fresh.
         assert bridge.guard.latched and bridge.guard.fault
@@ -382,8 +387,10 @@ def test_actual_zmq_bridge_arms_on_a_and_detects_tracker_exit(monkeypatch):
         pump(mode="policy", generation=3)
         assert bridge.guard.latched
     finally:
+        handset.close()
         io.close()
         bridge.low_state_zmq_pub.close(linger=0)
+        bridge.gamepad_zmq_pub.close(linger=0)
         bridge.low_cmd_zmq_sub.close(linger=0)
 
 

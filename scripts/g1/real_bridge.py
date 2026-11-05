@@ -16,8 +16,9 @@ from loguru import logger
 
 from sim2real.config.robots import get_robot_cfg
 from sim2real.config.robots.base import RobotCfg, get_unitree_dds_family
+from sim2real.rl_policy.controllers.bridge_joystick import GAMEPAD_FORMAT
 from sim2real.rl_policy.robot_io.bridge_safety import PROTEUS_TARGET_MARGIN_RAD, BridgeSafety
-from sim2real.utils.common import LowCmdMessage, LowStateMessage, UNITREE_LEGGED_CONST
+from sim2real.utils.common import PORTS, LowCmdMessage, LowStateMessage, UNITREE_LEGGED_CONST
 from sim2real.utils.sdk_shutdown import close_sdk_channel, exit_after_sdk_timeout
 
 UNITREE_INTERFACE = "eth0"
@@ -28,10 +29,11 @@ RECEPTION_GAP_LOG_NS = 30_000_000  # LowState normally arrives every 1 ms
 class RealBridge:
     def __init__(self, robot_cfg: RobotCfg, rate_hz=200, interface=UNITREE_INTERFACE,
                  *, read_only=False, timeout_s=0.1, target_margin_rad=PROTEUS_TARGET_MARGIN_RAD,
-                 hold_through_gaps=False):
+                 hold_through_gaps=False, gamepad_port=PORTS["gamepad"]):
         if rate_hz <= 0:
             raise ValueError("rate_hz must be positive")
         self.robot_cfg, self.interface = robot_cfg, interface
+        self.gamepad_port = gamepad_port
         self.dt = 1.0 / rate_hz
         self.read_only = read_only
         self.guard = BridgeSafety(robot_cfg, timeout_s, target_margin_rad, hold_through_gaps)
@@ -83,6 +85,12 @@ class RealBridge:
         self.low_state_zmq_pub.setsockopt(zmq.SNDHWM, 1)
         self.low_state_zmq_pub.setsockopt(zmq.LINGER, 0)
         self.low_state_zmq_pub.bind(f"tcp://{self.robot_cfg.low_state_bind_addr}:{self.robot_cfg.low_state_port}")
+        # The handset for the Tracker's bridge_joystick controller, so the Tracker needs no DDS subscription of its
+        # own: decoding 1 kHz LowState in Python took most of a core on the G1's Orin.
+        self.gamepad_zmq_pub = context.socket(zmq.PUB)
+        self.gamepad_zmq_pub.setsockopt(zmq.SNDHWM, 1)
+        self.gamepad_zmq_pub.setsockopt(zmq.LINGER, 0)
+        self.gamepad_zmq_pub.bind(f"tcp://{self.robot_cfg.low_state_bind_addr}:{self.gamepad_port}")
         self.low_cmd_zmq_sub = context.socket(zmq.SUB)
         self.low_cmd_zmq_sub.setsockopt(zmq.SUBSCRIBE, b"")
         self.low_cmd_zmq_sub.setsockopt(zmq.CONFLATE, 1)
@@ -119,6 +127,11 @@ class RealBridge:
         payload = bytes(getattr(msg, "wireless_remote", b""))
         keys = struct.unpack_from("<H", payload, 2)[0] if len(payload) == 40 else 0
         self.guard.observe_state(state, keys, received_ns)
+        if len(payload) == 40:
+            # Unitree SDK layout: keys@2, lx@4, rx@8, ry@12, ly@20.
+            lx, rx, ry = struct.unpack_from("<3f", payload, 4)
+            ly = struct.unpack_from("<f", payload, 20)[0]
+            self.gamepad_zmq_pub.send(struct.pack(GAMEPAD_FORMAT, received_ns, keys, lx, ly, rx, ry), flags=zmq.DONTWAIT)
         if hasattr(msg, "mode_machine") and msg.mode_machine != 5:
             self.guard.latch("unexpected G1 mode_machine")
 
@@ -239,6 +252,7 @@ class RealBridge:
             writer_closed = close_sdk_channel(self.low_cmd_unitree_pub)
             self._sdk_close_timed_out = not (reader_closed and writer_closed)
             self.low_state_zmq_pub.close(linger=0)
+            self.gamepad_zmq_pub.close(linger=0)
             self.low_cmd_zmq_sub.close(linger=0)
 
 

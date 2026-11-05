@@ -1,5 +1,7 @@
 # Proteus G1 外接电脑部署
 
+如需在 G1 自带的 Orin 上运行同一套程序，见 [Proteus G1 在机器人 Orin 上运行](proteus-g1-onboard.md)。
+
 PC 上运行 50 Hz 的 CPU ONNX Tracking 和 200 Hz 的 Python SDK2 Bridge。Tracking 从本地缓存读取 NPZ 参考动作；G1 通过 DDS 接收关节位置、速度目标、前馈力矩和 PD 增益。沿用现有 Python 3.10、SDK2、CycloneDDS 和 ZMQ 环境，无需 aarch64 inline 路径的 `unitree_interface`。
 
 启动器默认将 ONNX、OpenMP 和 BLAS 限制为一个 CPU 线程。未限制的 ONNX 线程池可能在 50 Hz 推理间隔期间占用多个核心，与 DDS 回调竞争。之前的日志也记录过一次 174 ms 的指令发送延迟。启动器现将统一 I/O 超时窗口从 100 ms 改为 250 ms，短时间隔不会锁定停止。这两项设置在新进程启动时生效，现有进程不会读取启动脚本的修改。真机测试期间不要并行运行策略基准测试或仿真。

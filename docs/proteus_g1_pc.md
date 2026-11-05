@@ -1,5 +1,7 @@
 # Proteus G1 from an external PC
 
+To run the same stack on the G1's own Orin instead, see [Proteus G1 on the robot's Orin](proteus_g1_onboard.md).
+
 Run CPU ONNX Tracking at 50 Hz and the Python SDK2 Bridge at 200 Hz on the PC. Tracking reads the cached NPZ reference; the G1 receives joint position/velocity targets, feedforward torque and PD gains over DDS. This route uses the existing Python 3.10 environment, SDK2, CycloneDDS and ZMQ. It does not require the aarch64 inline `unitree_interface` module.
 
 The launcher defaults ONNX, OpenMP and BLAS to one CPU thread. Unbounded ONNX thread pools can consume many cores between 50 Hz inference calls and compete with DDS callbacks. A prior log also recorded a 174 ms command-send delay. The launcher now uses a shared 250 ms I/O timeout instead of the former 100 ms limit, so brief gaps do not latch a stop. Both settings apply when new processes start. Existing processes do not pick up launcher edits. Do not run policy benchmarks or simulation alongside a hardware test.
