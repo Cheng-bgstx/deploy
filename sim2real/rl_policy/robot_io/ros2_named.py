@@ -187,8 +187,8 @@ class NamedRosRobotIO(RobotIO):
     def read_state(self):
         return self.codec.read_state()
 
-    def write_command(self, *values):
-        self.codec.write_command(*values)
+    def write_command(self, q_target, dq_target, tau_ff, kp, kd):
+        self.codec.write_command(q_target, dq_target, tau_ff, kp, kd)
 
     def set_control_mode(self, mode, generation):
         if mode not in {'zero', 'init', 'policy'}:

@@ -208,12 +208,15 @@ def test_ros_serialization_and_mode_generation_invalidate_cached_command(name):
                       for g in codec.groups}
     io.set_control_mode('policy', 1)
     n = len(codec.cfg.joint_names)
-    codec.write_command(np.zeros(n), np.zeros(n), np.zeros(n), np.full(n, 12.), np.full(n, .5))
+    # ActionManager calls RobotIO using these public keyword names.
+    io.write_command(q_target=np.zeros(n), dq_target=np.zeros(n), tau_ff=np.zeros(n),
+                     kp=np.full(n, 12.), kd=np.full(n, .5))
     io._publish()
     assert codec.error is None
     if name in {'t800', 'pm01'}:
         msg = sent['body']
-        assert len(msg.position) == len(codec.cfg.joint_names) and msg.parallel_parser_type == 1
+        assert len(msg.position) == len(codec.cfg.joint_names)
+        assert msg.parallel_parser_type == {'t800': 1, 'pm01': 0}[name]
         assert msg.stiffness == [12.] * len(codec.cfg.joint_names) and msg.feed_forward_torque == [0.] * len(codec.cfg.joint_names)
     else:
         for group, names in codec.groups.items():

@@ -1,0 +1,2727 @@
+{
+  "date": "2026-11-05",
+  "status": "original_training_baseline_restored_offline_hardware_not_validated",
+  "robot": "pm01",
+  "vendor_release": "76445d09e967a16eb191d10aa05fe2ac5df6c19f",
+  "candidate_change": {
+    "ankle_joint_indices": [
+      4,
+      5,
+      10,
+      11
+    ],
+    "original_kd": 2.4916,
+    "candidate_kd": 0.3,
+    "morphology_update": "For each ankle slot, morph[slot*23+19] += log(0.3/2.4916), following source morphology.py. All other fields unchanged.",
+    "source": "Proteus-wamseq/ScaleTrack/source/scaletrack/scaletrack/tasks/tracking/supermimic/morphology.py",
+    "contract": ".scratch/pm01-recovery/contracts/engineai_pm01.json"
+  },
+  "commands": {
+    "export": "uv run --no-sync python -m scripts.export_proteus_onnx --contract engineai_pm01 --robot pm01 --release wsq61 --proteus-root ../Proteus-wamseq --contract-dir .scratch/pm01-recovery/contracts --output-root .scratch/pm01-recovery/kd03",
+    "evaluate": "HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --no-sync python -m scripts.proteus.evaluate --robot pm01 --policy-config .scratch/pm01-recovery/kd03/engineai_pm01/policy-sim.yaml --dataset checkpoints/engineai_pm01/motions --output outputs/pm01/recovery-kd03-2ms --sim-dt .002",
+    "bench_loopback": "source scripts/pm01/env.sh; PM01_RUN_BENCH_SMOKE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 uv run --no-sync python -m pytest tests/test_pm01_bench.py -q",
+    "static_rehearsal": "HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --no-sync python -m scripts.pm01.rehearse_trial --policy-config .scratch/pm01-recovery/kd03-slew005/engineai_pm01/policy.yaml --pose-record .scratch/pm01-recovery/static-seed-record.npz --bridge-config .scratch/pm01-recovery/bridge-config.json --motion .scratch/pm01-recovery/static-reference/motions/current.npz --output outputs/pm01/recovery-static-weld",
+    "hardware_client": "source scripts/pm01/env.sh\nuv run --no-sync python -m scripts.pm01.trial_policy --policy-config .scratch/pm01-recovery/kd03-slew005/engineai_pm01/policy.yaml --motion .scratch/pm01-recovery/static-reference/motions/current.npz --output <new-record.npz>",
+    "hardware_onboard": "With root access and installed ROS environment on the inspected motion computer: python3 /tmp/pm01-policy-recovery/policy_bridge.py --execute --config /tmp/pm01-policy-recovery/bridge-config.json --output <new-log.jsonl>",
+    "static_rehearsal_3s": "HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --no-sync python -m scripts.pm01.rehearse_trial --policy-config .scratch/pm01-recovery/kd03-slew005/engineai_pm01/policy.yaml --pose-record .scratch/pm01-recovery/static-seed-record.npz --bridge-config .scratch/pm01-recovery/bridge-config.json --motion .scratch/pm01-recovery/static-reference/motions/current.npz --hold-seconds 3 --output outputs/pm01/recovery-static-weld-3s",
+    "ground_static_20s": "HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --no-sync python -m scripts.proteus.evaluate --robot pm01 --policy-config .scratch/pm01-recovery/kd03/engineai_pm01/policy-sim.yaml --dataset .scratch/pm01-recovery/ground-static-20s --output outputs/pm01/recovery-ground-static-20s --sim-dt .002"
+  },
+  "onnx_comparison": {
+    "release": "wsq61",
+    "actor_kind": "wam_seq",
+    "contract": "engineai_pm01",
+    "robot": "pm01",
+    "far_offset": 16,
+    "passed": true,
+    "max_abs_error": 0.0,
+    "tolerance": 1e-06,
+    "num_samples": 64,
+    "seed": 0,
+    "method": "standard-normal inputs in sim2real layout; the released actor gets them with a batch axis and the contract's morph; action is compared with actions[driven slots], next_slot_action with actions",
+    "sources": {
+      "proteus_actor.onnx": "418908bde5a1909d78219bc1d53775d4f557c1e4d176136270926fdbf8884671",
+      "engineai_pm01.json": "ba72ec58682582f47734369b9d37b784a92d5eb642a305bd0d4fe251b304ed01"
+    },
+    "artifact": {
+      "policy.onnx": {
+        "sha256": "6c01c97ddac4859a8bec38f432b74ed6851c503e001d34c2d8577896a0c099e9",
+        "ir_version": 8,
+        "opset": {
+          "ai.onnx": 17
+        },
+        "inputs": {
+          "proprioception": [
+            10,
+            68
+          ],
+          "task": [
+            6,
+            253
+          ],
+          "action_history": [
+            10,
+            31
+          ],
+          "history_valid": [
+            10
+          ]
+        },
+        "outputs": {
+          "action": [
+            24
+          ],
+          "next_slot_action": [
+            31
+          ]
+        }
+      }
+    },
+    "versions": {
+      "onnx": "1.17.0",
+      "onnxruntime": "1.23.2"
+    }
+  },
+  "baseline_evaluation": {
+    "robot": "pm01",
+    "policy": "/home/galbot/projects/sim2real/checkpoints/proteus/wsq61/engineai_pm01/policy-sim.yaml",
+    "dataset": "/home/galbot/projects/sim2real/checkpoints/engineai_pm01/motions",
+    "passed": true,
+    "motions": [
+      {
+        "motion": "/home/galbot/projects/sim2real/checkpoints/engineai_pm01/motions/motions/aiming1_subject1.npz",
+        "policy": "/home/galbot/projects/sim2real/checkpoints/proteus/wsq61/engineai_pm01/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "8bf16547ce80f5d5b392c7a96c55708f4e150fb9250b30e29edbc896254347bc",
+        "policy_yaml_sha256": "c446f24ae4b384a5f163212007da39539742eaf695c6ad5d260f2e2f3742a1df",
+        "onnx_sha256": "a89fe6583736e20ed409de05303babdf19f36bffaebd835401c7294c28372838",
+        "manifest_sha256": "e650f550dea38b8ba4e1384d5f8bd5db05e94baa455d185f6edb2bbea05636a9",
+        "prepared_mjcf_sha256": "bcbaa5c24f83716b48a035aa98d38606623fde311adf1c0bff5868eae16a4d91",
+        "sim_dt_s": 0.002,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.02529033273458481,
+        "max_frame_world_body_error_m": 0.04428384453058243,
+        "mean_local_body_error_m": 0.0172716174274683,
+        "world_root_endpoint_error_m": 0.03922637924551964,
+        "separate_start_frame_root_error_m": 0.045192886143922806,
+        "min_playback_root_height_m": 0.7901400923728943,
+        "root_trajectory": "outputs/pm01/recovery-baseline-2ms/aiming1_subject1.root.npz",
+        "trajectory": "outputs/pm01/recovery-baseline-2ms/aiming1_subject1.trajectory.npz",
+        "passed": true
+      },
+      {
+        "motion": "/home/galbot/projects/sim2real/checkpoints/engineai_pm01/motions/motions/dance2_subject1.npz",
+        "policy": "/home/galbot/projects/sim2real/checkpoints/proteus/wsq61/engineai_pm01/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "4778c89938e5ac2e3643667885ea1a9ae587532aade0155ba93c5b17e3db37ed",
+        "policy_yaml_sha256": "c446f24ae4b384a5f163212007da39539742eaf695c6ad5d260f2e2f3742a1df",
+        "onnx_sha256": "a89fe6583736e20ed409de05303babdf19f36bffaebd835401c7294c28372838",
+        "manifest_sha256": "e650f550dea38b8ba4e1384d5f8bd5db05e94baa455d185f6edb2bbea05636a9",
+        "prepared_mjcf_sha256": "bcbaa5c24f83716b48a035aa98d38606623fde311adf1c0bff5868eae16a4d91",
+        "sim_dt_s": 0.002,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.03368029370903969,
+        "max_frame_world_body_error_m": 0.09310801327228546,
+        "mean_local_body_error_m": 0.02123686857521534,
+        "world_root_endpoint_error_m": 0.03506042808294296,
+        "separate_start_frame_root_error_m": 0.05051359906792641,
+        "min_playback_root_height_m": 0.7532570362091064,
+        "root_trajectory": "outputs/pm01/recovery-baseline-2ms/dance2_subject1.root.npz",
+        "trajectory": "outputs/pm01/recovery-baseline-2ms/dance2_subject1.trajectory.npz",
+        "passed": true
+      },
+      {
+        "motion": "/home/galbot/projects/sim2real/checkpoints/engineai_pm01/motions/motions/fightAndSports1_subject4.npz",
+        "policy": "/home/galbot/projects/sim2real/checkpoints/proteus/wsq61/engineai_pm01/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "39f53c445ce97112a2ea04c1e7ab6009a5f61933b051000a4774114b699ac910",
+        "policy_yaml_sha256": "c446f24ae4b384a5f163212007da39539742eaf695c6ad5d260f2e2f3742a1df",
+        "onnx_sha256": "a89fe6583736e20ed409de05303babdf19f36bffaebd835401c7294c28372838",
+        "manifest_sha256": "e650f550dea38b8ba4e1384d5f8bd5db05e94baa455d185f6edb2bbea05636a9",
+        "prepared_mjcf_sha256": "bcbaa5c24f83716b48a035aa98d38606623fde311adf1c0bff5868eae16a4d91",
+        "sim_dt_s": 0.002,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.05735158547759056,
+        "max_frame_world_body_error_m": 0.21916913986206055,
+        "mean_local_body_error_m": 0.021537411957979202,
+        "world_root_endpoint_error_m": 0.07462167739868164,
+        "separate_start_frame_root_error_m": 0.08034250140190125,
+        "min_playback_root_height_m": 0.6530608534812927,
+        "root_trajectory": "outputs/pm01/recovery-baseline-2ms/fightAndSports1_subject4.root.npz",
+        "trajectory": "outputs/pm01/recovery-baseline-2ms/fightAndSports1_subject4.trajectory.npz",
+        "passed": true
+      },
+      {
+        "motion": "/home/galbot/projects/sim2real/checkpoints/engineai_pm01/motions/motions/walk1_subject1.npz",
+        "policy": "/home/galbot/projects/sim2real/checkpoints/proteus/wsq61/engineai_pm01/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "d89d0677bfe4566f91b8739082f786ba2904f54e45c91f7a57a268077d50857f",
+        "policy_yaml_sha256": "c446f24ae4b384a5f163212007da39539742eaf695c6ad5d260f2e2f3742a1df",
+        "onnx_sha256": "a89fe6583736e20ed409de05303babdf19f36bffaebd835401c7294c28372838",
+        "manifest_sha256": "e650f550dea38b8ba4e1384d5f8bd5db05e94baa455d185f6edb2bbea05636a9",
+        "prepared_mjcf_sha256": "bcbaa5c24f83716b48a035aa98d38606623fde311adf1c0bff5868eae16a4d91",
+        "sim_dt_s": 0.002,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.02729633077979088,
+        "max_frame_world_body_error_m": 0.0899152010679245,
+        "mean_local_body_error_m": 0.01984567753970623,
+        "world_root_endpoint_error_m": 0.01677197590470314,
+        "separate_start_frame_root_error_m": 0.14623163640499115,
+        "min_playback_root_height_m": 0.7642626166343689,
+        "root_trajectory": "outputs/pm01/recovery-baseline-2ms/walk1_subject1.root.npz",
+        "trajectory": "outputs/pm01/recovery-baseline-2ms/walk1_subject1.trajectory.npz",
+        "passed": true
+      }
+    ]
+  },
+  "candidate_evaluation": {
+    "robot": "pm01",
+    "policy": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/kd03/engineai_pm01/policy-sim.yaml",
+    "dataset": "/home/galbot/projects/sim2real/checkpoints/engineai_pm01/motions",
+    "passed": true,
+    "motions": [
+      {
+        "motion": "/home/galbot/projects/sim2real/checkpoints/engineai_pm01/motions/motions/aiming1_subject1.npz",
+        "policy": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/kd03/engineai_pm01/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "8bf16547ce80f5d5b392c7a96c55708f4e150fb9250b30e29edbc896254347bc",
+        "policy_yaml_sha256": "72477373989f13f2383be3ea68677bfb3113ed4e609d92821475b0dc962c0fac",
+        "onnx_sha256": "6c01c97ddac4859a8bec38f432b74ed6851c503e001d34c2d8577896a0c099e9",
+        "manifest_sha256": "e650f550dea38b8ba4e1384d5f8bd5db05e94baa455d185f6edb2bbea05636a9",
+        "prepared_mjcf_sha256": "bcbaa5c24f83716b48a035aa98d38606623fde311adf1c0bff5868eae16a4d91",
+        "sim_dt_s": 0.002,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.02542290650308132,
+        "max_frame_world_body_error_m": 0.04802660271525383,
+        "mean_local_body_error_m": 0.0174802727997303,
+        "world_root_endpoint_error_m": 0.03972242772579193,
+        "separate_start_frame_root_error_m": 0.04339940845966339,
+        "min_playback_root_height_m": 0.7848480343818665,
+        "root_trajectory": "outputs/pm01/recovery-kd03-2ms/aiming1_subject1.root.npz",
+        "trajectory": "outputs/pm01/recovery-kd03-2ms/aiming1_subject1.trajectory.npz",
+        "passed": true
+      },
+      {
+        "motion": "/home/galbot/projects/sim2real/checkpoints/engineai_pm01/motions/motions/dance2_subject1.npz",
+        "policy": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/kd03/engineai_pm01/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "4778c89938e5ac2e3643667885ea1a9ae587532aade0155ba93c5b17e3db37ed",
+        "policy_yaml_sha256": "72477373989f13f2383be3ea68677bfb3113ed4e609d92821475b0dc962c0fac",
+        "onnx_sha256": "6c01c97ddac4859a8bec38f432b74ed6851c503e001d34c2d8577896a0c099e9",
+        "manifest_sha256": "e650f550dea38b8ba4e1384d5f8bd5db05e94baa455d185f6edb2bbea05636a9",
+        "prepared_mjcf_sha256": "bcbaa5c24f83716b48a035aa98d38606623fde311adf1c0bff5868eae16a4d91",
+        "sim_dt_s": 0.002,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.03765338286757469,
+        "max_frame_world_body_error_m": 0.09827806055545807,
+        "mean_local_body_error_m": 0.02119598351418972,
+        "world_root_endpoint_error_m": 0.0868222713470459,
+        "separate_start_frame_root_error_m": 0.0969872996211052,
+        "min_playback_root_height_m": 0.7543147802352905,
+        "root_trajectory": "outputs/pm01/recovery-kd03-2ms/dance2_subject1.root.npz",
+        "trajectory": "outputs/pm01/recovery-kd03-2ms/dance2_subject1.trajectory.npz",
+        "passed": true
+      },
+      {
+        "motion": "/home/galbot/projects/sim2real/checkpoints/engineai_pm01/motions/motions/fightAndSports1_subject4.npz",
+        "policy": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/kd03/engineai_pm01/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "39f53c445ce97112a2ea04c1e7ab6009a5f61933b051000a4774114b699ac910",
+        "policy_yaml_sha256": "72477373989f13f2383be3ea68677bfb3113ed4e609d92821475b0dc962c0fac",
+        "onnx_sha256": "6c01c97ddac4859a8bec38f432b74ed6851c503e001d34c2d8577896a0c099e9",
+        "manifest_sha256": "e650f550dea38b8ba4e1384d5f8bd5db05e94baa455d185f6edb2bbea05636a9",
+        "prepared_mjcf_sha256": "bcbaa5c24f83716b48a035aa98d38606623fde311adf1c0bff5868eae16a4d91",
+        "sim_dt_s": 0.002,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.0799967423081398,
+        "max_frame_world_body_error_m": 0.30728310346603394,
+        "mean_local_body_error_m": 0.027105281129479408,
+        "world_root_endpoint_error_m": 0.07596995681524277,
+        "separate_start_frame_root_error_m": 0.08182066679000854,
+        "min_playback_root_height_m": 0.6535419821739197,
+        "root_trajectory": "outputs/pm01/recovery-kd03-2ms/fightAndSports1_subject4.root.npz",
+        "trajectory": "outputs/pm01/recovery-kd03-2ms/fightAndSports1_subject4.trajectory.npz",
+        "passed": true
+      },
+      {
+        "motion": "/home/galbot/projects/sim2real/checkpoints/engineai_pm01/motions/motions/walk1_subject1.npz",
+        "policy": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/kd03/engineai_pm01/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "d89d0677bfe4566f91b8739082f786ba2904f54e45c91f7a57a268077d50857f",
+        "policy_yaml_sha256": "72477373989f13f2383be3ea68677bfb3113ed4e609d92821475b0dc962c0fac",
+        "onnx_sha256": "6c01c97ddac4859a8bec38f432b74ed6851c503e001d34c2d8577896a0c099e9",
+        "manifest_sha256": "e650f550dea38b8ba4e1384d5f8bd5db05e94baa455d185f6edb2bbea05636a9",
+        "prepared_mjcf_sha256": "bcbaa5c24f83716b48a035aa98d38606623fde311adf1c0bff5868eae16a4d91",
+        "sim_dt_s": 0.002,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.025759713724255562,
+        "max_frame_world_body_error_m": 0.04644905403256416,
+        "mean_local_body_error_m": 0.018258513882756233,
+        "world_root_endpoint_error_m": 0.04184722155332565,
+        "separate_start_frame_root_error_m": 0.11813054233789444,
+        "min_playback_root_height_m": 0.7516986131668091,
+        "root_trajectory": "outputs/pm01/recovery-kd03-2ms/walk1_subject1.root.npz",
+        "trajectory": "outputs/pm01/recovery-kd03-2ms/walk1_subject1.trajectory.npz",
+        "passed": true
+      }
+    ]
+  },
+  "limitations": [
+    "Simulation includes serial-joint armature and total-torque clipping, not a validated model of the real parallel motor loop.",
+    "Real rotor inertia, sampled feedback delay, saturation and reset trigger remain unverified.",
+    "Installed JointCommand feedback does not fill the parser type byte; it cannot acknowledge parser selection.",
+    "MotorDebug has 24 motor values plus a DataMonitor timestamp, verified against installed binary.",
+    "The bench supervisor can handle a worker hang on the onboard host; it cannot guarantee recovery from OS, DDS or motor-bus failure."
+  ],
+  "hardware_trials": [
+    {
+      "ankle_kd": 0.1,
+      "duration_requested_s": 0.2,
+      "worker_console": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/pm01-bench-kd01-001.console.txt",
+      "rl_command_duration_s": 0.19933627099999285,
+      "peak_ankle_speed_rad_s": 0.014672662230739032,
+      "peak_ankle_feedback_torque_Nm": 0.02647715852606663,
+      "peak_motor_feed_forward_Nm": 0.0010157079668715596,
+      "motor_ankle_kd_states": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          3.0,
+          3.0,
+          3.0,
+          3.0
+        ]
+      ],
+      "supervisor": {
+        "supervisor": true,
+        "watchdog_triggered": false,
+        "output_started": true,
+        "classic_fallback_confirmed": true,
+        "worker_exit": 0
+      },
+      "exit": 0
+    },
+    {
+      "ankle_kd": 0.2,
+      "duration_requested_s": 0.2,
+      "worker_console": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/pm01-bench-kd02-001.console.txt",
+      "rl_command_duration_s": 0.19916161299988744,
+      "peak_ankle_speed_rad_s": 0.014738153091956488,
+      "peak_ankle_feedback_torque_Nm": 0.01380113567759997,
+      "peak_motor_feed_forward_Nm": 0.0019909534603357315,
+      "motor_ankle_kd_states": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          3.0,
+          3.0,
+          3.0,
+          3.0
+        ]
+      ],
+      "supervisor": {
+        "supervisor": true,
+        "watchdog_triggered": false,
+        "output_started": true,
+        "classic_fallback_confirmed": true,
+        "worker_exit": 0
+      },
+      "exit": 0
+    },
+    {
+      "ankle_kd": 0.3,
+      "duration_requested_s": 0.2,
+      "worker_console": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/pm01-bench-kd03-001.console.txt",
+      "rl_command_duration_s": 0.19797904400002153,
+      "peak_ankle_speed_rad_s": 0.012922213115781709,
+      "peak_ankle_feedback_torque_Nm": 0.02647858929613372,
+      "peak_motor_feed_forward_Nm": 0.002434243680909276,
+      "motor_ankle_kd_states": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          3.0,
+          3.0,
+          3.0,
+          3.0
+        ]
+      ],
+      "supervisor": {
+        "supervisor": true,
+        "watchdog_triggered": false,
+        "output_started": true,
+        "classic_fallback_confirmed": true,
+        "worker_exit": 0
+      },
+      "exit": 0
+    },
+    {
+      "ankle_kd": 0.3,
+      "duration_requested_s": 1.0,
+      "worker_console": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/pm01-bench-kd03-1s-001.console.txt",
+      "rl_command_duration_s": 0.998240936000002,
+      "peak_ankle_speed_rad_s": 0.013826839718431665,
+      "peak_ankle_feedback_torque_Nm": 0.02647858929613372,
+      "peak_motor_feed_forward_Nm": 0.003047123784199357,
+      "motor_ankle_kd_states": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          3.0,
+          3.0,
+          3.0,
+          3.0
+        ]
+      ],
+      "supervisor": {
+        "supervisor": true,
+        "watchdog_triggered": false,
+        "output_started": true,
+        "classic_fallback_confirmed": true,
+        "worker_exit": 0
+      },
+      "exit": 0
+    },
+    {
+      "ankle_kp": 10.0,
+      "ankle_kd": 0.3,
+      "duration_requested_s": 0.2,
+      "worker_console": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/pm01-bench-kp10-001.console.txt",
+      "rl_command_duration_s": 0.19936505399982707,
+      "peak_ankle_speed_rad_s": 0.04289789964423159,
+      "peak_ankle_feedback_torque_Nm": 0.03984543387282097,
+      "peak_motor_feed_forward_Nm": 0.012191747315227985,
+      "motor_ankle_kd_states": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          3.0,
+          3.0,
+          3.0,
+          3.0
+        ]
+      ],
+      "supervisor": {
+        "supervisor": true,
+        "watchdog_triggered": false,
+        "output_started": true,
+        "classic_fallback_confirmed": true,
+        "worker_exit": 0
+      },
+      "exit": 0
+    },
+    {
+      "ankle_kp": 2.0,
+      "ankle_kd": 0.3,
+      "duration_requested_s": 0.2,
+      "worker_console": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/pm01-bench-kp2-001.console.txt",
+      "rl_command_duration_s": 0.19920147299944801,
+      "peak_ankle_speed_rad_s": 0.01658084015163073,
+      "peak_ankle_feedback_torque_Nm": 0.03967536730132712,
+      "peak_motor_feed_forward_Nm": 0.002389034489169717,
+      "motor_ankle_kd_states": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          3.0,
+          3.0,
+          3.0,
+          3.0
+        ]
+      ],
+      "supervisor": {
+        "supervisor": true,
+        "watchdog_triggered": false,
+        "output_started": true,
+        "classic_fallback_confirmed": true,
+        "worker_exit": 0
+      },
+      "exit": 0
+    },
+    {
+      "ankle_kp": 20.0,
+      "ankle_kd": 0.3,
+      "duration_requested_s": 0.2,
+      "worker_console": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/pm01-bench-kp20-001.console.txt",
+      "rl_command_duration_s": 0.1978406250000262,
+      "peak_ankle_speed_rad_s": 0.04657045617755807,
+      "peak_ankle_feedback_torque_Nm": 0.03950742701430874,
+      "peak_motor_feed_forward_Nm": 0.012763937003910542,
+      "motor_ankle_kd_states": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          3.0,
+          3.0,
+          3.0,
+          3.0
+        ]
+      ],
+      "supervisor": {
+        "supervisor": true,
+        "watchdog_triggered": false,
+        "output_started": true,
+        "classic_fallback_confirmed": true,
+        "worker_exit": 0
+      },
+      "exit": 0
+    },
+    {
+      "ankle_kp": 30.0,
+      "ankle_kd": 0.3,
+      "duration_requested_s": 0.2,
+      "worker_console": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/pm01-bench-kp30-001.console.txt",
+      "rl_command_duration_s": 0.19927505600026052,
+      "peak_ankle_speed_rad_s": 0.05115237116758325,
+      "peak_ankle_feedback_torque_Nm": 0.03950742701430874,
+      "peak_motor_feed_forward_Nm": 0.014526753686368465,
+      "motor_ankle_kd_states": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          3.0,
+          3.0,
+          3.0,
+          3.0
+        ]
+      ],
+      "supervisor": {
+        "supervisor": true,
+        "watchdog_triggered": false,
+        "output_started": true,
+        "classic_fallback_confirmed": true,
+        "worker_exit": 0
+      },
+      "exit": 0
+    },
+    {
+      "ankle_kp": 37.701,
+      "ankle_kd": 0.3,
+      "duration_requested_s": 0.2,
+      "worker_console": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/pm01-bench-kp37701-001.console.txt",
+      "rl_command_duration_s": 0.1980318249998163,
+      "peak_ankle_speed_rad_s": 0.05476638985669029,
+      "peak_ankle_feedback_torque_Nm": 0.12038663447593222,
+      "peak_motor_feed_forward_Nm": 0.02105710469186306,
+      "motor_ankle_kd_states": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          3.0,
+          3.0,
+          3.0,
+          3.0
+        ]
+      ],
+      "supervisor": {
+        "supervisor": true,
+        "watchdog_triggered": false,
+        "output_started": true,
+        "classic_fallback_confirmed": true,
+        "worker_exit": 0
+      },
+      "exit": 0
+    },
+    {
+      "ankle_kp": 37.701,
+      "ankle_kd": 0.3,
+      "duration_requested_s": 1.0,
+      "worker_console": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/pm01-bench-kp37701-1s-001.console.txt",
+      "rl_command_duration_s": 0.9982858200000919,
+      "peak_ankle_speed_rad_s": 0.06395363497442844,
+      "peak_ankle_feedback_torque_Nm": 0.05500201251669433,
+      "peak_motor_feed_forward_Nm": 0.02186141535639763,
+      "motor_ankle_kd_states": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          3.0,
+          3.0,
+          3.0,
+          3.0
+        ]
+      ],
+      "supervisor": {
+        "supervisor": true,
+        "watchdog_triggered": false,
+        "output_started": true,
+        "classic_fallback_confirmed": true,
+        "worker_exit": 0
+      },
+      "exit": 0
+    },
+    {
+      "ankle_kp": 5.0,
+      "ankle_kd": 0.3,
+      "duration_requested_s": 0.2,
+      "worker_console": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/pm01-bench-kp5-001.console.txt",
+      "rl_command_duration_s": 0.19903321400033747,
+      "peak_ankle_speed_rad_s": 0.013739912861583058,
+      "peak_ankle_feedback_torque_Nm": 0.02647858929613372,
+      "peak_motor_feed_forward_Nm": 0.0032855274621397257,
+      "motor_ankle_kd_states": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          3.0,
+          3.0,
+          3.0,
+          3.0
+        ]
+      ],
+      "supervisor": {
+        "supervisor": true,
+        "watchdog_triggered": false,
+        "output_started": true,
+        "classic_fallback_confirmed": true,
+        "worker_exit": 0
+      },
+      "exit": 0
+    }
+  ],
+  "hardware_trial_scope": "Gantry-supported ankle tests, whole-body shaping, one- and three-second static policy holds; no ground hardware standing or walking.",
+  "live_shadow": {
+    "read_only": true,
+    "motor_commands_sent": 0,
+    "frames": 775,
+    "motion_mode": "passive",
+    "command_publishers": [],
+    "recording_sha256": "e11dc1a12e105834704591c52b70ebf7820f78bdf6b7e3107235fa8f331984d7"
+  },
+  "whole_body_trials": {
+    "shaping-probe-001": {
+      "reason": "completed shaping probe",
+      "active_duration_s": 0.9956565390002652,
+      "peak_joint_speed_rad_s": 0.19569778442382812,
+      "peak_ankle_speed_rad_s": 0.0730492834265502,
+      "peak_joint_torque_Nm": 1.762420654296875,
+      "peak_ankle_torque_Nm": 0.5255771920926496,
+      "joint_excursion_rad": [
+        0.0034332275390625,
+        0.0011444091796875,
+        0.0,
+        0.020981788635253906,
+        0.005145871161398072,
+        0.005045492085210657,
+        0.000762939453125,
+        0.0057220458984375,
+        0.0118255615234375,
+        0.020981788635253906,
+        0.004325545466497667,
+        0.008723432942273318,
+        0.0019073486328125,
+        0.0118255615234375,
+        0.08888435363769531,
+        0.0,
+        0.0011444091796875,
+        0.0164031982421875,
+        0.0087738037109375,
+        0.06828498840332031,
+        0.000762939453125,
+        0.0026702880859375,
+        0.00457763671875,
+        0.0
+      ]
+    },
+    "shaping-probe-003": {
+      "requested": "3",
+      "exit": 0,
+      "client_exit": 0,
+      "active_duration_s": 2.993563529000312,
+      "peak_joint_speed_rad_s": 0.5953292846679688,
+      "peak_ankle_speed_rad_s": 0.16561903402135483,
+      "peak_joint_torque_Nm": 3.1998291015625,
+      "peak_ankle_torque_Nm": 0.7940558610642017,
+      "joint_excursion_rad": [
+        0.030900001525878906,
+        0.0095367431640625,
+        0.0,
+        0.0690469741821289,
+        0.030123264263054124,
+        0.018764698036856715,
+        0.0263214111328125,
+        0.017547607421875,
+        0.048066139221191406,
+        0.0705728530883789,
+        0.03335312102522635,
+        0.04222579432945761,
+        0.008392333984375,
+        0.041581153869628906,
+        0.33875083923339844,
+        0.0003814697265625,
+        0.009919166564941406,
+        0.0747690200805664,
+        0.049210548400878906,
+        0.33493518829345703,
+        0.0091552734375,
+        0.01068115234375,
+        0.050354957580566406,
+        0.0
+      ],
+      "supervisor": {
+        "supervisor": true,
+        "watchdog_triggered": false,
+        "output_started": true,
+        "classic_fallback_confirmed": true,
+        "worker_exit": 0
+      }
+    },
+    "static-policy-hold-001": {
+      "requested": "hold",
+      "exit": 0,
+      "client_exit": 0,
+      "active_duration_s": 11.237998274000347,
+      "peak_joint_speed_rad_s": 0.18620810889527434,
+      "peak_ankle_speed_rad_s": 0.18620810889527434,
+      "peak_joint_torque_Nm": 2.183563232421875,
+      "peak_ankle_torque_Nm": 0.7288723481379447,
+      "joint_excursion_rad": [
+        0.010300636291503906,
+        0.0362396240234375,
+        0.039673805236816406,
+        0.035859107971191406,
+        0.033280334171196135,
+        0.05204404939919478,
+        0.028229713439941406,
+        0.032425880432128906,
+        0.0263214111328125,
+        0.038147926330566406,
+        0.009293868558478347,
+        0.01772522084490509,
+        0.023652076721191406,
+        0.0019073486328125,
+        0.0110626220703125,
+        0.0030517578125,
+        0.015259742736816406,
+        0.0339508056640625,
+        0.0057220458984375,
+        0.011826515197753906,
+        0.020599365234375,
+        0.0217437744140625,
+        0.023651123046875,
+        0.020599365234375
+      ],
+      "supervisor": {
+        "supervisor": true,
+        "watchdog_triggered": false,
+        "output_started": true,
+        "classic_fallback_confirmed": true,
+        "worker_exit": 0
+      }
+    },
+    "static-policy-hold-003": {
+      "requested": "hold3",
+      "exit": 0,
+      "client_exit": 0,
+      "active_duration_s": 13.235891484999229,
+      "peak_joint_speed_rad_s": 0.2712287902832031,
+      "peak_ankle_speed_rad_s": 0.1999502544282102,
+      "peak_joint_torque_Nm": 4.252685546875,
+      "peak_ankle_torque_Nm": 1.149486820483708,
+      "joint_excursion_rad": [
+        0.018311500549316406,
+        0.0656137466430664,
+        0.10185432434082031,
+        0.0679025650024414,
+        0.12068451919043346,
+        0.14283179107773425,
+        0.0644693374633789,
+        0.11482429504394531,
+        0.039292335510253906,
+        0.1312274932861328,
+        0.06324430241523939,
+        0.07809423292611391,
+        0.026703834533691406,
+        0.0171661376953125,
+        0.032425880432128906,
+        0.037766456604003906,
+        0.031281471252441406,
+        0.0698099136352539,
+        0.0156402587890625,
+        0.044251441955566406,
+        0.0324249267578125,
+        0.030517578125,
+        0.0717172622680664,
+        0.10833930969238281
+      ],
+      "supervisor": {
+        "supervisor": true,
+        "watchdog_triggered": false,
+        "output_started": true,
+        "classic_fallback_confirmed": true,
+        "worker_exit": 0
+      }
+    }
+  },
+  "gantry_rehearsal": {
+    "static_reference": {
+      "reason": "completed first-frame hold",
+      "passed": true,
+      "max_joint_speed_rad_s": 0.2305354821059549,
+      "max_ankle_speed_rad_s": 0.16450310306118499,
+      "max_joint_torque_Nm": 1.4429320096969604,
+      "max_ankle_torque_Nm": 0.2359437793493271,
+      "max_root_position_error_m": 2.8895355369927063e-06,
+      "policy_config": ".scratch/pm01-recovery/kd03-slew005/engineai_pm01/policy.yaml",
+      "pose_record": ".scratch/pm01-recovery/static-seed-record.npz",
+      "hardware_tested": false,
+      "limitation": "Mocap weld supplies gantry reaction; serial-joint dynamics, no physical cable or measured motor inertia",
+      "motion": ".scratch/pm01-recovery/static-reference/motions/current.npz"
+    },
+    "original_reference_guard_stop": {
+      "reason": "requested joint PD torque limit",
+      "passed": false,
+      "max_joint_speed_rad_s": 0.25535502236113733,
+      "max_ankle_speed_rad_s": 0.07709236966714904,
+      "max_joint_torque_Nm": 4.989553928375244,
+      "max_ankle_torque_Nm": 0.19188356399536133,
+      "max_root_position_error_m": 2.889801518326769e-06,
+      "policy_config": ".scratch/pm01-recovery/kd03-slew005/engineai_pm01/policy.yaml",
+      "pose_record": ".scratch/pm01-recovery/live-shadow-002.npz",
+      "hardware_tested": false,
+      "limitation": "Mocap weld supplies gantry reaction; serial-joint dynamics, no physical cable or measured motor inertia"
+    },
+    "superseded": "Earlier per-step free-root qpos/qvel reset does not remove free-fall acceleration during dynamics solve and underestimates gravity load; those results are not gantry validation.",
+    "static_reference_3s": {
+      "reason": "completed first-frame hold",
+      "passed": true,
+      "max_joint_speed_rad_s": 0.2305354821059549,
+      "max_ankle_speed_rad_s": 0.16450310306118499,
+      "max_joint_torque_Nm": 3.72819185256958,
+      "max_ankle_torque_Nm": 0.2359437793493271,
+      "max_root_position_error_m": 2.8895355369927063e-06,
+      "policy_config": ".scratch/pm01-recovery/kd03-slew005/engineai_pm01/policy.yaml",
+      "pose_record": ".scratch/pm01-recovery/static-seed-record.npz",
+      "motion": ".scratch/pm01-recovery/static-reference/motions/current.npz",
+      "hold_seconds": 3.0,
+      "hardware_tested": false,
+      "limitation": "Mocap weld supplies gantry reaction; serial-joint dynamics, no physical cable or measured motor inertia"
+    }
+  },
+  "commissioning_profile": {
+    "policy_yaml": ".scratch/pm01-recovery/kd03-slew005/engineai_pm01/policy.yaml",
+    "target_slew_rad_s": 0.05,
+    "motion": ".scratch/pm01-recovery/static-reference/motions/current.npz",
+    "reference_provenance": {
+      "purpose": "Gantry-supported static policy commissioning only; not walking",
+      "root_height": "configured nominal reference height; not measured",
+      "joint_names": [
+        "J00_HIP_PITCH_L",
+        "J01_HIP_ROLL_L",
+        "J02_HIP_YAW_L",
+        "J03_KNEE_PITCH_L",
+        "J04_ANKLE_PITCH_L",
+        "J05_ANKLE_ROLL_L",
+        "J06_HIP_PITCH_R",
+        "J07_HIP_ROLL_R",
+        "J08_HIP_YAW_R",
+        "J09_KNEE_PITCH_R",
+        "J10_ANKLE_PITCH_R",
+        "J11_ANKLE_ROLL_R",
+        "J12_WAIST_YAW",
+        "J13_SHOULDER_PITCH_L",
+        "J14_SHOULDER_ROLL_L",
+        "J15_SHOULDER_YAW_L",
+        "J16_ELBOW_PITCH_L",
+        "J17_ELBOW_YAW_L",
+        "J18_SHOULDER_PITCH_R",
+        "J19_SHOULDER_ROLL_R",
+        "J20_SHOULDER_YAW_R",
+        "J21_ELBOW_PITCH_R",
+        "J22_ELBOW_YAW_R",
+        "J23_HEAD_YAW"
+      ],
+      "qpos": [
+        0.0,
+        0.0,
+        0.8030999898910522,
+        0.9919571876525879,
+        -0.03227001428604126,
+        0.032231032848358154,
+        0.118071049451828,
+        -0.10204505920410156,
+        0.045968055725097656,
+        -0.00133514404296875,
+        0.02803802490234375,
+        0.061569660902023315,
+        -0.04105804115533829,
+        -0.09021854400634766,
+        0.042916297912597656,
+        -0.07534122467041016,
+        0.01735687255859375,
+        0.026414426043629646,
+        -0.10424716770648956,
+        -0.01621246337890625,
+        -0.06313419342041016,
+        0.00362396240234375,
+        0.00667572021484375,
+        -0.09174442291259766,
+        -0.08564090728759766,
+        -0.06427860260009766,
+        0.034142494201660156,
+        -0.01773834228515625,
+        -0.10280799865722656,
+        0.056267738342285156,
+        -0.00209808349609375
+      ],
+      "mode": "joint_bridge"
+    },
+    "scope": "Static suspended commissioning only. Restrictive slew profiles fell in grounded simulation; not suitable for walking."
+  },
+  "static_policy_evidence": {
+    "policy_requests": 51,
+    "init_requests": 510,
+    "policy_request_interval_s": 1.002304281000761,
+    "hardware_command_messages_including_fallback": 1989,
+    "recorded_frames_including_standby": 729,
+    "motion_computer_boot_id_unchanged": true,
+    "post_test_motor_kp": "all zero",
+    "post_test_motor_kd": [
+      4,
+      4,
+      4,
+      4,
+      3,
+      3,
+      4,
+      4,
+      4,
+      4,
+      3,
+      3,
+      2,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3,
+      1
+    ],
+    "post_test_motor_tau_ff": "all zero",
+    "original_incident_reboot_cause": "unresolved"
+  },
+  "commissioning_sha256": {
+    ".scratch/pm01-recovery/static-policy-hold-001.npz": "7b70f33006a865e9a6d165e37bb2276cc0010730b684b051c269aa599fa23db9",
+    ".scratch/pm01-recovery/static-policy-hold-001.jsonl": "c3324b4eeeaa8863c8859635fb1ca51003d7e77444770e2e3ebe083f78dafa68",
+    ".scratch/pm01-recovery/kd03-slew005/engineai_pm01/policy.yaml": "dcf4b20bd5b5b901cb4daaa6975a117cdf6ad581b0ab479d5b146c0cc112cf3a",
+    ".scratch/pm01-recovery/kd03-slew005/engineai_pm01/policy.onnx": "6c01c97ddac4859a8bec38f432b74ed6851c503e001d34c2d8577896a0c099e9",
+    ".scratch/pm01-recovery/static-reference/manifest.json": "6dfd142b87f76bb115d6599cedff2b7a63e3c90fdf0deedd524d5526412c433f",
+    ".scratch/pm01-recovery/static-reference/motions/current.npz": "d269e019c2d52263accecb97c1b7a095812a256f4eaeb43a422ac135b0da9088",
+    "scripts/pm01/bench_damping.py": "40118b8653ad5428c0ef1334f87f7f6e8bc017fb421ab9cc1df041cc5d742924",
+    "scripts/pm01/policy_bridge.py": "4696e30d90d18adcffd9501603dd0253731c83c9999c6d1886fec4c97b30852d",
+    "scripts/pm01/trial_policy.py": "f6b5e7f6d7d3df18aa32337265da69e5df16fa4fb4a6e358b80f04938f555c5a",
+    "scripts/pm01/rehearse_trial.py": "88e42a30005cdea1fe091864dabde9b6284bed7226399cc94409613997e9892a"
+  },
+  "validation": {
+    "command": "source scripts/pm01/env.sh\nPYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PM01_RUN_BENCH_SMOKE=1 uv run --no-sync python -m pytest -q tests/test_pm01.py tests/test_proteus_transport.py tests/test_pm01_bench.py tests/test_pm01_policy_bridge.py",
+    "passed": 79,
+    "skipped": 3,
+    "note": "ROS test fixtures use loopback interface and domain 171. Hardware uses eno1 and domain 69."
+  },
+  "post_test_read_only_check": {
+    "ready": true,
+    "read_only": true,
+    "expected_joints": 24,
+    "motion_state_fields": {
+      "current_motion_task_name": "string"
+    },
+    "motion_mode": "joint_bridge",
+    "received": {
+      "joint_state": 517,
+      "imu_info": 517,
+      "motion_state": 5
+    },
+    "command_subscribers": 1,
+    "compatible_command_subscribers": 1,
+    "other_command_publishers": [],
+    "feedback_error": null,
+    "fresh_joint_imu_and_joint_bridge": true,
+    "feedback_header_stamps_ns": {
+      "imu": 0,
+      "body": 0
+    },
+    "feedback_age_s": {
+      "body": 0.00014307800302049145,
+      "imu": 0.00026122800045413896,
+      "motion_mode": 0.17238155400264077
+    },
+    "pelvis_quaternion_wxyz": [
+      0.9891383647918701,
+      -0.03379696607589722,
+      0.032903969287872314,
+      0.13921304047107697
+    ],
+    "pelvis_gyro_rad_s": [
+      -0.001191832940094173,
+      -0.0013023647479712963,
+      -0.0010977248894050717
+    ]
+  },
+  "operator_observation_after_1s": "No abnormal vibration reported; subsequent read-only telemetry confirmed passive and no command publishers.",
+  "next_stage": {
+    "hold_seconds": 3,
+    "hardware_tested": true,
+    "software_changes": "Only 1 or 3 seconds supported; default 1. Same speed, torque, target-step, feedback-age and command-loss guards. Total active deadline extended by selected hold duration; independent onboard 30-second supervisor unchanged.",
+    "validation": {
+      "initial_run": "26 passed, 1 failed: three-second loopback hit joint feedback timeout and confirmed classic fallback. No hardware commands were sent by these loopback tests.",
+      "isolated_retry": "Three-second loopback passed in 18.09 seconds; no safety threshold changed.",
+      "command": "source scripts/pm01/env.sh\nPM01_RUN_BENCH_SMOKE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 uv run --no-sync python -m pytest -q tests/test_pm01_policy_bridge.py -k three_second_hold",
+      "syntax": "py_compile passed"
+    },
+    "script_sha256": {
+      "scripts/pm01/policy_bridge.py": "995a21d3e982e415a5fbd44231e552024d585c20aa9481a6a9d86bbc4ea94cff",
+      "scripts/pm01/trial_policy.py": "fa61327c8bd3d8835b07fe54b7cfe020ac0eeb1f84f543b21e3f1bdf1ca3da8d",
+      "scripts/pm01/rehearse_trial.py": "699c95c0b6b20520134c18ebc3741c62842716f2967808c8119d60f39bf27572"
+    },
+    "hardware_verification": {
+      "request_mode_counts": {
+        "zero": 15,
+        "init": 510,
+        "policy": 151
+      },
+      "policy_request_interval_s": 3.008793025999694,
+      "torque_peaks_Nm": [
+        [
+          4.252685546875,
+          "J07_HIP_ROLL_R"
+        ],
+        [
+          2.641326904296875,
+          "J01_HIP_ROLL_L"
+        ],
+        [
+          1.918060302734375,
+          "J03_KNEE_PITCH_L"
+        ],
+        [
+          1.762420654296875,
+          "J09_KNEE_PITCH_R"
+        ],
+        [
+          1.561004638671875,
+          "J06_HIP_PITCH_R"
+        ],
+        [
+          1.506072998046875,
+          "J19_SHOULDER_ROLL_R"
+        ],
+        [
+          1.149486820483708,
+          "J10_ANKLE_PITCH_R"
+        ],
+        [
+          0.89263916015625,
+          "J14_SHOULDER_ROLL_L"
+        ],
+        [
+          0.81939697265625,
+          "J00_HIP_PITCH_L"
+        ],
+        [
+          0.8036062231055401,
+          "J04_ANKLE_PITCH_L"
+        ],
+        [
+          0.78277587890625,
+          "J08_HIP_YAW_R"
+        ],
+        [
+          0.67291259765625,
+          "J12_WAIST_YAW"
+        ],
+        [
+          0.65460205078125,
+          "J21_ELBOW_PITCH_R"
+        ],
+        [
+          0.64544677734375,
+          "J16_ELBOW_PITCH_L"
+        ],
+        [
+          0.62713623046875,
+          "J02_HIP_YAW_L"
+        ],
+        [
+          0.49896240234375,
+          "J23_HEAD_YAW"
+        ],
+        [
+          0.4937403856737309,
+          "J11_ANKLE_ROLL_R"
+        ],
+        [
+          0.44403076171875,
+          "J22_ELBOW_YAW_R"
+        ],
+        [
+          0.37078857421875,
+          "J18_SHOULDER_PITCH_R"
+        ],
+        [
+          0.35247802734375,
+          "J20_SHOULDER_YAW_R"
+        ],
+        [
+          0.33416748046875,
+          "J17_ELBOW_YAW_L"
+        ],
+        [
+          0.33416748046875,
+          "J15_SHOULDER_YAW_L"
+        ],
+        [
+          0.3100838473795111,
+          "J05_ANKLE_ROLL_L"
+        ],
+        [
+          0.18768310546875,
+          "J13_SHOULDER_PITCH_L"
+        ]
+      ],
+      "boot_unchanged": true,
+      "operator_observation": "Returned to passive, no abnormal vibration or sounds reported"
+    },
+    "post_test_read_only": {
+      "ready": false,
+      "read_only": true,
+      "expected_joints": 24,
+      "motion_state_fields": {
+        "current_motion_task_name": "string"
+      },
+      "motion_mode": "passive",
+      "received": {
+        "joint_state": 1000,
+        "imu_info": 998,
+        "motion_state": 10
+      },
+      "command_subscribers": 1,
+      "compatible_command_subscribers": 1,
+      "other_command_publishers": [],
+      "feedback_error": null,
+      "fresh_joint_imu_and_joint_bridge": false,
+      "feedback_header_stamps_ns": {
+        "body": 0,
+        "imu": 0
+      },
+      "feedback_age_s": {
+        "body": 0.0018599529939820059,
+        "imu": 0.001987203002499882,
+        "motion_mode": 0.06804178799939109
+      },
+      "pelvis_quaternion_wxyz": [
+        0.9850158095359802,
+        -0.03505301475524902,
+        0.034146010875701904,
+        0.16537614166736603
+      ],
+      "pelvis_gyro_rad_s": [
+        0.0037553899455815554,
+        0.002196461893618107,
+        0.0016631241887807846
+      ]
+    },
+    "evidence_sha256": {
+      ".scratch/pm01-recovery/static-policy-hold-003.npz": "e7f43dc7bb0453198ed21d7d845a78d9d88791c5718d4eccfa954ccfcad20254",
+      ".scratch/pm01-recovery/static-policy-hold-003.jsonl": "9d72c85f4e31210b8c360c088b2cce32e78f915b478fbbb45f2067910f8c26d2",
+      ".scratch/pm01-recovery/motor-status-after-static-3s.json": "6cd2765730700df5719ca1f30ede88fd2cc820145a1f4b89aa8d73ed2cec53cc"
+    }
+  },
+  "ground_static_evaluation": {
+    "short": {
+      "robot": "pm01",
+      "policy": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/kd03/engineai_pm01/policy-sim.yaml",
+      "dataset": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/static-reference",
+      "passed": true,
+      "motions": [
+        {
+          "motion": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/static-reference/motions/current.npz",
+          "policy": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/kd03/engineai_pm01/policy-sim.yaml",
+          "seed": 0,
+          "motion_sha256": "d269e019c2d52263accecb97c1b7a095812a256f4eaeb43a422ac135b0da9088",
+          "policy_yaml_sha256": "72477373989f13f2383be3ea68677bfb3113ed4e609d92821475b0dc962c0fac",
+          "onnx_sha256": "6c01c97ddac4859a8bec38f432b74ed6851c503e001d34c2d8577896a0c099e9",
+          "manifest_sha256": "6dfd142b87f76bb115d6599cedff2b7a63e3c90fdf0deedd524d5526412c433f",
+          "prepared_mjcf_sha256": "bcbaa5c24f83716b48a035aa98d38606623fde311adf1c0bff5868eae16a4d91",
+          "sim_dt_s": 0.002,
+          "policy_dt_s": 0.02,
+          "initial_hold_s": 1.0,
+          "final_hold_s": 1.0,
+          "last_motion_index": 198,
+          "completed": true,
+          "finite": true,
+          "mean_world_body_error_m": 0.027840619906783104,
+          "max_frame_world_body_error_m": 0.02859978750348091,
+          "mean_local_body_error_m": 0.01773369126021862,
+          "world_root_endpoint_error_m": 0.017068244516849518,
+          "separate_start_frame_root_error_m": 0.005592788569629192,
+          "min_playback_root_height_m": 0.8162892460823059,
+          "root_trajectory": "outputs/pm01/recovery-ground-static/current.root.npz",
+          "trajectory": "outputs/pm01/recovery-ground-static/current.trajectory.npz",
+          "passed": true
+        }
+      ]
+    },
+    "twenty_seconds": {
+      "robot": "pm01",
+      "policy": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/kd03/engineai_pm01/policy-sim.yaml",
+      "dataset": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/ground-static-20s",
+      "passed": true,
+      "motions": [
+        {
+          "motion": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/ground-static-20s/motions/current.npz",
+          "policy": "/home/galbot/projects/sim2real/.scratch/pm01-recovery/kd03/engineai_pm01/policy-sim.yaml",
+          "seed": 0,
+          "motion_sha256": "34e46c8081858d5adfcb9bd0d7d10fb5b24aff86e71d69b944c0c785bc632c88",
+          "policy_yaml_sha256": "72477373989f13f2383be3ea68677bfb3113ed4e609d92821475b0dc962c0fac",
+          "onnx_sha256": "6c01c97ddac4859a8bec38f432b74ed6851c503e001d34c2d8577896a0c099e9",
+          "manifest_sha256": "bc53ab73a6d92a35fddd783378c669d2d19f4d678f2f1f462858bf04dc068cc2",
+          "prepared_mjcf_sha256": "bcbaa5c24f83716b48a035aa98d38606623fde311adf1c0bff5868eae16a4d91",
+          "sim_dt_s": 0.002,
+          "policy_dt_s": 0.02,
+          "initial_hold_s": 1.0,
+          "final_hold_s": 1.0,
+          "last_motion_index": 998,
+          "completed": true,
+          "finite": true,
+          "mean_world_body_error_m": 0.03143675625324249,
+          "max_frame_world_body_error_m": 0.038172222673892975,
+          "mean_local_body_error_m": 0.02300993539392948,
+          "world_root_endpoint_error_m": 0.01823977380990982,
+          "separate_start_frame_root_error_m": 0.021215535700321198,
+          "min_playback_root_height_m": 0.811847984790802,
+          "root_trajectory": "outputs/pm01/recovery-ground-static-20s/current.root.npz",
+          "trajectory": "outputs/pm01/recovery-ground-static-20s/current.trajectory.npz",
+          "passed": true
+        }
+      ]
+    },
+    "scope": "Offline, initialized directly at static reference, measured simulated root and no commissioning slew limiter. Does not validate hardware handoff, contact loading, or reference-forced root estimate."
+  },
+  "original_walk_recovery": {
+    "physical_playback_completed": false,
+    "hardware_attempts": {
+      "walk-deploy-001": {
+        "requested": "walkonce",
+        "exit": 2,
+        "client_exit": 1,
+        "active_duration_s": 10.271967457001665,
+        "peak_joint_speed_rad_s": 2.230945587158203,
+        "peak_ankle_speed_rad_s": 1.8569069374758398,
+        "peak_joint_torque_Nm": 10.643157958984375,
+        "peak_ankle_torque_Nm": 10.141951132226268,
+        "joint_excursion_rad": [
+          0.11253547668457031,
+          0.0091552734375,
+          0.01220703125,
+          0.0625619888305664,
+          0.04137634555351388,
+          0.06327740160309538,
+          0.0850687026977539,
+          0.0186920166015625,
+          0.0755319595336914,
+          0.12130928039550781,
+          0.054153815011320106,
+          0.033376850585438766,
+          0.08392524719238281,
+          0.1369495391845703,
+          1.3420305252075195,
+          0.0770578384399414,
+          0.040818214416503906,
+          0.1369495391845703,
+          0.18196392059326172,
+          1.403829574584961,
+          0.0759134292602539,
+          0.028992652893066406,
+          0.14190959930419922,
+          0.043107032775878906
+        ],
+        "supervisor": {
+          "supervisor": true,
+          "watchdog_triggered": false,
+          "output_started": true,
+          "classic_fallback_confirmed": true,
+          "worker_exit": 2
+        }
+      },
+      "walk-deploy-002": {
+        "requested": "walkonce",
+        "exit": 2,
+        "client_exit": 1,
+        "active_duration_s": 10.674116540998511,
+        "peak_joint_speed_rad_s": 4.422752380371094,
+        "peak_ankle_speed_rad_s": 3.569937363363639,
+        "peak_joint_torque_Nm": 32.14923095703125,
+        "peak_ankle_torque_Nm": 12.508235034104274,
+        "joint_excursion_rad": [
+          0.0736246109008789,
+          0.0148773193359375,
+          0.032807350158691406,
+          0.059510231018066406,
+          0.07094014759753273,
+          0.25775339071900805,
+          0.10452461242675781,
+          0.0785837173461914,
+          0.058365821838378906,
+          0.11635017395019531,
+          0.075577092208972,
+          0.1494700642582844,
+          0.0694284439086914,
+          0.17319011688232422,
+          1.9447622299194336,
+          0.18730449676513672,
+          0.12397956848144531,
+          0.20637798309326172,
+          0.22888565063476562,
+          1.932936668395996,
+          0.16823101043701172,
+          0.0679025650024414,
+          0.22697734832763672,
+          0.11940193176269531
+        ],
+        "supervisor": {
+          "supervisor": true,
+          "watchdog_triggered": false,
+          "output_started": true,
+          "classic_fallback_confirmed": true,
+          "worker_exit": 2
+        }
+      },
+      "walk-deploy-003": {
+        "requested": "walkonce",
+        "exit": 2,
+        "client_exit": 1,
+        "active_duration_s": 32.830122818000746,
+        "peak_joint_speed_rad_s": 6.317080491794066,
+        "peak_ankle_speed_rad_s": 6.317080491794066,
+        "peak_joint_torque_Nm": 33.449310302734375,
+        "peak_ankle_torque_Nm": 20.4887355507231,
+        "joint_excursion_rad": [
+          0.12207221984863281,
+          0.0701913833618164,
+          0.1487751007080078,
+          0.10986518859863281,
+          0.14370062831090855,
+          0.2504793763083194,
+          0.16823101043701172,
+          0.1354236602783203,
+          0.1319904327392578,
+          0.1354236602783203,
+          0.18968817606557542,
+          0.23965377456095988,
+          0.08011054992675781,
+          0.18539714813232422,
+          2.0267791748046875,
+          0.3017463684082031,
+          0.12359809875488281,
+          0.40016841888427734,
+          0.2525367736816406,
+          2.038987159729004,
+          0.20332622528076172,
+          0.1323719024658203,
+          0.34485435485839844,
+          0.38033103942871094
+        ],
+        "supervisor": {
+          "supervisor": true,
+          "watchdog_triggered": false,
+          "output_started": true,
+          "classic_fallback_confirmed": true,
+          "worker_exit": 2
+        }
+      },
+      "walk-deploy-004": {
+        "requested": "walkonce",
+        "exit": 2,
+        "client_exit": 1,
+        "active_duration_s": 64.99271967599998,
+        "peak_joint_speed_rad_s": 1.6775016784667969,
+        "peak_ankle_speed_rad_s": 0.4547258753371287,
+        "peak_joint_torque_Nm": 13.206695556640625,
+        "peak_ankle_torque_Nm": 9.575209376431218,
+        "joint_excursion_rad": [
+          0.058747291564941406,
+          0.0629434585571289,
+          0.058365821838378906,
+          0.061799049377441406,
+          0.05505887616502002,
+          0.2335271634721322,
+          0.1358051300048828,
+          0.1495380401611328,
+          0.0762948989868164,
+          0.19188213348388672,
+          0.11496190395184036,
+          0.03291542481314699,
+          0.039673805236816406,
+          0.1739521026611328,
+          1.7921724319458008,
+          0.1506824493408203,
+          0.044251441955566406,
+          0.17929363250732422,
+          0.2536811828613281,
+          1.7715730667114258,
+          0.0915536880493164,
+          0.059510231018066406,
+          0.2563514709472656,
+          0.2731361389160156
+        ],
+        "supervisor": {
+          "supervisor": true,
+          "watchdog_triggered": false,
+          "output_started": true,
+          "classic_fallback_confirmed": true,
+          "worker_exit": 2
+        }
+      },
+      "walk-deploy-005": {
+        "requested": "walkonce",
+        "exit": 2,
+        "client_exit": 1,
+        "active_duration_s": 76.43225827300012,
+        "peak_joint_speed_rad_s": 2.891510009765625,
+        "peak_ankle_speed_rad_s": 1.241341996344067,
+        "peak_joint_torque_Nm": 16.46600341796875,
+        "peak_ankle_torque_Nm": 15.230865640527755,
+        "joint_excursion_rad": [
+          0.0968942642211914,
+          0.0892648696899414,
+          0.0690469741821289,
+          0.7961397171020508,
+          0.45131530413106924,
+          0.21901027142662965,
+          0.11177253723144531,
+          0.27199268341064453,
+          0.1529712677001953,
+          0.9254598617553711,
+          0.5142304452031652,
+          0.1646362672541951,
+          0.059891700744628906,
+          0.18310832977294922,
+          1.7860689163208008,
+          0.1609821319580078,
+          0.049973487854003906,
+          0.1754779815673828,
+          0.2574958801269531,
+          1.7818717956542969,
+          0.0827798843383789,
+          0.060273170471191406,
+          0.1544971466064453,
+          0.35095787048339844
+        ],
+        "supervisor": {
+          "supervisor": true,
+          "watchdog_triggered": false,
+          "output_started": true,
+          "classic_fallback_confirmed": true,
+          "worker_exit": 2
+        }
+      }
+    },
+    "operator_correction": "walk-deploy-003 had sustained visible vibration; supersedes initial no-abnormality report",
+    "vibration": {
+      "policy_duration_s": 9.958969159,
+      "statistics_after_first_2_s": [
+        {
+          "joint": "J00_HIP_PITCH_L",
+          "q_range_rad": 0.12130928039550781,
+          "target_range_rad": 0.33298081159591675,
+          "speed_rms": 0.21341705322265625,
+          "speed_peak": 1.1405372619628906,
+          "torque_peak": 9.864959716796875,
+          "speed_dominant_hz": 1.9468676699653678,
+          "tracking_error_rms": 0.05976259335875511
+        },
+        {
+          "joint": "J01_HIP_ROLL_L",
+          "q_range_rad": 0.0698099136352539,
+          "target_range_rad": 0.15328557789325714,
+          "speed_rms": 0.09781468659639359,
+          "speed_peak": 0.38384246826171875,
+          "torque_peak": 23.70794677734375,
+          "speed_dominant_hz": 1.9468676699653678,
+          "tracking_error_rms": 0.10919876396656036
+        },
+        {
+          "joint": "J02_HIP_YAW_L",
+          "q_range_rad": 0.1277942657470703,
+          "target_range_rad": 0.2431989312171936,
+          "speed_rms": 0.34449124336242676,
+          "speed_peak": 1.049896240234375,
+          "torque_peak": 7.42047119140625,
+          "speed_dominant_hz": 1.9468676699653678,
+          "tracking_error_rms": 0.06964869052171707
+        },
+        {
+          "joint": "J03_KNEE_PITCH_L",
+          "q_range_rad": 0.10376167297363281,
+          "target_range_rad": 0.20591135323047638,
+          "speed_rms": 0.24965840578079224,
+          "speed_peak": 0.96337890625,
+          "torque_peak": 9.132537841796875,
+          "speed_dominant_hz": 1.9468676699653678,
+          "tracking_error_rms": 0.04449852928519249
+        },
+        {
+          "joint": "J04_ANKLE_PITCH_L",
+          "q_range_rad": 0.09393414855003357,
+          "target_range_rad": 0.5148632526397705,
+          "speed_rms": 0.22671909630298615,
+          "speed_peak": 0.9384692311286926,
+          "torque_peak": 20.43881607055664,
+          "speed_dominant_hz": 3.8937353399307355,
+          "tracking_error_rms": 0.2471112161874771
+        },
+        {
+          "joint": "J05_ANKLE_ROLL_L",
+          "q_range_rad": 0.13554999232292175,
+          "target_range_rad": 0.1324939876794815,
+          "speed_rms": 0.48898544907569885,
+          "speed_peak": 1.7963300943374634,
+          "torque_peak": 5.73781681060791,
+          "speed_dominant_hz": 1.9468676699653678,
+          "tracking_error_rms": 0.07515482604503632
+        },
+        {
+          "joint": "J06_HIP_PITCH_R",
+          "q_range_rad": 0.09689521789550781,
+          "target_range_rad": 0.41458815336227417,
+          "speed_rms": 0.20057082176208496,
+          "speed_peak": 1.2050819396972656,
+          "torque_peak": 10.725555419921875,
+          "speed_dominant_hz": 1.9468676699653678,
+          "tracking_error_rms": 0.08921786397695541
+        },
+        {
+          "joint": "J07_HIP_ROLL_R",
+          "q_range_rad": 0.11520576477050781,
+          "target_range_rad": 0.4302011728286743,
+          "speed_rms": 0.22155629098415375,
+          "speed_peak": 0.8548851013183594,
+          "torque_peak": 33.449310302734375,
+          "speed_dominant_hz": 1.9468676699653678,
+          "tracking_error_rms": 0.1330665647983551
+        },
+        {
+          "joint": "J08_HIP_YAW_R",
+          "q_range_rad": 0.1308460235595703,
+          "target_range_rad": 0.16864463686943054,
+          "speed_rms": 0.4467722475528717,
+          "speed_peak": 1.6047134399414062,
+          "torque_peak": 2.723724365234375,
+          "speed_dominant_hz": 1.9468676699653678,
+          "tracking_error_rms": 0.046985942870378494
+        },
+        {
+          "joint": "J09_KNEE_PITCH_R",
+          "q_range_rad": 0.0656137466430664,
+          "target_range_rad": 0.11696535348892212,
+          "speed_rms": 0.1934191882610321,
+          "speed_peak": 0.6310386657714844,
+          "torque_peak": 7.99725341796875,
+          "speed_dominant_hz": 1.9468676699653678,
+          "tracking_error_rms": 0.02821425534784794
+        },
+        {
+          "joint": "J10_ANKLE_PITCH_R",
+          "q_range_rad": 0.18081392347812653,
+          "target_range_rad": 0.40005284547805786,
+          "speed_rms": 0.7339465618133545,
+          "speed_peak": 4.63662576675415,
+          "torque_peak": 8.416074752807617,
+          "speed_dominant_hz": 7.787470679861471,
+          "tracking_error_rms": 0.11368931829929352
+        },
+        {
+          "joint": "J11_ANKLE_ROLL_R",
+          "q_range_rad": 0.1829289197921753,
+          "target_range_rad": 0.2678988575935364,
+          "speed_rms": 0.735923171043396,
+          "speed_peak": 6.2224955558776855,
+          "torque_peak": 4.8675737380981445,
+          "speed_dominant_hz": 1.9468676699653678,
+          "tracking_error_rms": 0.06723805516958237
+        },
+        {
+          "joint": "J12_WAIST_YAW",
+          "q_range_rad": 0.045014381408691406,
+          "target_range_rad": 0.0744083821773529,
+          "speed_rms": 0.1195259615778923,
+          "speed_peak": 0.7409019470214844,
+          "torque_peak": 8.74798583984375,
+          "speed_dominant_hz": 4.088422106927273,
+          "tracking_error_rms": 0.018776563927531242
+        },
+        {
+          "joint": "J13_SHOULDER_PITCH_L",
+          "q_range_rad": 0.1068124771118164,
+          "target_range_rad": 0.23004981875419617,
+          "speed_rms": 0.4051796495914459,
+          "speed_peak": 1.0347900390625,
+          "torque_peak": 1.350433349609375,
+          "speed_dominant_hz": 1.9468676699653678,
+          "tracking_error_rms": 0.06395301222801208
+        },
+        {
+          "joint": "J14_SHOULDER_ROLL_L",
+          "q_range_rad": 0.5077438354492188,
+          "target_range_rad": 0.5519721508026123,
+          "speed_rms": 1.9015458822250366,
+          "speed_peak": 3.4943923950195312,
+          "torque_peak": 11.12841796875,
+          "speed_dominant_hz": 1.9468676699653678,
+          "tracking_error_rms": 0.40434229373931885
+        },
+        {
+          "joint": "J15_SHOULDER_YAW_L",
+          "q_range_rad": 0.1537342071533203,
+          "target_range_rad": 0.2981889247894287,
+          "speed_rms": 0.48111438751220703,
+          "speed_peak": 1.4097061157226562,
+          "torque_peak": 1.222259521484375,
+          "speed_dominant_hz": 1.9468676699653678,
+          "tracking_error_rms": 0.07270179688930511
+        },
+        {
+          "joint": "J16_ELBOW_PITCH_L",
+          "q_range_rad": 0.08468818664550781,
+          "target_range_rad": 0.16718852519989014,
+          "speed_rms": 0.234214648604393,
+          "speed_peak": 1.2146949768066406,
+          "torque_peak": 1.524383544921875,
+          "speed_dominant_hz": 3.8937353399307355,
+          "tracking_error_rms": 0.037455085664987564
+        },
+        {
+          "joint": "J17_ELBOW_YAW_L",
+          "q_range_rad": 0.20752334594726562,
+          "target_range_rad": 0.3037201166152954,
+          "speed_rms": 0.7285214066505432,
+          "speed_peak": 1.5772476196289062,
+          "torque_peak": 0.61798095703125,
+          "speed_dominant_hz": 1.9468676699653678,
+          "tracking_error_rms": 0.09228936582803726
+        },
+        {
+          "joint": "J18_SHOULDER_PITCH_R",
+          "q_range_rad": 0.1304645538330078,
+          "target_range_rad": 0.29327383637428284,
+          "speed_rms": 0.45880118012428284,
+          "speed_peak": 1.3698768615722656,
+          "torque_peak": 1.597625732421875,
+          "speed_dominant_hz": 1.9468676699653678,
+          "tracking_error_rms": 0.08340609073638916
+        },
+        {
+          "joint": "J19_SHOULDER_ROLL_R",
+          "q_range_rad": 0.48142242431640625,
+          "target_range_rad": 0.5237278938293457,
+          "speed_rms": 1.5056613683700562,
+          "speed_peak": 2.962921142578125,
+          "torque_peak": 11.05517578125,
+          "speed_dominant_hz": 1.9468676699653678,
+          "tracking_error_rms": 0.37926575541496277
+        },
+        {
+          "joint": "J20_SHOULDER_YAW_R",
+          "q_range_rad": 0.0629434585571289,
+          "target_range_rad": 0.11736974120140076,
+          "speed_rms": 0.1444525420665741,
+          "speed_peak": 1.4399185180664062,
+          "torque_peak": 0.98419189453125,
+          "speed_dominant_hz": 1.9468676699653678,
+          "tracking_error_rms": 0.02297777496278286
+        },
+        {
+          "joint": "J21_ELBOW_PITCH_R",
+          "q_range_rad": 0.0942239761352539,
+          "target_range_rad": 0.23256884515285492,
+          "speed_rms": 0.23842079937458038,
+          "speed_peak": 0.99908447265625,
+          "torque_peak": 1.808197021484375,
+          "speed_dominant_hz": 1.9468676699653678,
+          "tracking_error_rms": 0.046937983483076096
+        },
+        {
+          "joint": "J22_ELBOW_YAW_R",
+          "q_range_rad": 0.19035720825195312,
+          "target_range_rad": 0.30033594369888306,
+          "speed_rms": 0.5653030872344971,
+          "speed_peak": 1.3753738403320312,
+          "torque_peak": 0.82855224609375,
+          "speed_dominant_hz": 1.9468676699653678,
+          "tracking_error_rms": 0.07934463024139404
+        },
+        {
+          "joint": "J23_HEAD_YAW",
+          "q_range_rad": 0.22316360473632812,
+          "target_range_rad": 0.30883729457855225,
+          "speed_rms": 0.42858996987342834,
+          "speed_peak": 0.90020751953125,
+          "torque_peak": 0.70037841796875,
+          "speed_dominant_hz": 1.9468676699653678,
+          "tracking_error_rms": 0.055838823318481445
+        }
+      ],
+      "operator_observed_vibration": true
+    },
+    "after_attempt_003": {
+      "boot_id": "680d8787-bc96-438d-9e17-a2b2ff23a3a3",
+      "error_indices": {
+        "disable": [],
+        "offline": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23
+        ],
+        "over_temperature_warning": [],
+        "over_temperature_error": [],
+        "under_voltage_error": [],
+        "over_voltage_error": [],
+        "phase_a_over_current_error": [],
+        "phase_b_over_current_error": [],
+        "phase_c_over_current_error": [],
+        "over_heat_error": [],
+        "over_torque_error": [],
+        "motor_encoder_validation_error": [],
+        "joint_encoder_validation_error": [],
+        "self_check_error": [],
+        "over_speed_error": []
+      }
+    },
+    "offline_arm_limiter_counterfactuals": {
+      "1": {
+        "reason": "completed walk",
+        "passed": true,
+        "max_joint_speed_rad_s": 6.590783359433426,
+        "max_ankle_speed_rad_s": 6.590783359433426,
+        "max_joint_torque_Nm": 57.94660186767578,
+        "max_ankle_torque_Nm": 44.935970306396484,
+        "max_root_position_error_m": 3.383261304329615,
+        "policy_config": ".scratch/pm01-recovery/kd03-walk-loaded/engineai_pm01/policy.yaml",
+        "pose_record": ".scratch/pm01-recovery/walk-ready-seed.npz",
+        "motion": "checkpoints/engineai_pm01/motions/motions/walk1_subject1.npz",
+        "hold_seconds": 1.0,
+        "walk_shaping": false,
+        "feet_touch": true,
+        "walk_once": true,
+        "hardware_tested": false,
+        "supported_policy_seconds": 12.0,
+        "limitation": "Idealized load transfer starts 12 seconds after policy entry, replacing the weld with vertical weight support ramped to zero over one second; serial-joint dynamics, no physical cable or measured motor inertia",
+        "diagnostic_only": true,
+        "diagnostic_arm_speed_rad_s": 1.0,
+        "hardware_guard_unchanged": true,
+        "not_hardware_validation": true,
+        "supported_seconds_analyzed": 9.998,
+        "supported_shoulder_q_peak_to_peak_rad": [
+          0.24849754642538846,
+          0.26834356252249925
+        ],
+        "supported_shoulder_speed_rms_rad_s": [
+          0.9541083157532066,
+          1.0514539455229857
+        ]
+      },
+      "3": {
+        "reason": "completed walk",
+        "passed": true,
+        "max_joint_speed_rad_s": 7.182690563484186,
+        "max_ankle_speed_rad_s": 7.182690563484186,
+        "max_joint_torque_Nm": 62.12694549560547,
+        "max_ankle_torque_Nm": 45.808963775634766,
+        "max_root_position_error_m": 3.491368357986721,
+        "policy_config": ".scratch/pm01-recovery/kd03-walk-loaded/engineai_pm01/policy.yaml",
+        "pose_record": ".scratch/pm01-recovery/walk-ready-seed.npz",
+        "motion": "checkpoints/engineai_pm01/motions/motions/walk1_subject1.npz",
+        "hold_seconds": 1.0,
+        "walk_shaping": false,
+        "feet_touch": true,
+        "walk_once": true,
+        "hardware_tested": false,
+        "supported_policy_seconds": 12.0,
+        "limitation": "Idealized load transfer starts 12 seconds after policy entry, replacing the weld with vertical weight support ramped to zero over one second; serial-joint dynamics, no physical cable or measured motor inertia",
+        "diagnostic_only": true,
+        "diagnostic_arm_speed_rad_s": 3.0,
+        "hardware_guard_unchanged": true,
+        "not_hardware_validation": true,
+        "supported_seconds_analyzed": 9.998,
+        "supported_shoulder_q_peak_to_peak_rad": [
+          0.35736102544756587,
+          0.503393870638285
+        ],
+        "supported_shoulder_speed_rms_rad_s": [
+          1.3604147111460057,
+          1.6626422770862073
+        ]
+      },
+      "6": {
+        "reason": "completed walk",
+        "passed": true,
+        "max_joint_speed_rad_s": 6.068912433652094,
+        "max_ankle_speed_rad_s": 6.068912433652094,
+        "max_joint_torque_Nm": 71.5606460571289,
+        "max_ankle_torque_Nm": 45.509193420410156,
+        "max_root_position_error_m": 3.3937463316462946,
+        "policy_config": ".scratch/pm01-recovery/kd03-walk-loaded/engineai_pm01/policy.yaml",
+        "pose_record": ".scratch/pm01-recovery/walk-ready-seed.npz",
+        "motion": "checkpoints/engineai_pm01/motions/motions/walk1_subject1.npz",
+        "hold_seconds": 1.0,
+        "walk_shaping": false,
+        "feet_touch": true,
+        "walk_once": true,
+        "hardware_tested": false,
+        "supported_policy_seconds": 12.0,
+        "limitation": "Idealized load transfer starts 12 seconds after policy entry, replacing the weld with vertical weight support ramped to zero over one second; serial-joint dynamics, no physical cable or measured motor inertia",
+        "diagnostic_only": true,
+        "diagnostic_arm_speed_rad_s": 6.0,
+        "hardware_guard_unchanged": true,
+        "not_hardware_validation": true,
+        "supported_seconds_analyzed": 9.998,
+        "supported_shoulder_q_peak_to_peak_rad": [
+          0.008378557269723252,
+          0.004767845032755069
+        ],
+        "supported_shoulder_speed_rms_rad_s": [
+          0.0474879398478868,
+          0.046772126375405496
+        ]
+      }
+    },
+    "oscillation_regression": {
+      "reason": "stationary shoulder oscillation",
+      "passed": false,
+      "max_joint_speed_rad_s": 4.657295681566694,
+      "max_ankle_speed_rad_s": 4.657295681566694,
+      "max_joint_torque_Nm": 20.136362075805664,
+      "max_ankle_torque_Nm": 17.559457778930664,
+      "max_root_position_error_m": 2.797634884867704e-06,
+      "policy_config": ".scratch/pm01-recovery/kd03-walk-loaded/engineai_pm01/policy.yaml",
+      "pose_record": ".scratch/pm01-recovery/walk-ready-seed.npz",
+      "motion": "checkpoints/engineai_pm01/motions/motions/walk1_subject1.npz",
+      "hold_seconds": 1.0,
+      "walk_shaping": false,
+      "feet_touch": true,
+      "walk_once": true,
+      "hardware_tested": false,
+      "supported_policy_seconds": 12.0,
+      "limitation": "Idealized load transfer starts 12 seconds after policy entry, replacing the weld with vertical weight support ramped to zero over one second; serial-joint dynamics, no physical cable or measured motor inertia"
+    },
+    "candidate": {
+      "policy_config": ".scratch/pm01-recovery/kd03-walk-blend/engineai_pm01/policy.yaml",
+      "ankle_kd": 0.3,
+      "body_arm_target_velocity_rad_s": 6.0,
+      "head_target_velocity_rad_s": 1.0,
+      "takeover_blend_s": 2.0,
+      "hardware_tested": true,
+      "hardware_scope": "Supported hold stable; loaded failure exit lost stance support; physical walk remains untested and quarantined"
+    },
+    "private_request_transport": "RELIABLE depth=8; existing stamp, deadline and target-step guards remain",
+    "stationary_guard": {
+      "policy_age_s": 4.0,
+      "window_s": 2.0,
+      "shoulder_peak_to_peak_rad": 0.25,
+      "shoulder_velocity_rms_rad_s": 0.6,
+      "required_before_play": true
+    },
+    "tests": {
+      "pure": "29 passed, 7 deselected",
+      "loopback_plus_pure_before_final_blend_clamp": "29 passed, 6 deselected",
+      "reliable_transport_client_loss": "1 passed, 35 deselected; native damping restored after PC loss",
+      "quarantine_and_pure": "30 passed, 7 deselected"
+    },
+    "source_sha256": {
+      "scripts/pm01/policy_bridge.py": "92ed5c1e27a1100b9241fa519ebb8e0b3ca93db4f9bc3d279a8afdc8326191d0",
+      "scripts/pm01/trial_policy.py": "87a9aca5cec29cf4d33f2bdffa1b83d75746a4d2c7f2eb056495ff3d4be2d41d",
+      "scripts/pm01/rehearse_trial.py": "0af725c3f433936fc1b35595a5822e3003933cf908d72b2c4df162b7ebdc0e6b"
+    },
+    "final_candidate_rehearsals": {
+      "walk-ready-seed": {
+        "reason": "completed walk",
+        "passed": true,
+        "max_joint_speed_rad_s": 6.090341954915102,
+        "max_ankle_speed_rad_s": 6.090341954915102,
+        "max_joint_torque_Nm": 69.94132995605469,
+        "max_ankle_torque_Nm": 45.32057189941406,
+        "max_root_position_error_m": 3.42413337875415,
+        "policy_config": ".scratch/pm01-recovery/kd03-walk-blend/engineai_pm01/policy.yaml",
+        "pose_record": ".scratch/pm01-recovery/walk-ready-seed.npz",
+        "motion": "checkpoints/engineai_pm01/motions/motions/walk1_subject1.npz",
+        "hold_seconds": 1.0,
+        "walk_shaping": false,
+        "feet_touch": true,
+        "walk_once": true,
+        "hardware_tested": false,
+        "supported_policy_seconds": 12.0,
+        "limitation": "Idealized load transfer starts 12 seconds after policy entry, replacing the weld with vertical weight support ramped to zero over one second; serial-joint dynamics, no physical cable or measured motor inertia",
+        "settled_supported_shoulder_peak_to_peak_rad": [
+          0.02121154657320523,
+          0.013518266596024286
+        ],
+        "settled_supported_shoulder_velocity_rms_rad_s": [
+          0.04973684327983138,
+          0.04226404407504068
+        ]
+      },
+      "feet-touch-seed": {
+        "reason": "completed walk",
+        "passed": true,
+        "max_joint_speed_rad_s": 6.188015045015013,
+        "max_ankle_speed_rad_s": 6.188015045015013,
+        "max_joint_torque_Nm": 66.42070770263672,
+        "max_ankle_torque_Nm": 45.9633674621582,
+        "max_root_position_error_m": 3.433603560382142,
+        "policy_config": ".scratch/pm01-recovery/kd03-walk-blend/engineai_pm01/policy.yaml",
+        "pose_record": ".scratch/pm01-recovery/feet-touch-seed.npz",
+        "motion": "checkpoints/engineai_pm01/motions/motions/walk1_subject1.npz",
+        "hold_seconds": 1.0,
+        "walk_shaping": false,
+        "feet_touch": true,
+        "walk_once": true,
+        "hardware_tested": false,
+        "supported_policy_seconds": 12.0,
+        "limitation": "Idealized load transfer starts 12 seconds after policy entry, replacing the weld with vertical weight support ramped to zero over one second; serial-joint dynamics, no physical cable or measured motor inertia",
+        "settled_supported_shoulder_peak_to_peak_rad": [
+          0.025065874341543726,
+          0.015833112462901644
+        ],
+        "settled_supported_shoulder_velocity_rms_rad_s": [
+          0.044185272119280423,
+          0.06921630503458735
+        ]
+      }
+    },
+    "corrected_supported_hold": {
+      "policy_duration_s": 45.023857853,
+      "steady_shoulder_peak_to_peak_rad": [
+        0.0019073486328125,
+        0.0003814697265625
+      ],
+      "steady_shoulder_speed_rms_rad_s": [
+        0.0022386093623936176,
+        0.002095039701089263
+      ],
+      "steady_max_joint_speed_rad_s": 0.0116729736328125,
+      "policy_max_joint_torque_Nm": 13.179229736328125,
+      "played": false
+    },
+    "operator_wait_seconds": 180,
+    "supervisor_limit_seconds": 270,
+    "weight_transfer_failure": {
+      "stop_reason": "joint feedback timeout",
+      "first_classic_elapsed_s": 78.7916460510005,
+      "last_200ms_before_classic_peak_joint_speed_rad_s": 0.0075531005859375,
+      "last_policy_tilt_rad": 0.06733712553977966,
+      "max_policy_tilt_rad": 0.10010252147912979,
+      "policy_duration_s": 57.284981094,
+      "first_post_classic_motion_delay_ms": 17.93502799955604,
+      "knees_at_classic_rad": [
+        0.24433517456054688,
+        0.2641716003417969
+      ],
+      "knees_100ms_after_classic_rad": [
+        [
+          0.2904939651489258,
+          0.3080415725708008
+        ],
+        [
+          0.2939271926879883,
+          0.3114748001098633
+        ]
+      ],
+      "operator": "E-stop applied; gantry caught robot; people safe; weight transfer was in progress",
+      "play_signal_sent": false,
+      "interpretation": "Motion began after damping removed position stiffness. Feedback timeout precedes knee flexion. Logs do not establish the source of the feedback gap."
+    },
+    "read_only_timing_initial": {
+      "read_only": true,
+      "motor_commands_published": 0,
+      "loaded": [
+        {
+          "batch": 1,
+          "seconds": 30,
+          "joint_samples": 9620,
+          "age_percentiles_ms": [
+            0.6839580000814749,
+            2.211688600255002,
+            3.0857651396945585,
+            3.9199518902169093,
+            9.416156999577652
+          ],
+          "loop_percentiles_ms": [
+            0.9717170005387743,
+            1.952498749960796,
+            2.0254410104098493,
+            3.14092136605379,
+            8.272130000477773
+          ],
+          "spin_percentiles_ms": [
+            0.4185369998594979,
+            1.3258620988381153,
+            1.3724856496446591,
+            1.7095543222549436,
+            6.086573999709799
+          ],
+          "work_percentiles_ms": [
+            0.4963370001860312,
+            1.4964319998398423,
+            1.5860174603221822,
+            1.8559694765554373,
+            7.769784000629443
+          ],
+          "timeout_events": []
+        },
+        {
+          "batch": 8,
+          "seconds": 30,
+          "joint_samples": 14883,
+          "age_percentiles_ms": [
+            0.31055399995238986,
+            1.5165546007665398,
+            1.865871500212961,
+            2.03477566083712,
+            2.133997999408166
+          ],
+          "loop_percentiles_ms": [
+            3.5048545005338383,
+            4.112013100348122,
+            4.713091350731702,
+            8.156967875359225,
+            16.273605999231222
+          ],
+          "spin_percentiles_ms": [
+            2.360919500461023,
+            3.1043243996464294,
+            3.401380390387203,
+            4.310401838243901,
+            9.23835399953532
+          ],
+          "work_percentiles_ms": [
+            0.8537829999113455,
+            1.6412562500590866,
+            1.6888502209803846,
+            2.920052358027573,
+            13.5189979991992
+          ],
+          "timeout_events": []
+        }
+      ],
+      "baseline": {
+        "read_only": true,
+        "received": 33756,
+        "gap_percentiles_ms": [
+          2.002396999159828,
+          2.1233934992778813,
+          2.1577045201775036,
+          2.3725341077116515,
+          6.741647001035744
+        ],
+        "gaps_over_20ms": []
+      }
+    },
+    "read_only_timing_full_guard": {
+      "read_only": true,
+      "motor_commands_published": 0,
+      "loaded": [
+        {
+          "batch": 1,
+          "seconds": 60,
+          "joint_samples": 15208,
+          "age_percentiles_ms": [
+            1.3290449996929965,
+            3.172152249589999,
+            4.7710472198377865,
+            6.905477985239497,
+            19.112394000330823
+          ],
+          "loop_percentiles_ms": [
+            1.1426909995861934,
+            2.179020000312448,
+            3.656360970908283,
+            5.350179537932501,
+            10.033315000328002
+          ],
+          "spin_percentiles_ms": [
+            0.47472500045842025,
+            1.3317198497134086,
+            1.3910648688943184,
+            1.5502626873130947,
+            7.534576001489768
+          ],
+          "work_percentiles_ms": [
+            0.6301700004769373,
+            1.653009749497869,
+            3.0301937389958775,
+            4.114564485256779,
+            7.994857000085176
+          ],
+          "timeout_events": []
+        },
+        {
+          "batch": 8,
+          "seconds": 60,
+          "joint_samples": 28837,
+          "age_percentiles_ms": [
+            0.30854200122121256,
+            1.4075594001042189,
+            1.8772274792718235,
+            2.069809118998839,
+            3.0424630003835773
+          ],
+          "loop_percentiles_ms": [
+            3.825314999630791,
+            4.7998985999583965,
+            5.441086159626137,
+            9.773099857244492,
+            66.02348599881225
+          ],
+          "spin_percentiles_ms": [
+            2.4044340007094434,
+            3.3175000000483124,
+            3.461230481043458,
+            4.097605031252996,
+            46.27079800047795
+          ],
+          "work_percentiles_ms": [
+            1.2614019997272408,
+            1.8122981997294119,
+            2.742995319931649,
+            6.307584647927356,
+            19.75167399905331
+          ],
+          "timeout_events": []
+        }
+      ],
+      "baseline": {
+        "read_only": true,
+        "received": 63744,
+        "gap_percentiles_ms": [
+          2.00308499915991,
+          2.1261340010823915,
+          2.156411339637998,
+          2.4022208003189327,
+          20.060137001564726
+        ],
+        "gaps_over_20ms": [
+          {
+            "at": 13368.137223383,
+            "gap_ms": 20.060137001564726
+          }
+        ]
+      },
+      "gc_pauses": []
+    },
+    "loaded_exit_simulation": {
+      "unsupported": {
+        "read_only_offline": true,
+        "hardware_tested": false,
+        "injected_fault": "feedback timeout after load transfer",
+        "exit": "kp=0, native classic damping approximation",
+        "ideal_rigid_gantry": false,
+        "root_height_before_m": 0.81001740007061,
+        "min_root_height_after_m": 0.25406851025593435,
+        "max_tilt_after_rad": 2.0158409580147243,
+        "knees_after_100ms_rad": [
+          0.2973257937142305,
+          0.40309551510496283
+        ],
+        "limitation": "Serial-joint motor approximation; ideal weld does not validate a real sling or loaded hardware exit."
+      },
+      "ideal-gantry": {
+        "read_only_offline": true,
+        "hardware_tested": false,
+        "injected_fault": "feedback timeout after load transfer",
+        "exit": "kp=0, native classic damping approximation",
+        "ideal_rigid_gantry": true,
+        "root_height_before_m": 0.81001740007061,
+        "min_root_height_after_m": 0.810015173798077,
+        "max_tilt_after_rad": 0.05436894101110921,
+        "knees_after_100ms_rad": [
+          0.20625080586803288,
+          0.31536797676226774
+        ],
+        "limitation": "Serial-joint motor approximation; ideal weld does not validate a real sling or loaded hardware exit."
+      }
+    }
+  },
+  "latest_hardware_result": {
+    "tag": "walk-deploy-006",
+    "policy_duration_s": 3.7896,
+    "stop_reason": "joint speed limit",
+    "operator_report": "continuous vibration; returned to passive",
+    "feedback_epoch": 0,
+    "hardware_walk_played": false,
+    "native_damping_confirmed": true
+  },
+  "pure_training_audit": {
+    "policy": "checkpoints/proteus/wsq61/engineai_pm01/policy.yaml",
+    "source_contract": "../Proteus-wamseq/ScaleTrack/checkpoints/wsq61/engineai_pm01.json",
+    "source_action": "CanonicalJointPositionAction.process_actions/apply_actions: default + scale * action, then slot-to-sim mapping",
+    "ankle_kp": 37.701,
+    "ankle_kd": 2.4916,
+    "export_comparison": {
+      "release": "wsq61",
+      "actor_kind": "wam_seq",
+      "contract": "engineai_pm01",
+      "robot": "pm01",
+      "far_offset": 16,
+      "passed": true,
+      "max_abs_error": 0.0,
+      "tolerance": 1e-06,
+      "num_samples": 64,
+      "seed": 0,
+      "method": "standard-normal inputs in sim2real layout; the released actor gets them with a batch axis and the contract's morph; action is compared with actions[driven slots], next_slot_action with actions",
+      "sources": {
+        "proteus_actor.onnx": "418908bde5a1909d78219bc1d53775d4f557c1e4d176136270926fdbf8884671",
+        "engineai_pm01.json": "45c14ba2d26ff715a2eebc574ea2a78a3c8427d6657072c249df1197c4b49b11"
+      },
+      "artifact": {
+        "policy.onnx": {
+          "sha256": "a89fe6583736e20ed409de05303babdf19f36bffaebd835401c7294c28372838",
+          "ir_version": 8,
+          "opset": {
+            "ai.onnx": 17
+          },
+          "inputs": {
+            "proprioception": [
+              10,
+              68
+            ],
+            "task": [
+              6,
+              253
+            ],
+            "action_history": [
+              10,
+              31
+            ],
+            "history_valid": [
+              10
+            ]
+          },
+          "outputs": {
+            "action": [
+              24
+            ],
+            "next_slot_action": [
+              31
+            ]
+          }
+        }
+      },
+      "versions": {
+        "onnx": "1.17.0",
+        "onnxruntime": "1.23.2"
+      }
+    },
+    "removed": [
+      "policy soft-position clipping",
+      "body/arm/head target slew",
+      "takeover blend",
+      "limiter reseeding",
+      "PM01 transport target position/velocity/feed-forward clipping and per-packet slew",
+      "modified ankle damping and morphology in baseline"
+    ],
+    "retained": [
+      "training actuator limits",
+      "10 s pre-policy shaping",
+      "startup silence",
+      "finite-data validation",
+      "fault and continued-loss handling",
+      "public hardware lockout",
+      "historical experimental relay stop thresholds (not used for baseline evaluation)"
+    ],
+    "integrated_simulation": {
+      "robot": "pm01",
+      "policy": "/home/galbot/projects/sim2real/checkpoints/proteus/wsq61/engineai_pm01/policy-sim.yaml",
+      "dataset": "/home/galbot/projects/sim2real/checkpoints/engineai_pm01/motions",
+      "passed": true,
+      "motions": [
+        {
+          "motion": "/home/galbot/projects/sim2real/checkpoints/engineai_pm01/motions/motions/aiming1_subject1.npz",
+          "policy": "/home/galbot/projects/sim2real/checkpoints/proteus/wsq61/engineai_pm01/policy-sim.yaml",
+          "seed": 0,
+          "motion_sha256": "8bf16547ce80f5d5b392c7a96c55708f4e150fb9250b30e29edbc896254347bc",
+          "policy_yaml_sha256": "61e3fdb9f4998850e366a3827635c439eb1725a5e6cac98bd2c52371a4c43442",
+          "onnx_sha256": "a89fe6583736e20ed409de05303babdf19f36bffaebd835401c7294c28372838",
+          "manifest_sha256": "e650f550dea38b8ba4e1384d5f8bd5db05e94baa455d185f6edb2bbea05636a9",
+          "prepared_mjcf_sha256": "bcbaa5c24f83716b48a035aa98d38606623fde311adf1c0bff5868eae16a4d91",
+          "sim_dt_s": 0.002,
+          "policy_dt_s": 0.02,
+          "initial_hold_s": 1.0,
+          "final_hold_s": 1.0,
+          "last_motion_index": 398,
+          "completed": true,
+          "finite": true,
+          "mean_world_body_error_m": 0.02591557800769806,
+          "max_frame_world_body_error_m": 0.04428911954164505,
+          "mean_local_body_error_m": 0.017099935561418533,
+          "world_root_endpoint_error_m": 0.03931187838315964,
+          "separate_start_frame_root_error_m": 0.04490947723388672,
+          "min_playback_root_height_m": 0.7941720485687256,
+          "root_trajectory": "outputs/pm01/pure-training-2ms/aiming1_subject1.root.npz",
+          "trajectory": "outputs/pm01/pure-training-2ms/aiming1_subject1.trajectory.npz",
+          "passed": true
+        },
+        {
+          "motion": "/home/galbot/projects/sim2real/checkpoints/engineai_pm01/motions/motions/dance2_subject1.npz",
+          "policy": "/home/galbot/projects/sim2real/checkpoints/proteus/wsq61/engineai_pm01/policy-sim.yaml",
+          "seed": 0,
+          "motion_sha256": "4778c89938e5ac2e3643667885ea1a9ae587532aade0155ba93c5b17e3db37ed",
+          "policy_yaml_sha256": "61e3fdb9f4998850e366a3827635c439eb1725a5e6cac98bd2c52371a4c43442",
+          "onnx_sha256": "a89fe6583736e20ed409de05303babdf19f36bffaebd835401c7294c28372838",
+          "manifest_sha256": "e650f550dea38b8ba4e1384d5f8bd5db05e94baa455d185f6edb2bbea05636a9",
+          "prepared_mjcf_sha256": "bcbaa5c24f83716b48a035aa98d38606623fde311adf1c0bff5868eae16a4d91",
+          "sim_dt_s": 0.002,
+          "policy_dt_s": 0.02,
+          "initial_hold_s": 1.0,
+          "final_hold_s": 1.0,
+          "last_motion_index": 398,
+          "completed": true,
+          "finite": true,
+          "mean_world_body_error_m": 0.02927974797785282,
+          "max_frame_world_body_error_m": 0.06629176437854767,
+          "mean_local_body_error_m": 0.019917327910661697,
+          "world_root_endpoint_error_m": 0.02191638946533203,
+          "separate_start_frame_root_error_m": 0.03842483088374138,
+          "min_playback_root_height_m": 0.7547951936721802,
+          "root_trajectory": "outputs/pm01/pure-training-2ms/dance2_subject1.root.npz",
+          "trajectory": "outputs/pm01/pure-training-2ms/dance2_subject1.trajectory.npz",
+          "passed": true
+        },
+        {
+          "motion": "/home/galbot/projects/sim2real/checkpoints/engineai_pm01/motions/motions/fightAndSports1_subject4.npz",
+          "policy": "/home/galbot/projects/sim2real/checkpoints/proteus/wsq61/engineai_pm01/policy-sim.yaml",
+          "seed": 0,
+          "motion_sha256": "39f53c445ce97112a2ea04c1e7ab6009a5f61933b051000a4774114b699ac910",
+          "policy_yaml_sha256": "61e3fdb9f4998850e366a3827635c439eb1725a5e6cac98bd2c52371a4c43442",
+          "onnx_sha256": "a89fe6583736e20ed409de05303babdf19f36bffaebd835401c7294c28372838",
+          "manifest_sha256": "e650f550dea38b8ba4e1384d5f8bd5db05e94baa455d185f6edb2bbea05636a9",
+          "prepared_mjcf_sha256": "bcbaa5c24f83716b48a035aa98d38606623fde311adf1c0bff5868eae16a4d91",
+          "sim_dt_s": 0.002,
+          "policy_dt_s": 0.02,
+          "initial_hold_s": 1.0,
+          "final_hold_s": 1.0,
+          "last_motion_index": 398,
+          "completed": true,
+          "finite": true,
+          "mean_world_body_error_m": 0.047864850610494614,
+          "max_frame_world_body_error_m": 0.19371242821216583,
+          "mean_local_body_error_m": 0.020123658701777458,
+          "world_root_endpoint_error_m": 0.07002018392086029,
+          "separate_start_frame_root_error_m": 0.07524189352989197,
+          "min_playback_root_height_m": 0.6508272290229797,
+          "root_trajectory": "outputs/pm01/pure-training-2ms/fightAndSports1_subject4.root.npz",
+          "trajectory": "outputs/pm01/pure-training-2ms/fightAndSports1_subject4.trajectory.npz",
+          "passed": true
+        },
+        {
+          "motion": "/home/galbot/projects/sim2real/checkpoints/engineai_pm01/motions/motions/walk1_subject1.npz",
+          "policy": "/home/galbot/projects/sim2real/checkpoints/proteus/wsq61/engineai_pm01/policy-sim.yaml",
+          "seed": 0,
+          "motion_sha256": "d89d0677bfe4566f91b8739082f786ba2904f54e45c91f7a57a268077d50857f",
+          "policy_yaml_sha256": "61e3fdb9f4998850e366a3827635c439eb1725a5e6cac98bd2c52371a4c43442",
+          "onnx_sha256": "a89fe6583736e20ed409de05303babdf19f36bffaebd835401c7294c28372838",
+          "manifest_sha256": "e650f550dea38b8ba4e1384d5f8bd5db05e94baa455d185f6edb2bbea05636a9",
+          "prepared_mjcf_sha256": "bcbaa5c24f83716b48a035aa98d38606623fde311adf1c0bff5868eae16a4d91",
+          "sim_dt_s": 0.002,
+          "policy_dt_s": 0.02,
+          "initial_hold_s": 1.0,
+          "final_hold_s": 1.0,
+          "last_motion_index": 398,
+          "completed": true,
+          "finite": true,
+          "mean_world_body_error_m": 0.022879844531416893,
+          "max_frame_world_body_error_m": 0.03512514382600784,
+          "mean_local_body_error_m": 0.01876615546643734,
+          "world_root_endpoint_error_m": 0.023725362494587898,
+          "separate_start_frame_root_error_m": 0.12369802594184875,
+          "min_playback_root_height_m": 0.7796230912208557,
+          "root_trajectory": "outputs/pm01/pure-training-2ms/walk1_subject1.root.npz",
+          "trajectory": "outputs/pm01/pure-training-2ms/walk1_subject1.trajectory.npz",
+          "passed": true
+        }
+      ]
+    },
+    "recorded_pose_rehearsal": {
+      "reason": "completed walk",
+      "passed": false,
+      "stationary_quality": {
+        "passed": false,
+        "joint_names": [
+          "J00_HIP_PITCH_L",
+          "J01_HIP_ROLL_L",
+          "J02_HIP_YAW_L",
+          "J03_KNEE_PITCH_L",
+          "J04_ANKLE_PITCH_L",
+          "J05_ANKLE_ROLL_L",
+          "J06_HIP_PITCH_R",
+          "J07_HIP_ROLL_R",
+          "J08_HIP_YAW_R",
+          "J09_KNEE_PITCH_R",
+          "J10_ANKLE_PITCH_R",
+          "J11_ANKLE_ROLL_R",
+          "J12_WAIST_YAW",
+          "J13_SHOULDER_PITCH_L",
+          "J14_SHOULDER_ROLL_L",
+          "J15_SHOULDER_YAW_L",
+          "J16_ELBOW_PITCH_L",
+          "J17_ELBOW_YAW_L",
+          "J18_SHOULDER_PITCH_R",
+          "J19_SHOULDER_ROLL_R",
+          "J20_SHOULDER_YAW_R",
+          "J21_ELBOW_PITCH_R",
+          "J22_ELBOW_YAW_R",
+          "J23_HEAD_YAW"
+        ],
+        "joint_peak_to_peak_rad": [
+          0.04360988247705072,
+          0.019401480493611206,
+          0.08233185398692008,
+          0.04102244918995629,
+          0.06339368200159574,
+          0.16041445106926375,
+          0.08029783537205007,
+          0.06611766947424491,
+          0.05981291420273682,
+          0.10279483520145166,
+          0.072434786391618,
+          0.11119055435425473,
+          0.02045080073305437,
+          0.017248574809916456,
+          0.03220699772003188,
+          0.02913011165124149,
+          0.0216686134150135,
+          0.05168625752768635,
+          0.016843584283970092,
+          0.006843495530766797,
+          0.019560122050683113,
+          0.023201507616216782,
+          0.013175945725058924,
+          0.0761770167221251
+        ],
+        "joint_speed_rms_rad_s": [
+          0.029462762367247684,
+          0.023512453078023715,
+          0.06503217967082951,
+          0.03894449117859403,
+          0.0836774115335953,
+          0.1908309232792878,
+          0.09776834926726162,
+          0.10671638451894748,
+          0.09884218786456743,
+          0.14867842829858566,
+          0.08965873228342021,
+          0.14547001888032565,
+          0.018517351784220502,
+          0.028089734672968474,
+          0.05092542956582067,
+          0.0378792005705084,
+          0.025590449745463737,
+          0.05880644497460341,
+          0.026013396313012246,
+          0.010138664348393481,
+          0.03080095808502961,
+          0.03232663131574633,
+          0.017519357484785916,
+          0.06691459863485406
+        ],
+        "peak_to_peak_limit_rad": 0.12,
+        "speed_rms_limit_rad_s": 0.3,
+        "scope": "Whole-body settled supported first-frame hold; offline qualification, not a hardware rating"
+      },
+      "max_joint_speed_rad_s": 7.77315892867079,
+      "max_ankle_speed_rad_s": 7.77315892867079,
+      "max_joint_torque_Nm": 65.48018646240234,
+      "max_ankle_torque_Nm": 50.20220947265625,
+      "max_root_position_error_m": 3.327479806451301,
+      "policy_config": "checkpoints/proteus/wsq61/engineai_pm01/policy.yaml",
+      "pose_record": ".scratch/pm01-recovery/walk-deploy-006-seed.npz",
+      "motion": "checkpoints/engineai_pm01/motions/motions/walk1_subject1.npz",
+      "hold_seconds": 1.0,
+      "walk_shaping": false,
+      "feet_touch": true,
+      "walk_once": true,
+      "hardware_tested": false,
+      "supported_policy_seconds": 12.0,
+      "limitation": "Idealized load transfer starts 12 seconds after policy entry, replacing the weld with vertical weight support ramped to zero over one second; serial-joint dynamics, no physical cable or measured motor inertia"
+    },
+    "recorded_pose_hold_seconds_5_to_12": {
+      "max_joint_peak_to_peak_rad": 0.028922554741324477,
+      "max_joint_speed_rms_rad_s": 0.004289754195365386,
+      "interpretation": "early transient settles; does not change the failed 2-to-12-second qualification verdict"
+    },
+    "hardware_tested": false,
+    "read_only_live_attempt": {
+      "passed": false,
+      "reason": "eno1 DOWN, no IPv4 address; CycloneDDS cannot create domain",
+      "motor_commands_sent": 0
+    },
+    "commands": {
+      "export": "HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --no-sync python -m scripts.export_proteus_onnx --contract engineai_pm01 --robot pm01 --release wsq61 --proteus-root ../Proteus-wamseq",
+      "evaluate": "HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --no-sync python -m scripts.proteus.evaluate --robot pm01 --policy-config checkpoints/proteus/wsq61/engineai_pm01/policy-sim.yaml --dataset checkpoints/engineai_pm01/motions --output outputs/pm01/pure-training-2ms --sim-dt .002",
+      "pose_rehearsal": "HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 PYTHONPATH=.:$PYTHONPATH uv run --no-sync python .scratch/pm01-recovery/pure_training_rehearsal.py"
+    }
+  },
+  "classic_parser_baseline": {
+    "date": "2026-11-05",
+    "status": "First gantry-protected hardware walk completed",
+    "change": "PM01Codec.parallel_parser_type = 0; policy.onnx, policy.yaml and commanded kp/kd unchanged; T800 and relay tools keep RL_PARSER",
+    "reset_20261105": {
+      "tracking_rclpy_init": "19:35:41.193",
+      "eno1_link_down": "19:35:44.6",
+      "recording": false,
+      "first_powered_run_after_containment_removal": true
+    },
+    "evidence": {
+      "motor_driver_rl_samples": 38277,
+      "trials_with_motor_samples": 18,
+      "gain_mismatches": 0,
+      "classic_kd3_stable_trials": 23,
+      "walk_deploy_006_classic_decay": {
+        "from_rad_s": 9.39,
+        "to_rad_s": 0.42,
+        "within_ms": 24
+      }
+    },
+    "estimates": {
+      "pd_to_acceleration_ms": [
+        8,
+        9
+      ],
+      "ankle_roll_inertia_kg_m2": [
+        0.011,
+        0.016
+      ],
+      "free_foot_rl_stable_kd_at_kp_37_701": [
+        0.54,
+        1.23
+      ],
+      "delayed_model_incident_match": {
+        "inertia_kg_m2": 0.0107,
+        "delay_ms": 8,
+        "speed_rad_s": 40.8,
+        "position_rad": 0.242,
+        "frequency_hz": 28
+      }
+    },
+    "simulation": {
+      "config": "outputs/pm01/classic-equivalent-config/policy-sim.yaml",
+      "summary": "outputs/pm01/classic-equivalent-2ms/summary.json",
+      "sim_dt": 0.002,
+      "joint_side_ankle_gain_multipliers": {
+        "pitch": 4.09,
+        "roll": 1.113
+      },
+      "passed": true,
+      "limitations": "No measured ankle inertia or loop delay in the model",
+      "motions": {
+        "aiming1_subject1": {
+          "rl_baseline": {
+            "mean_world_body_error_m": 0.02591557800769806,
+            "max_frame_world_body_error_m": 0.04428911954164505,
+            "world_root_endpoint_error_m": 0.03931187838315964
+          },
+          "classic_equivalent": {
+            "mean_world_body_error_m": 0.03209865093231201,
+            "max_frame_world_body_error_m": 0.05555308237671852,
+            "world_root_endpoint_error_m": 0.034585919231176376
+          }
+        },
+        "dance2_subject1": {
+          "rl_baseline": {
+            "mean_world_body_error_m": 0.02927974797785282,
+            "max_frame_world_body_error_m": 0.06629176437854767,
+            "world_root_endpoint_error_m": 0.02191638946533203
+          },
+          "classic_equivalent": {
+            "mean_world_body_error_m": 0.038359470665454865,
+            "max_frame_world_body_error_m": 0.06612643599510193,
+            "world_root_endpoint_error_m": 0.05554363876581192
+          }
+        },
+        "fightAndSports1_subject4": {
+          "rl_baseline": {
+            "mean_world_body_error_m": 0.047864850610494614,
+            "max_frame_world_body_error_m": 0.19371242821216583,
+            "world_root_endpoint_error_m": 0.07002018392086029
+          },
+          "classic_equivalent": {
+            "mean_world_body_error_m": 0.04439375922083855,
+            "max_frame_world_body_error_m": 0.1054038256406784,
+            "world_root_endpoint_error_m": 0.05662574619054794
+          }
+        },
+        "walk1_subject1": {
+          "rl_baseline": {
+            "mean_world_body_error_m": 0.022879844531416893,
+            "max_frame_world_body_error_m": 0.03512514382600784,
+            "world_root_endpoint_error_m": 0.023725362494587898
+          },
+          "classic_equivalent": {
+            "mean_world_body_error_m": 0.04292244091629982,
+            "max_frame_world_body_error_m": 0.11595042794942856,
+            "world_root_endpoint_error_m": 0.0348832905292511
+          }
+        }
+      }
+    },
+    "first_hardware_walk": {
+      "recording": "policy_tracking_record_policy_20261105_210134.npz",
+      "playback_frames": 398,
+      "reset": false,
+      "max_motor_temperature_after_c": 43,
+      "matched_simulation": "outputs/pm01/classic-rf-walk.npz",
+      "matched_simulation_config": "outputs/pm01/classic-equivalent-config/policy-rf.yaml",
+      "hardware_vs_matched_sim": {
+        "knee_range_rad": {
+          "hardware": [
+            1.14,
+            1.04
+          ],
+          "simulation": [
+            1.18,
+            1.01
+          ]
+        },
+        "foot_lift_cm": {
+          "hardware": [
+            17.1,
+            16.9
+          ],
+          "simulation": [
+            17.8,
+            18.1
+          ]
+        },
+        "mean_pelvis_tilt_deg": {
+          "hardware": 5.2,
+          "simulation": 5.9
+        },
+        "ankle_pitch_rms_error_rad": {
+          "hardware": 0.145,
+          "simulation": 0.147,
+          "ideal_rl_simulation": 0.074
+        },
+        "peak_ankle_pitch_torque_nm": {
+          "hardware": 106.1,
+          "simulation_clipped_at": 61.0
+        }
+      },
+      "final_frame_hold": {
+        "duration_s": 33,
+        "peak_ankle_speed_rad_s": 18.27,
+        "peak_torque_nm": 133.7,
+        "peak_near_s": 110
+      },
+      "not_measured": "Root position, foot placement and distance travelled"
+    },
+    "pose_incident": "On 2026-11-05 the pelvis was physically turned about 180 degrees relative to torso and feet while the robot looked upright; restored by hand in passive"
+  }
+}

@@ -50,6 +50,12 @@ def check_robot(duration=5.):
             'other_command_publishers': [p.node_name for p in command_publishers],
             'feedback_error': str(codec.error) if codec.error else None,
             'fresh_joint_imu_and_joint_bridge': codec._fresh(),
+            'feedback_header_stamps_ns': dict(codec.stamps),
+            'feedback_age_s': {
+                **{key: time.monotonic() - state[0] for key, state in codec.state.items()},
+                'imu': time.monotonic() - codec.imu[0] if codec.imu is not None else None,
+                'motion_mode': time.monotonic() - codec.motion_mode_time if codec.motion_mode is not None else None,
+            },
         }
         if codec.imu is not None:
             result['pelvis_quaternion_wxyz'] = codec.imu[1].tolist()

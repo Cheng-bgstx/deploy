@@ -11,6 +11,7 @@ from sim2real.rl_policy.robot_io.ros2_named import NamedJointCodec, NamedRosRobo
 
 
 class EngineAICodec(NamedJointCodec):
+    parallel_parser_type = 1
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.motion_mode, self.motion_mode_time = None, 0.
@@ -75,7 +76,10 @@ class EngineAIRobotIO(NamedRosRobotIO):
                 # damping; an explicit transition gives ownership back to firmware.
             if not ready or self._publishers['body'].get_subscription_count() == 0:
                 return
-            groups = self.codec.command_groups(force_damping)
+            # Capture parser choice and arrays in the same codec transaction.
+            with self.codec.lock:
+                groups = self.codec.command_groups(force_damping)
+                parser_type = self.codec.parallel_parser_type
             if 'body' not in groups:
                 return
             q, dq, tau, kp, kd = groups['body']
@@ -85,9 +89,9 @@ class EngineAIRobotIO(NamedRosRobotIO):
             msg.feed_forward_torque = tau.tolist()
             msg.torque = [0.] * len(q)
             msg.stiffness, msg.damping = kp.tolist(), kd.tolist()
-            # RL_PARSER consumes serial pitch/roll targets and performs the
-            # SDK's parallel-ankle transform, matching the vendor RL example.
-            msg.parallel_parser_type = 1
+            # The codec selects the SDK's parallel-ankle transform: RL_PARSER
+            # converts serial PD to motor torque; classic keeps PD in the motor.
+            msg.parallel_parser_type = parser_type
             self._publishers['body'].publish(msg)
         except Exception as exc:
             with self.codec.lock:
