@@ -15,9 +15,22 @@ from sim2real.utils.math import quat_conjugate, quat_mul, quat_rotate_numpy
 class NamedJointCodec:
     def __init__(self, cfg, groups, *, timeout_s=.25, damping=2., max_position_step=.2,
                  imu_to_pelvis_wxyz=(1., 0., 0., 0.), fixed_joints=None, physical_limits=None,
-                 allow_init_from_measured=False):
+                 allow_init_from_measured=False, policy_limit_mode='clip', limit_feedforward_band_rad=.1):
         self.cfg, self.groups = cfg, groups
         self.allow_init_from_measured = allow_init_from_measured
+        # Policy-mode position targets beyond the joint range (Shaping always clips):
+        #   clip         send the range bound (PD torque toward the target is lost)
+        #   pass         send the target unchanged (as in training, but a robot without a hard
+        #                stop at the model limit is driven past it)
+        #   feedforward  send the range bound plus effort kp * (target - bound), faded linearly to
+        #                zero over the last limit_feedforward_band_rad before the limit: in range the
+        #                torque equals the unclipped PD; at the limit it equals clip, a virtual stop.
+        if policy_limit_mode not in {'clip', 'pass', 'feedforward'}:
+            raise ValueError(f"policy_limit_mode must be 'clip', 'pass' or 'feedforward', got {policy_limit_mode!r}")
+        self.policy_limit_mode = policy_limit_mode
+        self.limit_feedforward_band = float(limit_feedforward_band_rad)
+        if not (np.isfinite(self.limit_feedforward_band) and self.limit_feedforward_band > 0):
+            raise ValueError('limit_feedforward_band_rad must be finite and positive')
         self.timeout_s, self.damping, self.max_step = float(timeout_s), float(damping), float(max_position_step)
         if not all(np.isfinite(v) and v > 0 for v in (self.timeout_s, self.damping, self.max_step)):
             raise ValueError('timeout, damping and max_position_step must be finite and positive')
@@ -151,7 +164,14 @@ class NamedJointCodec:
                                 # range; never command farther out than the current feedback.
                                 measured = self.state[group][1][0][i]
                                 lo, hi = min(lo, measured), max(hi, measured)
-                            values[0, i] = np.clip(values[0, i], lo, hi)
+                            target = values[0, i]
+                            if self.mode != 'policy' or self.policy_limit_mode != 'pass':
+                                values[0, i] = np.clip(target, lo, hi)
+                            excess = target - values[0, i]
+                            if self.mode == 'policy' and self.policy_limit_mode == 'feedforward' and excess:
+                                measured = self.state[group][1][0][i]
+                                room = (measured - lo) if excess < 0 else (hi - measured)
+                                values[2, i] += values[3, i] * excess * np.clip(room / self.limit_feedforward_band, 0., 1.)
                             values[1, i] = np.clip(values[1, i], -self.cfg.joint_velocity_limit[n], self.cfg.joint_velocity_limit[n])
                             values[2, i] = np.clip(values[2, i], -self.cfg.joint_effort_limit[n], self.cfg.joint_effort_limit[n])
                         previous = self.last_position.get(n, float(self.state[group][1][0][i]))

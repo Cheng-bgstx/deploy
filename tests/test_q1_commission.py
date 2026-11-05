@@ -151,3 +151,29 @@ def test_manual_overlay_removes_inherited_gates_and_feedforward_without_changing
     assert result['max_target_velocity_rad_s'] == 15.
     assert len(result['soft_joint_pos_limits']) == 22
     assert yaml.safe_load(source.read_text()) == original
+
+
+@pytest.mark.parametrize('mode', ['pass', 'feedforward'])
+def test_codec_limit_mode_moves_yaml_limits_to_shaping(tmp_path, mode):
+    cfg = get_robot_cfg('q1')
+    source = tmp_path / 'policy.yaml'
+    source.write_text(yaml.safe_dump({
+        'policy_joint_names': list(cfg.joint_names),
+        'proteus': {'robot': 'primebot_q1', 'reference_forcing': True},
+        'robot_io_options': {'publish_hz': 1000., 'timeout_s': .25, 'clip_policy_positions': False},
+        'model_path': 'policy.onnx',
+    }))
+    def make(**options):
+        output = prepare(PrepareArgs('/aima/hal/imu/state', (1., 0., 0., 0.), policy_config=source,
+                                     manual_policy_entry=True, **options))
+        return output.read_text(), yaml.safe_load(output.read_text())
+    _, clipped = make()
+    assert clipped['robot_io_options']['policy_limit_mode'] == 'clip'
+    assert 'shaping_joint_pos_limits' not in clipped
+    text, result = make(policy_limit_mode=mode)
+    assert 'soft_joint_pos_limits' not in result
+    assert result['shaping_joint_pos_limits'] == clipped['soft_joint_pos_limits']
+    assert result['robot_io_options']['policy_limit_mode'] == mode
+    assert 'clip_policy_positions' not in result['robot_io_options']  # stale key from a previous overlay
+    assert result['max_target_velocity_rad_s'] == 15.
+    assert 'EXPERIMENTAL' in text

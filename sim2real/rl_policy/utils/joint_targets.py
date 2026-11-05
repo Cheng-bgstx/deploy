@@ -35,7 +35,9 @@ Pose targets the robot interpolates to before policy control (the
 ``shaping_joint_pos_limits`` (same format), else ``soft_joint_pos_limits``.
 ``shaping_joint_pos_limits`` never clips policy targets. A robot IO layer may
 still clip them: ``NamedJointCodec`` (Q1) clips every command to the model joint
-range, so there the rate limit would run on targets the robot never receives.
+range under its default ``policy_limit_mode: clip``, so there the rate limit would
+run on targets the robot never receives. Its ``pass`` and ``feedforward`` modes
+handle out-of-range policy targets instead (``robot_io_options``).
 """
 
 from __future__ import annotations

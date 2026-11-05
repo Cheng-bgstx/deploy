@@ -229,6 +229,59 @@ def test_q1_shaping_returns_gradually_from_measured_position_outside_model_range
     assert command(target) == pytest.approx(.22)  # policy retains model limits
 
 
+
+def test_q1_unclipped_policy_positions_keep_offset_but_shaping_still_clips():
+    cfg = get_robot_cfg('q1')
+    codec = NamedJointCodec(cfg, {'body': cfg.joint_names}, damping=5., allow_init_from_measured=True,
+                            policy_limit_mode='pass')
+    feed(codec)
+    names = codec.groups['body']
+    n, index = len(names), names.index('left_ankle_pitch_joint')
+    lo, _ = codec.limits['left_ankle_pitch_joint']
+    target = codec.state['body'][1][0].copy()
+    target[index] = lo - .15
+    def settle():
+        codec.write_command(target, np.zeros(n), np.full(n, 1e4), np.ones(n), np.ones(n))
+        for _ in range(10):  # the 0.2 rad per-publish step bound still applies
+            values = codec.command_groups()['body']
+        return values
+    codec.mode = 'init'
+    assert settle()[0, index] == pytest.approx(lo)  # Shaping keeps the model range
+    codec.mode = 'policy'
+    values = settle()
+    assert values[0, index] == pytest.approx(lo - .15)  # policy keeps the actor's PD offset
+    assert values[2, index] == pytest.approx(cfg.joint_effort_limit['left_ankle_pitch_joint'])  # effort still bounded
+
+
+def test_q1_feedforward_limit_mode_is_a_virtual_stop():
+    cfg = get_robot_cfg('q1')
+    codec = NamedJointCodec(cfg, {'body': cfg.joint_names}, damping=5., allow_init_from_measured=True,
+                            policy_limit_mode='feedforward', limit_feedforward_band_rad=.1)
+    feed(codec)
+    names = codec.groups['body']
+    n, index = len(names), names.index('left_ankle_pitch_joint')
+    lo, _ = codec.limits['left_ankle_pitch_joint']
+    target = codec.state['body'][1][0].copy()
+    target[index] = lo - .15
+    def settle(kp=8.4):
+        codec.write_command(target, np.zeros(n), np.zeros(n), np.full(n, kp), np.ones(n))
+        for _ in range(10):
+            values = codec.command_groups()['body']
+        return values[0, index], values[2, index]
+    codec.mode = 'init'
+    assert settle() == pytest.approx((lo, 0.))  # Shaping: clip, no feedforward
+    codec.mode = 'policy'
+    assert settle() == pytest.approx((lo, 8.4 * -.15))  # well inside the range: the unclipped PD torque
+    codec.state['body'][1][0][index] = lo + .05
+    assert settle() == pytest.approx((lo, .5 * 8.4 * -.15))  # half way through the band
+    codec.state['body'][1][0][index] = lo - .02
+    assert settle() == pytest.approx((lo, 0.))  # past the limit: plain clip
+    codec.state['body'][1][0][index] = 0.
+    limit = cfg.joint_effort_limit['left_ankle_pitch_joint']
+    assert settle(kp=1e4) == pytest.approx((lo, -limit))  # effort bound still applies
+    with pytest.raises(ValueError, match='policy_limit_mode'):
+        NamedJointCodec(cfg, {'body': cfg.joint_names}, policy_limit_mode='unclipped')
+
 def test_q1_full_command_preserves_feedback_slots_and_all_joint_fields(monkeypatch):
     """Replay the observed Q1 layout into the actual serializer and a slot-based HAL.
 

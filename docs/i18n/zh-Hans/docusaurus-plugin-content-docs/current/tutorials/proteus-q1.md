@@ -103,7 +103,20 @@ uv run --no-sync python -m scripts.q1.prepare_deployment \
 bash scripts/q1/start_proteus.sh checkpoints/primebot_q1/motions/motions/walk1_subject1.npz
 ```
 
-`start_proteus.sh` 选择 `checkpoints/proteus/wsq61/primebot_q1/policy-pc.yaml`，可用 `PROTEUS_POLICY_CONFIG` 覆盖。该配置提供 `shaping_target: motion_first_frame` 所需的软限位及 15 rad/s 策略目标速度限制。上方命令按本机操作者要求明确选择**手动策略接管**：按 `]` 直接进入暂停回放的 policy Hold，不要求塑形完成、关节误差小于 0.10 rad 或速度小于 0.5 rad/s。`i` 仍可选择执行十秒塑形。启动仍未使能，反馈检查、超时阻尼、目标限位及 `o` 停止仍保留。这是操作者手动试机，不代表实机验收通过。
+`start_proteus.sh` 选择 `checkpoints/proteus/wsq61/primebot_q1/policy-pc.yaml`，可用 `PROTEUS_POLICY_CONFIG` 覆盖。该配置提供 `shaping_target: motion_first_frame` 所需的关节限位（`soft_joint_pos_limits`；使用 `--policy-limit-mode pass|feedforward` 时为 `shaping_joint_pos_limits`）及 15 rad/s 策略目标速度限制。上方命令按本机操作者要求明确选择**手动策略接管**：按 `]` 直接进入暂停回放的 policy Hold，不要求塑形完成、关节误差小于 0.10 rad 或速度小于 0.5 rad/s。`i` 仍可选择执行十秒塑形。启动仍未使能，反馈检查、超时阻尼、目标限位及 `o` 停止仍保留。这是操作者手动试机，不代表实机验收通过。
+
+**超出关节范围的策略目标（实验性）。** 默认情况下，overlay 会把每个策略目标裁剪到模型关节范围，共两层：Tracker 中的 `soft_joint_pos_limits`，以及 `NamedJointCodec` 的位置钳位。Proteus 训练时没有这种裁剪。低增益关节（踝 kp 8.4 N·m/rad）上，策略靠把目标打到限位之外来获得力矩。在 2026-11-05 的 walk1 实机记录中，裁剪在行走时削掉了约 35% 的踝 pitch PD 力矩，在 7.0–7.5 s 踉跄时削掉 60–73%。`--policy-limit-mode` 选择 policy 模式下 codec 如何处理这类目标，塑形目标始终会被裁剪。
+- `clip`（默认）：发送范围边界。
+- `pass`：原样发送目标。**Q1 上只配合手臂放下起步的动作使用。** 2026-11-06 用 walk1 进入 policy Hold 后，右臂剧烈摆动：右肩 roll 实测达到 -2.28 rad，超过模型限位 -1.54。厂商把肩 roll 列为连续转动关节，模型限位处没有任何机械限位。walk1 前 3 s 是 LAFAN 的 T-pose，手臂平举在肩 roll 限位边上（-1.43/+1.52，限位 ±1.54）。三次裁剪版 walk1 实机记录中，这段时间策略的手臂目标 100% 的帧超出范围，超出 1.4–1.7 rad；参考手臂放下后只有 1–4% 的帧超出，而行走时腿部目标 83–91% 的帧超出。把合约 `morph`（actor 的输入）中的肩 roll 限位放宽到 2.49 rad，实机上手臂仍然摆动。
+- `feedforward`：发送范围边界，再加上力矩 kp·(目标 − 边界)，并在距限位最后 0.1 rad 内线性衰减到零。范围内等于不裁剪时的 PD 力矩，到达限位时等于 `clip`。
+
+使用 `pass` 或 `feedforward` 时，overlay 把关节范围写成 `shaping_joint_pos_limits`，并设置 `robot_io_options.policy_limit_mode`。速度和力矩上限、15 rad/s 速度限制以及每次发布的步长上限仍保留。
+
+在 codec 闭环仿真中，肩 roll 范围放宽到 ±3 rad，依次运行龙门架 Hold、释放、播放和结束后 3 s 保持。`feedforward` 下 walk1、dance1 和 fightAndSports1 从两种初始姿态出发都完成了且未摔倒；`clip` 6 次中摔倒 4 次，`pass` 摔倒 1 次。但从实机初始姿态出发、焊接约束把骨盆固定在录制时的 29° 倾角时，`feedforward` 下右肩 roll 在 Hold 中仍摆到 -2.42 rad，与 `pass` 相同。实机龙门架上骨盆会回正到约 7°；骨盆竖直时，仿真中没有任何变体复现实机的手臂摆动。2026-11-04 的重力前馈测试也提示 Q1 实机链路可能忽略 `effort`，这时 `feedforward` 等同于 `clip`。两种选项都未经实机验证，本地 overlay 使用 `clip`。
+
+本地实验导出 `checkpoints/proteus/wsq61_shoulder249/primebot_q1` 使用同一个 actor，只是把 `morph` 中肩 roll 的外展限位从 1.54 放宽到 2.49 rad（61 个训练机器人的中位数），并附带 `pass` overlay。仿真中 walk1 的 6 次运行全部完成且未摔倒，1.54 版摔倒 1 次；实机上 walk1 的 Hold 中右臂仍然摆动。
+
+`checkpoints/primebot_q1/motions_walk1_stand` 是用同一 IK 配置从 LAFAN 3.2–10.7 s 重新重定向的 walk1。它以手臂放下的站姿起步，以约 0.45 m/s 行走后减速停下，停下时右脚跟抬起。同一 codec 仿真中从直立姿态起步，各模式下有支撑的 Hold 中右肩 roll 都保持在 [-0.36, -0.19] rad，没有手臂目标超出范围。在 15.0 或 16.0 s 释放后播放：`clip` 2 次中摔倒 2 次，`pass` 摔倒 0 次。`scripts.q1.validate_deployment` 使用 `policy-pc-pass.yaml` 通过。尚未在实机上测试。
 
 重力前馈**默认关闭**。最新实机记录虽然包含非零前馈命令，反馈力矩却接近单独的 PD 项，肩部下垂仍然存在。离线 SDK/CDR 序列化保留了 `effort`；具体是硬件执行链路还是反馈语义存在差异，尚未确定。显式传入 `--enable-shaping-gravity` 才启用实验性的限幅模型前馈（两秒渐增、关节力矩上限的 10%、仅塑形阶段）。不传 `--manual-policy-entry` 则恢复塑形完成、姿态和速度接管门槛。这些选项均不改变导出的 actor 和 PD 增益。
 

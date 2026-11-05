@@ -12,6 +12,7 @@ from types import SimpleNamespace as NS
 import mujoco
 import numpy as np
 import tyro
+import yaml
 
 from sim2real.config.robots import get_robot_cfg
 from sim2real.rl_policy.controllers.base import ControllerBase
@@ -31,11 +32,12 @@ class Operator(ControllerBase):
 
 
 class OfflineIO(NamedRosRobotIO):
-    def __init__(self, sim, cfg, wire_names):
+    def __init__(self, sim, cfg, wire_names, **codec_options):
         # Deliberately bypass the ROS constructor; exercise the real codec and
         # keyword-command path with MuJoCo feedback in the vendor wire layout.
         self.sim, self.cfg = sim, cfg
-        self.codec = NamedJointCodec(cfg, {'body': cfg.joint_names}, damping=5., allow_init_from_measured=True)
+        self.codec = NamedJointCodec(cfg, {'body': cfg.joint_names}, damping=5., allow_init_from_measured=True,
+                                     **codec_options)
         self._armed = False
         self._preserve_feedback_order = True
         self.wire_names = list(wire_names)
@@ -123,7 +125,10 @@ def main(args):
     # Default to a deliberately different wire layout; captured feedback supplies
     # the actual hardware layout when provided.
     wire_names = [j['name'] for j in feedback['joints']] if feedback else list(reversed(cfg.joint_names))
-    io = OfflineIO(sim, cfg, wire_names)
+    # The hardware codec reads these from robot_io_options; mirror them here.
+    io_options = yaml.safe_load(Path(args.policy_config).read_text()).get('robot_io_options') or {}
+    limit_options = {k: io_options[k] for k in ('policy_limit_mode', 'limit_feedforward_band_rad') if k in io_options}
+    io = OfflineIO(sim, cfg, wire_names, **limit_options)
     tracker = OfflineTracking(TrackingArgs(robot='q1', policy_config=args.policy_config,
         motion_path=args.motion_path, robot_io='inline', inference_backend='onnx-cpu'), io)
     tracker.total_inference_cnt = 0
@@ -202,6 +207,7 @@ def main(args):
             'initial_tracking_record': str(args.initial_tracking_record),
             'use_recorded_orientation': args.use_recorded_orientation,
             'entry_mode': 'guarded' if guarded_entry else 'manual',
+            'policy_limit_mode': io.codec.policy_limit_mode,
             'joint_error_before_policy_rad': records[519]['joint_error'],
             'first_command_max_change_rad': float(np.max(np.abs(first_command-initial_q))),
             'joint_error_at_10_4_s_rad': records[520]['joint_error'],
