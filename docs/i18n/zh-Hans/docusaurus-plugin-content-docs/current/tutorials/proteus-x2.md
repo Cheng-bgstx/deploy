@@ -106,6 +106,94 @@ seed=0，策略 50 Hz，物理步长 0.005 秒。初始暂停 1 秒和结束保�
 
 ## AimDK 部署
 
+### 有线只读反馈检查
+
+在上位机使用 ROS 2 Humble 和与机器人固件匹配的 AimDK 消息包运行 Proteus。
+当前 `wsq61/lingxi_x2/policy.yaml` 使用参考根位置锚定，适用于真机；
+`policy-sim.yaml` 需要世界坐标定位反馈。
+
+换线之前先检查实际以太网帧。2026-11-04 连接的 Ultra 网口带有 **VLAN 200 标签**。
+仅在 `eno1` 上配置普通 IP 可以收到广播，但无法完成 ARP 回程。以下临时配置打通了
+双向通信（接口已存在时跳过创建）：
+
+```bash
+sudo ip link add link eno1 name eno1.200 type vlan id 200
+sudo ip addr add 10.0.1.2/24 dev eno1.200
+sudo ip link set eno1.200 up
+ping -c 2 10.0.1.40
+```
+
+`10.0.1.2/24` 只配置在一个接口上；如果此前加在父接口，先从父接口删除该地址。
+上述配置重启后不保留。VLAN 200 是这台机器的实测结果，并非所有 X2 的统一要求。
+当时 `10.0.1.40` 和 `.42` 均可访问，文档中的默认开发机地址 `.41` 未响应；
+尚未登录确认 `.42` 的角色。
+
+```bash
+source /opt/ros/humble/setup.bash
+source /path/to/matching/aimdk/install/setup.bash
+export ROS_DOMAIN_ID=0 ROS_LOCALHOST_ONLY=0 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+export CYCLONEDDS_URI='<CycloneDDS><Domain><General><Interfaces><NetworkInterface address="10.0.1.2" multicast="true"/></Interfaces><AllowMulticast>true</AllowMulticast></General></Domain></CycloneDDS>'
+HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --no-sync python \
+  scripts/x2/check_feedback.py --duration 10 --output outputs/x2/feedback.json
+```
+
+检查脚本只创建订阅者，不实例化 `X2RobotIO`，不发布控制指令，也不停止原生运控。
+它使用运行时相同的 codec 检查四组关节和骨盆 IMU，报告消息包路径、字段布局、
+关节名称、频率、反馈时效与关节角度。
+
+这台机器使用官方 v0.8.2 消息定义可正确解码全部 **31 个具名关节**：腿、腰、臂约
+**1000 Hz**，头约 **333 Hz**，IMU 约 **500 Hz**。最新 v1.1 RL 扩展包的消息定义
+会解出错误的数组长度，已被检查拒绝。v0.8.2 布局含温度字段，没有 `error_code`
+和数组 `state`；反馈解码成功**不能**确认实际固件版本，也不代表已具备电机故障监控。
+接管前仍需在 Agibot Go 中确认固件版本并使用匹配 SDK。本机已编译的只读消息包位于
+`third_party/aimdk_x2_ros_v082/install/setup.bash`，其 `source.json` 记录官方来源和
+源码哈希。目前尚未验证真机控制。
+
+### 接管控制
+
+**这台机器的实测能力限制：**2026-11-04 的迁移请求返回
+`code=0, status=2: State Develop_MC not configured, it will be skipped`。
+通信链路正常，但机器人配置没有定义 Develop_MC，仍处于 Business。本机辅助脚本
+不能给机器人新增模式配置。不要猜其他模式名称重试，也不要在原生 MC 仍占有 HAL
+时启动 Tracking。官方更新记录在 v1.0 才列出开发者模式，实际安装固件版本仍未确认；
+旧 HAL 布局不能证明全部固件能力。这台机器人接管前，仍需支持该模式的固件/配置，
+或通过已认证的机器人端管理入口执行旧版停止 MC 的操作。
+
+对于已配置该模式的机器人，可从上位机使用官方[系统模式接口](https://x2-aimdk.agibot.com/zh-cn/dev/Interface/system_state/)：
+`MigrateSystemState(state="Develop_MC")` 会停用原生运控，**不需要 SSH**。
+SUCCESS 仅表示请求已接受；必须轮询 GetSystemState，直到
+`cur_state == "Develop_MC"` 且 `curr_status.value == 1`（`IN_READY`）。迁移可能
+耗时数秒至数十秒。MC 的零力矩动作模式与系统的 Develop_MC 模式不同。
+
+辅助入口默认只读；显式传入 `--target` 才会切换系统模式。操作时保持吊装和独立停止手段：
+
+```bash
+bash scripts/x2/system_state.sh                       # 只读查询
+bash scripts/x2/system_state.sh --target Develop_MC  # 仅适用于机器人已配置该模式的情况
+bash scripts/x2/start_first_hold.sh                 # 单独启动控制进程
+```
+
+2026-11-04 本机只读服务调用成功，返回 Business / IN_READY。Fast DDS 绑定
+10.0.1.2 时服务响应正常；CycloneDDS 能发现服务，但查询未收到响应。辅助入口使用
+`scripts/x2/fastdds_host.xml`。本地消息包补充了官方 v1.1 的四个系统状态定义，保留
+已验证的全部 v0.8.2 HAL 定义，源码哈希记录于 `source.json`。只读查询成功不代表
+目标模式可用；后续迁移被拒绝的实测结果见上文。
+
+首次 Hold 启动器只检查控制权，不主动请求迁移。它要求 Develop_MC 已完成迁移、
+反馈新鲜、没有其他 HAL 控制发布者，且实测关节位于官方/训练限位交集内（允许
+0.01 rad 测量余量）；失败会在创建控制传输前退出。这些是启动检查，不是控制权
+互斥锁。先核对 IMU 轴向与骨盆实际倾斜、编码器零位；不要放宽限位来绕过拒绝。
+
+启动器使用 wsq61、静态参考 `outputs/x2/pico_hold` 和 CPU 推理，记录至
+`outputs/x2/first_hold_<time>.npz`。Tracking 启动后即发送阻尼命令，不必等到按键。
+按 `i` 等待 10 秒完成初始姿态整形，再按 `]` 进入策略 Hold；首次测试继续保留支撑。
+`o` 切换阻尼，正常 Ctrl+C 退出也发送阻尼；这些软件操作不替代独立停止手段。
+
+停止 Tracking 后继续保留支撑，执行 `bash scripts/x2/system_state.sh --target Ready`
+恢复原生功能；Ready 可能自动进入 Business。其他控制器还在发送 HAL 指令时不要
+恢复原生运控。旧文档中的机器人终端 `aima em stop-app mc` 可作为手动替代方案，
+在机器人确实支持上述全程上位机系统模式路径时，它不是前置条件。
+
 inline 后端遵循 [AimDK 关节接口](https://x2-aimdk.agibot.com/zh-cn/latest/Interface/control_mod/joint_control.html)
 和[骨盆 IMU 说明](https://x2-aimdk.agibot.com/zh-cn/latest/Interface/hal/sensor.html)。
 订阅四组关节状态及 `/aima/hal/imu/torso/state`（虽然叫 torso，实际为胯部 IMU），
@@ -117,8 +205,7 @@ inline 后端遵循 [AimDK 关节接口](https://x2-aimdk.agibot.com/zh-cn/lates
 ```bash
 source /opt/ros/humble/setup.bash
 source /path/to/aimdk/install/setup.bash
-# 真机取得 HAL 控制权前，需要显式释放原生控制器：
-# aima em stop-app mc
+# 先通过 MigrateSystemState 进入 Develop_MC，并等待 IN_READY。
 bash scripts/x2/start_proteus.sh /path/to/x2/any4hdmi_dataset
 ```
 
@@ -194,8 +281,7 @@ bash scripts/x2/start_pico.sh policy-sim 127.0.0.1
 ```bash
 source /opt/ros/humble/setup.bash
 source /path/to/aimdk/install/setup.bash
-# 接管 HAL 前按上文释放原生 mc 控制权。
-# aima em stop-app mc
+# 先通过 MigrateSystemState 进入 Develop_MC，并等待 IN_READY。
 bash scripts/x2/start_pico.sh robot PUBLISHER_IP
 ```
 

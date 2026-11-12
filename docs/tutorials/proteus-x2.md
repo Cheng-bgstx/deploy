@@ -118,6 +118,111 @@ because the initial pelvis orientations differ. The metrics JSON names both meas
 
 ## AimDK deployment
 
+### Wired feedback preflight
+
+Run Proteus on the host PC with ROS 2 Humble and the robot's matching AimDK
+message package. The current `wsq61/lingxi_x2/policy.yaml` uses
+reference-root anchoring for hardware; `policy-sim.yaml` needs world localization.
+
+Check the actual Ethernet framing before changing cables. On the Ultra tested
+on 2026-11-04, the connected port carried **tagged VLAN 200**. A plain address on
+`eno1` received broadcasts but could not complete ARP replies. The following
+temporary setup enabled two-way communication (skip creation if it already exists):
+
+```bash
+sudo ip link add link eno1 name eno1.200 type vlan id 200
+sudo ip addr add 10.0.1.2/24 dev eno1.200
+sudo ip link set eno1.200 up
+ping -c 2 10.0.1.40
+```
+
+Use one interface for `10.0.1.2/24`; remove that address from the parent first if
+previously added there. These commands do not persist across reboot. VLAN 200
+is an observation from this robot, not a requirement established for every X2.
+Both `10.0.1.40` and `.42` responded; the documented default development address
+`.41` did not. The role of `.42` was not authenticated.
+
+```bash
+source /opt/ros/humble/setup.bash
+source /path/to/matching/aimdk/install/setup.bash
+export ROS_DOMAIN_ID=0 ROS_LOCALHOST_ONLY=0 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+export CYCLONEDDS_URI='<CycloneDDS><Domain><General><Interfaces><NetworkInterface address="10.0.1.2" multicast="true"/></Interfaces><AllowMulticast>true</AllowMulticast></General></Domain></CycloneDDS>'
+HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --no-sync python \
+  scripts/x2/check_feedback.py --duration 10 --output outputs/x2/feedback.json
+```
+
+This checker only creates subscribers. It does not instantiate `X2RobotIO`,
+publish commands, or stop the native controller. It checks all four joint groups
+and the pelvis IMU using the runtime codec, and reports message-package paths,
+field layouts, names, rates, freshness and joint positions.
+
+On this robot, the official v0.8.2 message definitions decoded all **31 named
+joints** correctly: leg/waist/arm approximately **1000 Hz**, head **333 Hz**, IMU
+**500 Hz**. The latest v1.1 RL extension's message definitions decoded incorrect
+array lengths and were rejected. The v0.8.2 layout has temperature fields and no
+`error_code` or array `state`; matching feedback does **not** confirm the installed
+firmware version or establish motor-fault monitoring. Confirm the firmware in
+Agibot Go and use its matching SDK before control. The locally built reader is
+at `third_party/aimdk_x2_ros_v082/install/setup.bash`; its `source.json` records
+the official download URL and source hashes. Hardware control remains untested.
+
+### Taking control
+
+**Capability limitation observed on this robot:** the 2026-11-04 migration request
+returned `code=0, status=2: State Develop_MC not configured, it will be skipped`.
+The transport works, but this robot's configuration does not define Develop_MC;
+it remains in Business. The host helper cannot add robot-side modes. Do not retry
+with guessed mode names or start Tracking while native MC still owns HAL.
+The official changelog first lists developer modes under v1.0; the exact installed
+firmware remains unverified. The old HAL layout does not establish all firmware
+capabilities. On this robot, a supported firmware/configuration or authenticated
+robot-side legacy MC stop is still needed before hardware takeover.
+
+On robots that configure this mode, use the official
+[system-mode interface](https://x2-aimdk.agibot.com/zh-cn/dev/Interface/system_state/)
+from the host: `MigrateSystemState(state="Develop_MC")` disables native motion
+control without SSH. SUCCESS only acknowledges the request. Poll GetSystemState
+until `cur_state == "Develop_MC"` and `curr_status.value == 1` (`IN_READY`);
+migration can take seconds to tens of seconds. A zero-torque MC action is distinct
+from the system's Develop_MC mode.
+
+The helper defaults to a read-only query. An explicit `--target` changes the
+system mode; keep gantry support and an independent stop available:
+
+```bash
+bash scripts/x2/system_state.sh                       # Read-only query
+bash scripts/x2/system_state.sh --target Develop_MC  # Only if the robot configures this mode
+bash scripts/x2/start_first_hold.sh                 # Separate control process
+```
+
+On 2026-11-04, a read-only service query from this host succeeded and returned
+Business / IN_READY. Fast DDS bound to 10.0.1.2 worked for services; CycloneDDS
+could discover them but received no query responses. The helper uses
+`scripts/x2/fastdds_host.xml`. The local message build adds four official v1.1
+system-state definitions while retaining the verified v0.8.2 HAL definitions;
+source hashes are recorded in `source.json`. The read-only query did not prove
+target-mode availability; the subsequent rejected migration is recorded above.
+
+The first-Hold launcher only checks ownership, never requests migration. It
+requires a completed Develop_MC state, fresh feedback, no other HAL command
+publishers and measured joints within the vendor/training limit intersection
+(0.01 rad measurement margin). A failure exits before creating command transport.
+These are startup checks, not a control-ownership lock. Verify IMU axes against
+physical pelvis tilt and check encoder zero positions; do not widen limits to
+bypass refusal.
+
+The launcher uses wsq61, the static `outputs/x2/pico_hold` reference and CPU
+inference, recording to `outputs/x2/first_hold_<time>.npz`. Starting Tracking sends
+damping commands before any key press. Press `i`, wait 10 s for shaping, then `]`
+for policy Hold. Retain support during the first test. `o` selects damping;
+normal Ctrl+C exit also sends damping. These do not replace the independent stop.
+
+After stopping Tracking and retaining support, restore native functionality with
+`bash scripts/x2/system_state.sh --target Ready`. Ready may automatically proceed
+to Business. Do not restore native MC while another controller sends HAL commands.
+The older robot-terminal `aima em stop-app mc` recipe is a manual alternative.
+It is not a prerequisite when the host-only system-mode path is actually supported.
+
 The inline backend uses the documented
 [AimDK joint interface](https://x2-aimdk.agibot.com/zh-cn/latest/Interface/control_mod/joint_control.html)
 and [pelvis IMU topic](https://x2-aimdk.agibot.com/zh-cn/latest/Interface/hal/sensor.html).
@@ -132,8 +237,7 @@ watchdog, so this thread does not protect against process kill or computer power
 ```bash
 source /opt/ros/humble/setup.bash
 source /path/to/aimdk/install/setup.bash
-# On the robot, release the native controller before taking HAL ownership:
-# aima em stop-app mc
+# First enter Develop_MC through MigrateSystemState and wait for IN_READY.
 bash scripts/x2/start_proteus.sh /path/to/x2/any4hdmi_dataset
 ```
 
@@ -220,8 +324,7 @@ For hardware, replace terminal 3 with the following on the X2 policy computer:
 ```bash
 source /opt/ros/humble/setup.bash
 source /path/to/aimdk/install/setup.bash
-# Release the native mc controller before taking HAL ownership, as above.
-# aima em stop-app mc
+# First enter Develop_MC through MigrateSystemState and wait for IN_READY.
 bash scripts/x2/start_pico.sh robot PUBLISHER_IP
 ```
 
