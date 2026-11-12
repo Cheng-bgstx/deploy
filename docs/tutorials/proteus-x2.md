@@ -148,6 +148,9 @@ the model; physical deployment must use factory calibration rather than relying
 on the topic's `frame_id`. Head pitch is disabled by default because only yaw is
 active on the original X2 Ultra. This adapter does not establish compatibility with
 other X2 revisions. Do not use `policy-sim.yaml` on hardware without world localization.
+`policy.yaml` also sets `soft_joint_pos_limits` to the AimDK backend's own target clip
+(training limits narrowed to the vendor limits), which the `motion_first_frame` Shaping
+target requires; hardware commands are unchanged. `policy-sim.yaml` omits them.
 
 Regression: `uv run --no-sync python -m pytest tests/test_x2.py tests/test_oli.py
 tests/test_proteus_observations.py tests/test_et1_proteus.py tests/test_robot_io.py

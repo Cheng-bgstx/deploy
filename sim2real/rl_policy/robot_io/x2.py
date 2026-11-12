@@ -11,7 +11,7 @@ import time
 import numpy as np
 
 from sim2real.config.robots.base import RobotCfg
-from sim2real.config.robots.x2 import X2_AIMDK_GROUPS, X2_VENDOR_LIMITS
+from sim2real.config.robots.x2 import X2_AIMDK_GROUPS, x2_deploy_joint_limits
 from sim2real.rl_policy.robot_io.base import RobotIO, RobotState
 from sim2real.utils.math import quat_conjugate, quat_mul, quat_rotate_numpy
 
@@ -38,8 +38,9 @@ class X2StateCommand:
         self.error = None
         self.lock = threading.Lock()
         # Never widen the physical robot limits to the training model's wider bounds.
-        self.lower = np.array([max(cfg.joint_pos_lower_limit[n], X2_VENDOR_LIMITS[n][0]) for n in cfg.joint_names])
-        self.upper = np.array([min(cfg.joint_pos_upper_limit[n], X2_VENDOR_LIMITS[n][1]) for n in cfg.joint_names])
+        limits = x2_deploy_joint_limits(cfg)
+        self.lower = np.array([limits[n][0] for n in cfg.joint_names])
+        self.upper = np.array([limits[n][1] for n in cfg.joint_names])
 
     @staticmethod
     def vector(value, count):

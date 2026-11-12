@@ -131,6 +131,8 @@ Hold，空格播放/暂停，`o` 阻尼，Ctrl+C 退出。首次真机测试需�
 使用出厂标定外参，不能只依赖话题 `frame_id`。旧版 X2 Ultra 仅头部 yaw 有效，因此
 默认不驱动 head pitch。本适配没有验证其他 X2 修订版本。没有世界系定位时，不能在
 真机使用 `policy-sim.yaml`。
+`policy.yaml` 另设 `soft_joint_pos_limits`，取值即 AimDK 后端自身的目标截断范围（训练限位与
+厂商限位的交集），供 `motion_first_frame` 初始插值目标使用，下发硬件的命令不变；`policy-sim.yaml` 不含此项。
 
 回归检查：`uv run --no-sync python -m pytest tests/test_x2.py tests/test_oli.py
 tests/test_proteus_observations.py tests/test_et1_proteus.py tests/test_robot_io.py

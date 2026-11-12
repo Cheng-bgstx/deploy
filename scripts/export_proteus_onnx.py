@@ -48,6 +48,7 @@ import yaml
 from onnx import TensorProto, helper, numpy_helper
 
 from sim2real.config.robots import get_robot_cfg
+from sim2real.config.robots.x2 import x2_deploy_joint_limits
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -312,6 +313,9 @@ def policy_yaml(contract: dict[str, Any], robot: str, far_offset: int) -> dict[s
             "publish_hz": 500.0, "timeout_s": 0.25, "head_pitch_enabled": False,
             "imu_topic": "/aima/hal/imu/torso/state", "imu_to_pelvis_wxyz": [1.0, 0.0, 0.0, 0.0],
         }
+        # motion_first_frame Shaping needs soft limits. These equal the AimDK backend's own target clip, so
+        # policy targets are unchanged. Hardware only: export_policy drops them from policy-sim.yaml.
+        cfg["soft_joint_pos_limits"] = {n: [lo, hi] for n, (lo, hi) in x2_deploy_joint_limits(robot_cfg).items()}
     return cfg
 
 
@@ -360,6 +364,7 @@ def export_policy(
         encoding="utf-8",
     )
     cfg["proteus"]["reference_forcing"] = False
+    cfg.pop("soft_joint_pos_limits", None)  # X2 hardware clip bounds; the sim keeps its recorded behaviour.
     (output_dir / "policy-sim.yaml").write_text(
         "# Simulation only: measured world root, matching the source Proteus MuJoCo rollout.\n"
         + yaml.dump(cfg, Dumper=_PolicyYamlDumper, sort_keys=False, width=110), encoding="utf-8",

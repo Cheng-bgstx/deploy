@@ -135,3 +135,9 @@ X2_VENDOR_LIMITS = {
     'head_yaw_joint': (-0.349, 0.349),
     'head_pitch_joint': (-0.3838, 0.3838),
 }
+
+
+def x2_deploy_joint_limits(cfg: RobotCfg = X2_CFG) -> dict[str, tuple[float, float]]:
+    """Training limits narrowed to the physical v1.3 limits: the widest targets the hardware accepts."""
+    return {n: (max(cfg.joint_pos_lower_limit[n], X2_VENDOR_LIMITS[n][0]),
+                min(cfg.joint_pos_upper_limit[n], X2_VENDOR_LIMITS[n][1])) for n in cfg.joint_names}
