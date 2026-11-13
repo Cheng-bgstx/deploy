@@ -63,11 +63,11 @@ uv run sim2real/rl_policy/tracking.py \
 | GRIT v0.0.1 | `checkpoints/grit/v0_0_1/policy.yaml` | 九帧参考上下文和十帧本体感知历史。 |
 | ScaleBFM | `checkpoints/scalebfm` | [WeishuaiZeng/ScaleBFM](https://huggingface.co/WeishuaiZeng/ScaleBFM) 的 Humanoid Transformer XL 和 M ONNX exports。 |
 | Proteus | `checkpoints/proteus/proteus_wamseq_62/unitree_g1/policy.yaml` | [ScaleBFM](https://github.com/zengweishuai/ScaleBFM) 的 62 本体 Proteus WAMSeq actor（已在 G1 真机测试；wsq61 actor 可作为替代），由 `scripts/export_proteus_onnx.py` 包装成 G1 policy；见 [Run External Policies](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/run-external-policies.md#proteus)。 |
-| Proteus ET1 | `checkpoints/proteus/proteus_wamseq_62/galbot_et1/policy.yaml` | Galbot ET1（`--robot et1`）上的 Proteus，在 ET1 板载运行；见 [Proteus 在 Galbot ET1 板载运行](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/reference/proteus-et1-onboard.md)。 |
+| Proteus ET1 | `checkpoints/proteus/proteus_60/galbot_et1/policy.yaml` | Galbot ET1（`--robot et1`）上的 Proteus，在 ET1 板载运行；见 [Proteus 在 Galbot ET1 板载运行](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/reference/proteus-et1-onboard.md)。 |
 | Proteus WAMSeq AgiBot Expedition A3 | `checkpoints/proteus/proteus_wamseq_62/agibot_a3/policy.yaml` | 30 关节、多条 LAFAN 动作和 PICO；[教程](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-a3.md)。 |
-| Proteus WAMSeq EngineAI T800 | `checkpoints/proteus/proteus_wamseq_62/engineai_t800/policy.yaml` | 25 关节、多条 LAFAN 动作和 PICO；[教程](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-t800.md)。 |
+| Proteus WAMSeq EngineAI T800 | `checkpoints/proteus/wsq61/engineai_t800/policy.yaml` | 25 关节、多条 LAFAN 动作和 PICO；[教程](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-t800.md)。 |
 | Proteus WAMSeq EngineAI PM01 | `checkpoints/proteus/wsq61/engineai_pm01/policy.yaml` | 24 关节 PM01/pm_v2、旧版 ROS 接口、LAFAN 动作和 PICO；[教程](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-pm01.md)。 |
-| Proteus WAMSeq Primebot Q1 | `checkpoints/proteus/proteus_wamseq_62/primebot_q1/policy.yaml` | 22 关节、多条 LAFAN 动作和 PICO；[教程](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-q1.md)。 |
+| Proteus WAMSeq Primebot Q1 | `checkpoints/proteus/wsq61/primebot_q1/policy.yaml` | 22 关节、多条 LAFAN 动作和 PICO；[教程](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-q1.md)。 |
 | BFM-Zero | `checkpoints/bfm-zero/exp_lafan40-100style_update_z10/policy.yaml` | Latent-conditioned motion tracker。 |
 | TeleopIT | `checkpoints/teleopit/policy.yaml` | TeleopIT policy wrapper。 |
 | Humanoid-GPT | `checkpoints/humanoid-gpt/policy.yaml` | Humanoid-GPT policy wrapper。 |
@@ -101,6 +101,24 @@ root XY 位移为 1.5--3.0 m。
 | Policy | Mimic Lite v1.1 | MimicLite-ROA | MimicLite-PPO | HEFT | HoloMotion | SONIC | SONIC low-latency | SONIC v1.1 | GRIT v0.0.1 | ScaleBFM XL | ScaleBFM M | Proteus | BFM-Zero | TeleopIT | Humanoid-GPT | TWIST2 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Motion-lookahead latency | 0.08 s | 0.08 s | 0.08 s | 0.12 s | 0.20 s | 0.90 s | 0.18 s | 0.90 s | 0.26 s | 0.10 s | 0.10 s | 0.32 s | 0.12 s | 0.00 s | 0.02 s | 0.00 s |
+
+## 真机部署
+
+每款机器人在 [`scripts/`](./scripts/README_zh.md) 下都有自己的文件夹，其中的 README 说明需要调整什么、如何运行。
+[`scripts/README_zh.md`](./scripts/README_zh.md) 介绍所有机器人共用的部署流程（导出、部署 overlay、sim2sim 预演、
+上机前检查、Shaping → Hold → Go → Final Hold 各阶段以及急停），以及接入新机器人的检查清单。
+
+| 机器人 | 文件夹 | 真机状态 |
+| --- | --- | --- |
+| Unitree G1 | [`scripts/g1`](./scripts/g1/README_zh.md) | PC 部署已真机测试；机载 Orin 路线尚未真机测试 |
+| Galbot ET1 | [`scripts/et1`](./scripts/et1/README_zh.md) | 已机载真机测试 |
+| EngineAI PM01 | [`scripts/pm01`](./scripts/pm01/README_zh.md) | 首次吊架保护行走 |
+| Primebot Q1 | [`scripts/q1`](./scripts/q1/README_zh.md) | 仅验证反馈读取；策略接管未验证 |
+| AgiBot A3 | [`scripts/a3`](./scripts/a3/README_zh.md) | 仅仿真 |
+| EngineAI T800 | [`scripts/t800`](./scripts/t800/README_zh.md) | 仅仿真 |
+| 智元灵犀 X2 | [`scripts/x2`](./scripts/x2/README_zh.md) | 仅仿真 |
+| LimX OLI | [`scripts/oli`](./scripts/oli/README_zh.md) | 仅仿真 |
+| DH116S 灵巧手 | [`scripts/dh116s`](./scripts/dh116s/README_zh.md) | PICO 抓握控制 |
 
 ## 真机环境
 

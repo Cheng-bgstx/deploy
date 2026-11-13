@@ -64,11 +64,11 @@ Currently supported adapted / distributed checkpoint families:
 | GRIT v0.0.1 | `checkpoints/grit/v0_0_1/policy.yaml` | Nine-frame reference context and ten-frame proprioceptive history. |
 | ScaleBFM | `checkpoints/scalebfm` | ScaleBFM Humanoid Transformer XL and M ONNX exports from [WeishuaiZeng/ScaleBFM](https://huggingface.co/WeishuaiZeng/ScaleBFM). |
 | Proteus | `checkpoints/proteus/proteus_wamseq_62/unitree_g1/policy.yaml` | The 62-robot Proteus WAMSeq actor (hardware-tested on G1; the wsq61 actor is an alternative) from [ScaleBFM](https://github.com/zengweishuai/ScaleBFM), wrapped for the G1 by `scripts/export_proteus_onnx.py`; see [Run External Policies](./docs/tutorials/run-external-policies.md#proteus). |
-| Proteus ET1 | `checkpoints/proteus/proteus_wamseq_62/galbot_et1/policy.yaml` | Proteus on the Galbot ET1 (`--robot et1`), run on the ET1 board; see [Proteus on the Galbot ET1 board](./docs/proteus_et1_onboard.md). |
+| Proteus ET1 | `checkpoints/proteus/proteus_60/galbot_et1/policy.yaml` | Proteus on the Galbot ET1 (`--robot et1`), run on the ET1 board; see [Proteus on the Galbot ET1 board](./docs/proteus_et1_onboard.md). |
 | Proteus WAMSeq AgiBot Expedition A3 | `checkpoints/proteus/proteus_wamseq_62/agibot_a3/policy.yaml` | 30 joints, multiple LAFAN motions and PICO; [guide](./docs/tutorials/proteus-a3.md). |
-| Proteus WAMSeq EngineAI T800 | `checkpoints/proteus/proteus_wamseq_62/engineai_t800/policy.yaml` | 25 joints, multiple LAFAN motions and PICO; [guide](./docs/tutorials/proteus-t800.md). |
+| Proteus WAMSeq EngineAI T800 | `checkpoints/proteus/wsq61/engineai_t800/policy.yaml` | 25 joints, multiple LAFAN motions and PICO; [guide](./docs/tutorials/proteus-t800.md). |
 | Proteus WAMSeq EngineAI PM01 | `checkpoints/proteus/wsq61/engineai_pm01/policy.yaml` | 24-joint PM01/pm_v2, legacy ROS interface, LAFAN motions and PICO; [guide](./docs/tutorials/proteus-pm01.md). |
-| Proteus WAMSeq Primebot Q1 | `checkpoints/proteus/proteus_wamseq_62/primebot_q1/policy.yaml` | 22 joints, multiple LAFAN motions and PICO; [guide](./docs/tutorials/proteus-q1.md). |
+| Proteus WAMSeq Primebot Q1 | `checkpoints/proteus/wsq61/primebot_q1/policy.yaml` | 22 joints, multiple LAFAN motions and PICO; [guide](./docs/tutorials/proteus-q1.md). |
 | BFM-Zero | `checkpoints/bfm-zero/exp_lafan40-100style_update_z10/policy.yaml` | Latent-conditioned motion tracker. |
 | TeleopIT | `checkpoints/teleopit/policy.yaml` | TeleopIT policy wrapper. |
 | Humanoid-GPT | `checkpoints/humanoid-gpt/policy.yaml` | Humanoid-GPT policy wrapper. |
@@ -98,6 +98,25 @@ the shared 50 Hz reference-motion contract.
 | Policy | Mimic Lite v1.1 | MimicLite-ROA | MimicLite-PPO | HEFT | HoloMotion | SONIC | SONIC low-latency | SONIC v1.1 | GRIT v0.0.1 | ScaleBFM XL | ScaleBFM M | Proteus | BFM-Zero | TeleopIT | Humanoid-GPT | TWIST2 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Motion-lookahead latency | 0.08 s | 0.08 s | 0.08 s | 0.12 s | 0.20 s | 0.90 s | 0.18 s | 0.90 s | 0.26 s | 0.10 s | 0.10 s | 0.32 s | 0.12 s | 0.00 s | 0.02 s | 0.00 s |
+
+## Deploying On Robots
+
+Every robot has its own folder under [`scripts/`](./scripts/README.md) with a README on what to adjust and how
+to run it. [`scripts/README.md`](./scripts/README.md) describes the deployment workflow shared by all of them
+(export, deployment overlay, sim2sim rehearsal, hardware preflight, the Shaping → Hold → Go → Final Hold stages
+and E-stop) and the checklist for bringing up a new robot.
+
+| Robot | Folder | Hardware status |
+| --- | --- | --- |
+| Unitree G1 | [`scripts/g1`](./scripts/g1/README.md) | Tested on PC; onboard Orin path not yet hardware-tested |
+| Galbot ET1 | [`scripts/et1`](./scripts/et1/README.md) | Tested onboard |
+| EngineAI PM01 | [`scripts/pm01`](./scripts/pm01/README.md) | First gantry-protected walk |
+| Primebot Q1 | [`scripts/q1`](./scripts/q1/README.md) | Feedback only; policy takeover unvalidated |
+| AgiBot A3 | [`scripts/a3`](./scripts/a3/README.md) | Simulation only |
+| EngineAI T800 | [`scripts/t800`](./scripts/t800/README.md) | Simulation only |
+| AgiBot Lingxi X2 | [`scripts/x2`](./scripts/x2/README.md) | Simulation only |
+| LimX OLI | [`scripts/oli`](./scripts/oli/README.md) | Simulation only |
+| DH116S hand | [`scripts/dh116s`](./scripts/dh116s/README.md) | PICO grip control |
 
 ## Real-robot Environments
 
