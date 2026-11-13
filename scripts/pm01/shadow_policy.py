@@ -98,6 +98,7 @@ def run(args):
             time.sleep(.01)
         if policy.robot_io.read_state() is None:
             raise RuntimeError('No fresh real feedback')
+        step_ms = []
         for step in range(775):
             deadline = time.monotonic()+.02
             for at, phase in phases:
@@ -106,12 +107,21 @@ def run(args):
                     elif phase == 'init': policy.set_init_mode(source='read-only test')
                     elif phase == 'policy': policy.set_policy_mode(source='read-only test')
                     else: policy.set_zero_mode(source='read-only test')
+            begin = time.perf_counter()
             policy.step()
+            step_ms.append((time.perf_counter() - begin) * 1e3)
             policy.total_inference_cnt += 1
             time.sleep(max(0., deadline-time.monotonic()))
         if policy.robot_io.commands != 775:
             raise RuntimeError(f'Incomplete inference: {policy.robot_io.commands}/775 frames')
-        result = {'read_only': True, 'motor_commands_sent': 0, 'frames': policy.robot_io.commands,
+        # Whole Tracking step (observation, ONNX, action) against the 20 ms control period; the policy
+        # phase (steps 550+) is the one that runs the actor every step.
+        active = np.asarray(step_ms[550:])
+        timing = {'policy_step_ms_p50': round(float(np.percentile(active, 50)), 2),
+                  'policy_step_ms_p99': round(float(np.percentile(active, 99)), 2),
+                  'policy_step_ms_max': round(float(active.max()), 2),
+                  'steps_over_20ms': int((np.asarray(step_ms) > 20.).sum())}
+        result = {'read_only': True, 'motor_commands_sent': 0, 'frames': policy.robot_io.commands, **timing,
                   'motion_mode': policy.robot_io.codec.motion_mode,
                   'command_publishers': [p.node_name for p in policy.robot_io.node.get_publishers_info_by_topic('/hardware/joint_command')]}
         print(json.dumps(result, indent=2))

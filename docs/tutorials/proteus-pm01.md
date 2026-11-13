@@ -5,6 +5,146 @@ slug: /tutorials/proteus-pm01
 
 # Proteus WAMSeq on EngineAI PM01
 
+## Onboard on the motion computer: wamseq_62_full, wave and walk (2026-11-13)
+
+The policy can also run on the PM01's own motion computer (Nezha, `user@192.168.0.163`: Ubuntu 22.04, x86_64,
+CPython 3.10, ROS Humble), as on the Galbot ET1. It uses the robot's own ROS and installed `interface_protocol`,
+so the PC needs no ROS. The Tracking process, transport, watchdogs and keys are the ones described below for the
+PC; only where it runs changes. **Prepared and simulated only: nothing below has run on the robot yet.**
+
+### Assets (on the PC)
+
+The `wsq61` actor of the 2026-11-05 runs was not available, so this setup exports `proteus_wamseq_62_full` (same
+WAMSeq inputs and PM01 contract values; see "Pelvis rocking" below for why `_full` rather than `proteus_wamseq_62`). Source checkouts next to the repository: `Proteus-wamseq`, `GMR-engineai`
+(engineai-robotics/GMR) and LAFAN1 `walk1_subject1.bvh`.
+
+```bash
+python -m scripts.pm01.prepare --sources-root .. --release proteus_wamseq_62_full --skip-motions
+uv run --project venv/pico --no-sync python -m scripts.proteus.retarget_lafan --robot pm01 --duration 8 \
+  --output checkpoints/engineai_pm01/motions --bvh /path/to/lafan1/walk1_subject1.bvh
+python -m scripts.pm01.make_wave_motion --output checkpoints/engineai_pm01/wave
+```
+
+The wave is synthetic, not motion capture: standing, the right arm raised to the side with the forearm upright
+beside the head over 1.5 s, waved with the elbow at 1 Hz (±0.4 rad) for about 5 s, lowered, standing. Its first and
+last frames are the contract's default standing pose. Peak joint speed is 2.5 rad/s, and the arm stays at least
+11.8 cm from the torso and head. The walk is the same 8-s LAFAN window as before (first frame: arms near horizontal).
+
+Integrated MuJoCo evaluation (`scripts.proteus.evaluate`, measured root, one-second holds), mean / worst-frame world
+body error:
+
+| Motion | Training gains (0.625 ms) | Classic ankle gains (2 ms) |
+| --- | --- | --- |
+| walk1_subject1 | 2.30 / 3.57 cm | 4.29 / 11.6 cm |
+| wave_right | 5.17 / 13.7 cm | 5.09 / 9.0 cm |
+
+The classic column multiplies the ankle kp and kd by the joint-side factors above (pitch 4.09, roll 1.113). Most of
+the wave's world error is a 12 cm start offset that the evaluator also shows on the walk: the robot shuffles its
+feet 6-9 cm to catch up. In the pelvis frame the right hand stays within 1-2 cm of the reference and swings
+10.6 cm against 12.1 cm. Neither simulation includes the measured ankle inertia or loop delay.
+
+### Pelvis rocking: classic ankle gains and control delay
+
+In the first simulation videos the pelvis rocked back and forth at about 2 Hz, also during the wave, whose
+reference keeps the body still. A hardware-like simulation (the integrated sim with `reference_forcing` on, as on
+the robot, and a command delay from observation to new targets) separates the causes:
+
+- **Classic ankle gains.** The transport forwards the training gains, and through the classic parser ankle pitch
+  acts about 4.09x stiffer at the joint. With `proteus_wamseq_62` at 15 ms delay the wave rocks the pelvis
+  0.92 deg rms and the feet slide 10 cm (40 cm, a recovery step, without delay). More kd does not help.
+- **Control delay.** With `proteus_wamseq_62` the wave starts to wobble at 20 ms (waist 1 deg) and steps at 22.5 ms
+  for every ankle setting. `proteus_wamseq_62_full` (the same model trained on every motion) stays steady to 20 ms
+  and starts to wobble at 22.5 ms. On the Nezha, inference alone takes about 12.5 ms.
+- **Releases.** `proteus_wamseq_62_full` steps when its ankle gains are off and there is no delay at all, which the
+  robot cannot have; in the 15-20 ms band it is the steadier release.
+
+- **Arm servos and delay.** At the delay edge every joint group oscillates, the waving arm most. The arm servos are
+  soft (kp 18.9, kd 1.25); arm kp x0.7 moves the edge from about 20 ms to about 30 ms. Arm kd x1.5 reaches 25 ms;
+  waist or leg damping alone does not help. Faster inference was not needed: int8 quantization is 3x faster but
+  tracks worse in closed loop, and two ONNX Runtime threads on CPUs 1 and 3 measured 26 ms on the Nezha (one thread
+  on CPU 3: 12.5 ms, so about 15-18 ms from observation to targets).
+
+The onboard launcher therefore defaults to `proteus_wamseq_62_full`, scales the commanded ankle-pitch kp and kd by
+`PM01_ANKLE_PITCH_GAIN_SCALE=0.306` (1.25 / 4.09) and the shoulder/elbow kp by `PM01_ARM_KP_SCALE=0.7`. Both apply
+to policy commands only; damping is unchanged, and 1 restores the training gains. Over joint-side ankle factors
+0.8-2x (in case 4.09 is off) and delays 15-25 ms the wave keeps pelvis rocking within 0.18 deg rms and the feet
+within 5.6 cm, except at 2x and 20-25 ms together (0.88 deg, a 46 cm step at 25 ms); the walk never falls and keeps
+the worst-frame pelvis-frame error under 4 cm.
+
+First gantry run (2026-11-13) and the changes it led to:
+
+- **Callback thread latency.** In `joint_bridge` the policy step took 22-28 ms instead of 12.5 ms. The firmware
+  streams joint and IMU state faster than Python decodes it, so the ROS callback thread ran nonstop on the policy
+  CPU (py-spy: about 40% in our decoders, 60% in rclpy). The launcher now paces that thread at 200 Hz
+  (`PM01_HAL_HZ`) on CPU 0 (`PM01_HAL_CPU`): inference is back to about 12 ms and a step averages about 17.5 ms
+  (about 10% of steps run slightly over 20 ms, from GIL contention). The 12.5 ms dry-run figure missed this because
+  outside `joint_bridge` nothing is published.
+- **Light-load rocking.** Hold and the wave rocked the pelvis at 4.3-4.7 Hz (pitch rate 15-40 deg/s rms in bursts)
+  while a still Hold was quiet (0.1 deg/s). Knee torque was only 5-7 Nm: the taut rope carried most of the weight.
+  Simulation reproduces it with 80% of the weight held at the pelvis (5.4 Hz) and is quiet at full load. The
+  launcher now multiplies the ankle pitch and roll kd by `PM01_ANKLE_KD_SCALE=1.5`: at 80% support the wave rocking
+  falls from 8.8 to 0.4 deg/s, at 50% Hold is quiet, and over 0.8-2x ankle factors and 15-25 ms the wave and walk
+  match the values above (the 2x / 25 ms wave step shrinks from 46 to 13 cm). Let the feet carry the weight before
+  Hold (see Run).
+
+### Deploy (from the PC)
+
+```bash
+ssh-copy-id user@192.168.0.163    # once
+bash scripts/pm01/deploy_onboard.sh
+```
+
+It resolves the x86_64 / CPython 3.10 packages from `uv.lock` (CPU-only torch), copies code, the
+`proteus_wamseq_62_full` export, both motions, the prepared model and two cached Hugging Face assets to
+`~/proteus_pm01` on the robot, and ends with an import check under the robot's ROS. It never starts, stops or
+reconfigures robot software. The tree takes about 1.6 GB (1.4 GB of packages, mostly CPU torch, which Tracking
+imports); check `df -h ~` on the robot first. `--build-only` resolves the packages without contacting the robot.
+Run from that package set with a standalone CPython 3.10 and offline assets, the wave evaluation above gives the
+same result (5.17 cm), so the ONNX Runtime and MuJoCo builds shipped to the robot are checked; rclpy and the
+robot's messages are only checked on the robot.
+
+### Run on the robot
+
+1. Power on as above: computer power, then the white button for joint power, and wait until
+   `systemctl status monitor.service robotics.service` shows the monitor exited and robotics running
+   (`journalctl -b -u robotics.service | grep 在线设备有` reports 25 devices).
+2. With the robot on the gantry: **LB + RB** (`passive`), bring every joint within 1.2 rad of standing (the
+   hip, shoulder and elbow yaws swing far when the robot hangs), **LB + A** (`pd_stand`). If `pd_stand` is
+   refused, `journalctl -u robotics.service` names the joints.
+3. Dry run, read-only, in `passive` or `pd_stand`: the full Tracking path runs for 15.5 s on live feedback with no
+   command publisher, and reports the step time against the 20 ms period.
+
+   ```bash
+   ssh -t user@192.168.0.163 'source proteus_pm01/repo/scripts/pm01/env_onboard.sh && cd proteus_pm01/repo && \
+     python3 -m scripts.pm01.shadow_policy --policy-config checkpoints/proteus/proteus_wamseq_62_full/engineai_pm01/policy.yaml \
+     --motion checkpoints/engineai_pm01/wave/motions/wave_right.npz --output ../logs/shadow-wave.npz'
+   ```
+
+   Continue only with `policy_step_ms_p99` well under 20 and `steps_over_20ms` near 0. Otherwise pin Tracking with
+   `PM01_TRACKER_CPU` to a core the vendor controller does not use.
+4. **LB + D-pad left** (`joint_bridge`) while the robot hangs with its feet free. Then:
+
+   ```bash
+   ssh -t user@192.168.0.163 proteus_pm01/repo/scripts/pm01/start_proteus_onboard.sh wave
+   ```
+
+   The launcher stops unless the read-only check passes. The keys match the ET1 operator: **a** shapes, **a**
+   again (after shaping) enters policy Hold, **s** plays or pauses, **space** or **x** stops (damping), **Ctrl+C**
+   exits. Press nothing for 10 s; the robot should stay as quiet as in `passive`. **a** shapes to the first frame
+   over 10 s. Lower the gantry until both feet are flat on the floor and carry the weight, with the rope slack but
+   still able to catch a fall, then **a** for policy Hold. With a taut rope carrying most of the weight the policy
+   rocks the pelvis at 4-5 Hz (see above). Hold for about 10 s and watch the pelvis: if it rocks, press **space**
+   and stop. Never enter Hold while the feet hang free: the policy takes that for a fall (on the X2 it flailed on
+   the rope). Then **s** plays. Stopping enters damping, which does not hold a standing robot, so keep the gantry
+   ready. To watch the pelvis from another terminal:
+   `ssh user@192.168.0.163 'source proteus_pm01/repo/scripts/pm01/env_onboard.sh && cd proteus_pm01/repo && python3 -m scripts.pm01.watch_sway'`.
+5. Walk: the same with `start_proteus_onboard.sh walk`. The walk moves about 3 m forward, so the gantry must
+   follow and the path must be clear.
+
+Each run writes `~/proteus_pm01/logs/run-*/` (`check_robot.json`, `tracking.npz`). The transport is the PC
+transport except for the ankle and arm gain scales and the paced callback thread: classic ankle parser, damping after 250 ms without commands or feedback, and 0.2 rad
+position steps at most. Process death or power loss still relies on firmware protection.
+
 ## Current baseline: classic ankle parser (2026-11-05)
 
 `start_proteus.sh` and `start_pico.sh robot` now send `parallel_parser_type=0` (`PM01Codec.parallel_parser_type`). `policy.onnx`, `policy.yaml` and every commanded kp/kd are unchanged. T800 keeps `RL_PARSER=1`, and the relay tools (`policy_bridge.py`, `trial_policy.py`, `bench_damping.py`) still use `RL_PARSER=1` for active commands. **A first gantry-protected hardware walk completed on 2026-11-05; the result is below.**
@@ -38,9 +178,9 @@ Hardware run, with the gantry and emergency stop ready throughout:
 
 1. Check joint readings, not just appearance. On 2026-11-05 the robot looked upright with its pelvis turned about 180 degrees relative to its torso (`J12` about -3.4, `J08` about -3.1, `J00` about -3.1, `J01` about +2.3). Enter `joint_bridge` through `pd_stand`, which rejects poses more than 1.2 rad from standing, not straight from `passive`.
 2. Hang the robot with its feet free. Run `bash scripts/pm01/start_proteus.sh --record` and press nothing for 10 seconds. It should stay as quiet as `passive`.
-3. Press **i** to shape. The arms rise to nearly horizontal: this is walk frame 0.
-4. Lower the gantry until the feet lightly touch, then press **]** to enter policy Hold.
-5. Transfer load gradually, then press **Space** to play.
+3. Press **a** to shape. The arms rise to nearly horizontal: this is walk frame 0.
+4. Lower the gantry until the feet carry the weight (rope slack, still able to catch a fall), then press **a** again to enter policy Hold.
+5. Press **s** to play.
 
 Damping alone does not hold a standing robot (see `walk-deploy-005`), so the gantry must be able to catch it at every step.
 
@@ -551,8 +691,9 @@ The launcher sources the PM01 environment and runs the read-only check before
 opening the command transport. Default inference is CPU at 50 Hz; the independent
 ROS sender runs at 500 Hz. Override the policy with `PROTEUS_POLICY_CONFIG`.
 
-Keys: **i** shapes to the motion's first frame over 10 seconds; **]** enables
-policy Hold; **Space** plays/pauses; **o** enters damping; **Ctrl+C** exits.
+Keys (as on the ET1): **a** shapes to the motion's first frame over 10 seconds;
+**a** again enables policy Hold; **s** plays/pauses; **space** or **x** enters
+damping; **Ctrl+C** exits.
 Keep gantry support through shaping and the initial Hold. Starting the transport
 in `joint_bridge` sends damping before shaping, so it does not support a standing
 robot by itself. An explicit mode change gives ownership back to the firmware.

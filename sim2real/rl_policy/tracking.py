@@ -8,6 +8,7 @@ import tyro
 from loguru import logger
 
 from sim2real.rl_policy.base_policy import BasePolicyArgs, BasePolicy
+from sim2real.rl_policy.control_mode import KEYBOARD_PLAY_KEYS
 from sim2real.rl_policy.controllers.keyboard import KeyboardController
 from sim2real.rl_policy.controllers.unitree_joystick import UnitreeJoystickController
 from sim2real.rl_policy.utils.motion import (
@@ -512,8 +513,10 @@ class Tracking(BasePolicy):
         mode = self.state_dict.get("control_mode")
         joystick = isinstance(self.controller, UnitreeJoystickController)
         g1_joystick = joystick and getattr(self.controller, "_g1_controls", True)
-        sequence = "A -> A -> Start" if g1_joystick else "A -> R1 -> B" if joystick else "i -> ] -> Space"
-        stop_key = "Select" if g1_joystick else "R2" if joystick else "o"
+        et1_keys = getattr(self.controller, "layout", None) == "et1"
+        sequence = ("A -> A -> Start" if g1_joystick else "A -> R1 -> B" if joystick
+                    else "a -> a -> s" if et1_keys else "i -> ] -> Space")
+        stop_key = "Select" if g1_joystick else "R2" if joystick else "Space" if et1_keys else "o"
         if mode != "policy":
             logger.warning(
                 "Planner: Go ignored (via {}): Go needs the Tracker in Hold ({}); control mode is {}",
@@ -585,10 +588,10 @@ class Tracking(BasePolicy):
 
         # Space/Start: Go with the Planner, play/pause with File Playback.
         b_pressed = self.planner_go if self.motion_backend == "planner" else self.toggle_paused
-        if isinstance(self.controller, KeyboardController) and (
-            "space" in extra_keys or " " in extra_keys
-        ):
-            b_pressed(source="keyboard:space")
+        if isinstance(self.controller, KeyboardController):
+            play_keys = KEYBOARD_PLAY_KEYS[getattr(self.controller, "layout", "default")]
+            if any(key.lower() in play_keys for key in extra_keys):
+                b_pressed(source=f"keyboard:{play_keys[0]}")
         elif isinstance(self.controller, UnitreeJoystickController):
             play_key = "Start" if getattr(self.controller, "_g1_controls", True) else "B"
             if play_key in extra_keys:

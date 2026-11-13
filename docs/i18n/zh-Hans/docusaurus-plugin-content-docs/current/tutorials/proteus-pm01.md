@@ -5,6 +5,83 @@ slug: /tutorials/proteus-pm01
 
 # 众擎 PM01 上的 Proteus WAMSeq
 
+## 在运控计算机上机载运行：wamseq_62_full、挥手与行走（2026-11-13）
+
+策略也可以像 Galbot ET1 一样，直接在 PM01 自带的运控计算机上运行。运控计算机是 Nezha（`user@192.168.0.163`），配置为 Ubuntu 22.04、x86_64、CPython 3.10、ROS Humble。机载运行使用机器人自己的 ROS 和已安装的 `interface_protocol`，因此 PC 上不需要装 ROS。Tracking 进程、通信传输、看门狗和按键都与下文 PC 方案相同，变化的只是运行位置。**以下内容只完成了准备和仿真，还没有在真机上运行过。**
+
+### 资产（在 PC 上）
+
+2026-11-05 真机试验用的是 `wsq61` 权重，这台电脑上没有，所以这里导出的是 `proteus_wamseq_62_full`。两者的 WAMSeq 输入格式相同，PM01 契约中的参数也一致。为什么选 `_full` 而不是 `proteus_wamseq_62`，见下文“骨盆晃动”一节。需要把以下源码放在仓库旁边：`Proteus-wamseq`、`GMR-engineai`（engineai-robotics/GMR），以及 LAFAN1 的 `walk1_subject1.bvh`。
+
+```bash
+python -m scripts.pm01.prepare --sources-root .. --release proteus_wamseq_62_full --skip-motions
+uv run --project venv/pico --no-sync python -m scripts.proteus.retarget_lafan --robot pm01 --duration 8 \
+  --output checkpoints/engineai_pm01/motions --bvh /path/to/lafan1/walk1_subject1.bvh
+python -m scripts.pm01.make_wave_motion --output checkpoints/engineai_pm01/wave
+```
+
+挥手动作是合成的，不是动作捕捉。整个过程是：站立；用 1.5 秒把右臂向侧面抬起，小臂竖直立在头旁边；以 1 Hz 用肘部挥手（±0.4 rad），持续约 5 秒；放下手臂；站立。首帧和末帧都是契约中的默认站姿。关节峰值速度为 2.5 rad/s，挥动的手臂与躯干、头部至少相距 11.8 cm。行走使用的仍是之前那段 8 秒的 LAFAN 片段，首帧双臂接近水平。
+
+MuJoCo 集成评测（`scripts.proteus.evaluate`，使用实测根位置，前后各保持一秒）的世界坐标身体误差，格式为平均 / 最差帧：
+
+| 动作 | 训练增益（0.625 ms） | classic 踝增益（2 ms） |
+| --- | --- | --- |
+| walk1_subject1 | 2.30 / 3.57 cm | 4.29 / 11.6 cm |
+| wave_right | 5.17 / 13.7 cm | 5.09 / 9.0 cm |
+
+classic 一列是把踝关节的 kp 和 kd 乘以下文的关节侧系数（俯仰 4.09，横滚 1.113）得到的。挥手的世界误差主要来自评测开始时 12 cm 的位置偏差，行走评测中也有同样的偏差，机器人会挪动双脚 6–9 cm 去追上参考。在骨盆坐标系下，右手与参考的偏差在 1–2 cm 以内，左右摆幅 10.6 cm，参考为 12.1 cm。两组仿真都没有包含实测的踝关节惯量和回路延迟。
+
+### 骨盆晃动：classic 踝关节增益与控制延迟
+
+最初的仿真视频里，骨盆以约 2 Hz 前后晃动，挥手时也一样，而挥手的参考动作身体是不动的。用贴近真机的仿真可以把原因分开：这种仿真使用集成仿真，和真机一样开启 `reference_forcing`，并加入从观测到新目标生效的命令延迟。
+
+- **classic 踝关节增益。** 通信层把训练增益原样转发，经过 classic parser 后，踝关节俯仰在关节侧约硬 4.09 倍。用 `proteus_wamseq_62`、15 ms 延迟时，挥手中骨盆晃动 0.92° rms，双脚滑动 10 cm；没有延迟时滑动 40 cm，相当于迈了一步。加大 kd 没有帮助。
+- **控制延迟。** `proteus_wamseq_62` 在延迟 20 ms 时挥手开始抖动（腰部约 1°），22.5 ms 时无论踝关节怎么设置都会迈步。`proteus_wamseq_62_full`（同一模型，用全部动作训练）到 20 ms 仍然平稳，22.5 ms 才开始抖动。在 Nezha 上，仅推理就要约 12.5 ms。
+- **版本。** `proteus_wamseq_62_full` 在踝关节增益有偏差且完全没有延迟时会迈步，但真机不可能没有延迟；在 15–20 ms 区间内，它是更稳的版本。
+
+- **手臂伺服与延迟。** 到了延迟临界点，所有关节组都会振荡，挥动的那只手臂最明显。手臂伺服比较软（kp 18.9，kd 1.25）；把手臂 kp 乘以 0.7，临界点从约 20 ms 推到约 30 ms。手臂 kd 乘以 1.5 能到 25 ms；只加腰部或腿部阻尼没有帮助。不需要再提高推理速度：int8 量化快 3 倍，但闭环跟踪变差；在 Nezha 上用 CPU 1 和 3 跑两个 ONNX Runtime 线程实测 26 ms，反而更慢（CPU 3 单线程为 12.5 ms，因此从观测到目标约 15–18 ms）。
+
+因此机载启动脚本默认使用 `proteus_wamseq_62_full`，用 `PM01_ANKLE_PITCH_GAIN_SCALE=0.306`（1.25 / 4.09）缩放指令中的踝关节俯仰 kp 和 kd，并用 `PM01_ARM_KP_SCALE=0.7` 缩放肩、肘的 kp。两者都只作用于策略命令，阻尼不变；设为 1 即恢复训练增益。考虑到 4.09 这个估计可能不准，测试覆盖了关节侧踝关节系数 0.8–2 倍、延迟 15–25 ms：挥手时骨盆晃动不超过 0.18° rms，双脚滑动不超过 5.6 cm；唯一例外是 2 倍与 20–25 ms 同时出现时（0.88°，25 ms 时迈了 46 cm 一步）。行走从未摔倒，骨盆坐标系下的最差帧误差小于 4 cm。
+
+第一次吊架测试（2026-11-13）及由此做的修改：
+
+- **回调线程延迟。** 进入 `joint_bridge` 后，每步策略计算从 12.5 ms 变成 22–28 ms。固件发布关节和 IMU 状态的速度比 Python 解析得快，ROS 回调线程在策略所在的 CPU 上一直满负荷运行（py-spy：约 40% 在我们的解析代码，60% 在 rclpy）。启动脚本现在把这个线程固定为 200 Hz 节奏（`PM01_HAL_HZ`），并放到 CPU 0（`PM01_HAL_CPU`）：推理恢复到约 12 ms，每步平均约 17.5 ms（由于 GIL 争用，约 10% 的步骤略超 20 ms）。之前空跑测得的 12.5 ms 没有发现这个问题，因为不在 `joint_bridge` 时不会发布命令。
+- **轻载晃动。** Hold 和挥手时骨盆以 4.3–4.7 Hz 前后晃动（俯仰角速度阵发性达到 15–40°/s rms），而静止的 Hold 很安静（0.1°/s）。膝关节力矩只有 5–7 Nm：张紧的吊绳承担了大部分体重。仿真中在骨盆处托住 80% 体重即可复现（5.4 Hz），满载时则很安静。启动脚本现在用 `PM01_ANKLE_KD_SCALE=1.5` 放大踝关节俯仰和横滚的 kd：托住 80% 体重时挥手晃动从 8.8 降到 0.4°/s，托住 50% 时 Hold 很安静；在踝关节系数 0.8–2 倍、延迟 15–25 ms 范围内，挥手和行走结果与上文一致（2 倍 / 25 ms 时挥手迈出的一步从 46 cm 缩小到 13 cm）。进入 Hold 前要让双脚承担体重（见“在机器人上运行”）。
+
+### 部署（在 PC 上）
+
+```bash
+ssh-copy-id user@192.168.0.163    # 只需一次
+bash scripts/pm01/deploy_onboard.sh
+```
+
+脚本会按 `uv.lock` 解析出 x86_64 / CPython 3.10 的依赖包（torch 用仅 CPU 版本），然后把代码、`proteus_wamseq_62_full` 导出、两个动作、准备好的模型和两个缓存的 Hugging Face 资产复制到机器人的 `~/proteus_pm01`，最后在机器人的 ROS 环境下做一次导入检查。它不会启动、停止或重新配置机器人上的任何软件。整个目录约占 1.6 GB，其中依赖包 1.4 GB，大部分是 Tracking 需要导入的 CPU 版 torch，部署前请先在机器人上用 `df -h ~` 确认空间足够。加上 `--build-only` 参数时，只在 PC 上解析依赖包，不连接机器人。用这套依赖包加独立的 CPython 3.10、离线资产重新跑上面的挥手评测，结果与之前相同（5.17 cm），说明要部署到机器人上的 ONNX Runtime 和 MuJoCo 都能正常工作；rclpy 和机器人的消息定义只能在机器人上检查。
+
+### 在机器人上运行
+
+1. 按下文方式上电：先开计算机电源，再按白色按钮给关节上电，等 `systemctl status monitor.service robotics.service` 显示 monitor 已退出、robotics 正在运行（`journalctl -b -u robotics.service | grep 在线设备有` 应报告 25 个设备）。
+2. 机器人挂在吊架上：按 **LB + RB** 进入 `passive`，把每个关节都扳到离站姿 1.2 rad 以内（悬挂时髋、肩、肘的偏航关节会转得很远），再按 **LB + A** 进入 `pd_stand`。如果 `pd_stand` 被拒绝，`journalctl -u robotics.service` 会列出超限的关节。
+3. 只读演练，在 `passive` 或 `pd_stand` 状态下进行：完整的 Tracking 流程会用实时反馈运行 15.5 秒，不创建任何命令发布者，并报告每一步耗时与 20 ms 控制周期的对比。
+
+   ```bash
+   ssh -t user@192.168.0.163 'source proteus_pm01/repo/scripts/pm01/env_onboard.sh && cd proteus_pm01/repo && \
+     python3 -m scripts.pm01.shadow_policy --policy-config checkpoints/proteus/proteus_wamseq_62_full/engineai_pm01/policy.yaml \
+     --motion checkpoints/engineai_pm01/wave/motions/wave_right.npz --output ../logs/shadow-wave.npz'
+   ```
+
+   只有当 `policy_step_ms_p99` 明显小于 20、`steps_over_20ms` 接近 0 时才继续。否则用 `PM01_TRACKER_CPU` 把 Tracking 绑定到厂商控制器不使用的 CPU 核上。
+4. 在机器人悬挂、双脚离地时按 **LB + 十字键左**，进入 `joint_bridge`。然后运行：
+
+   ```bash
+   ssh -t user@192.168.0.163 proteus_pm01/repo/scripts/pm01/start_proteus_onboard.sh wave
+   ```
+
+   只读检查不通过时，启动脚本会直接退出。按键与 ET1 操作一致：**a** 整形，整形完成后再按 **a** 进入策略 Hold，**s** 播放或暂停，**空格** 或 **x** 停止（进入阻尼），**Ctrl+C** 退出。启动后先 10 秒什么都不按，机器人应该和在 `passive` 时一样安静。按 **a**，用 10 秒整形到首帧。放低吊架，直到双脚平稳踩在地上并承担体重，吊绳放松但仍能接住摔倒，再按 **a** 进入策略 Hold。如果吊绳张紧、承担了大部分体重，策略会让骨盆以 4–5 Hz 晃动（见上文）。先保持约 10 秒观察骨盆：如果晃动，按 **空格** 并停止。双脚悬空时绝不能进入 Hold：策略会把悬空当成正在摔倒（X2 上就出现过机器人在吊绳上乱甩的情况）。然后按 **s** 开始播放。停止后进入阻尼，但阻尼撑不住站立的机器人，所以吊架要随时能接住。可以在另一个终端观察骨盆：
+   `ssh user@192.168.0.163 'source proteus_pm01/repo/scripts/pm01/env_onboard.sh && cd proteus_pm01/repo && python3 -m scripts.pm01.watch_sway'`。
+5. 行走：步骤相同，改用 `start_proteus_onboard.sh walk`。行走动作会向前移动约 3 米，吊架必须能跟着走，路径上也要清空。
+
+每次运行都会写入 `~/proteus_pm01/logs/run-*/`，包括 `check_robot.json` 和 `tracking.npz`。除踝关节和手臂增益缩放以及按固定节奏运行的回调线程外，通信传输与 PC 方案相同：使用 classic 踝关节 parser；250 ms 收不到命令或反馈就进入阻尼；每次位置变化最多 0.2 rad。进程崩溃或断电时，仍然只能依靠固件自身的保护。
+
 ## 当前基线：classic 踝关节 parser（2026-11-05）
 
 `start_proteus.sh` 和 `start_pico.sh robot` 现在发送 `parallel_parser_type=0`（`PM01Codec.parallel_parser_type`）。`policy.onnx`、`policy.yaml` 和所有下发的 kp/kd 数值都没有改变。T800 继续使用 `RL_PARSER=1`，relay 工具（`policy_bridge.py`、`trial_policy.py`、`bench_damping.py`）的主动命令也仍使用 `RL_PARSER=1`。**2026-11-05 已在吊架保护下完成首次硬件行走，结果见下文。**
@@ -38,9 +115,9 @@ walk 的跟踪变差了。此仿真既没有实测的踝惯量，也没有回路
 
 1. 检查关节读数，不要只看外观。2026-11-05 机器人看起来站得很正，骨盆却相对躯干转了约 180 度（`J12` 约 -3.4，`J08` 约 -3.1，`J00` 约 -3.1，`J01` 约 +2.3）。要经由 `pd_stand` 进入 `joint_bridge`，它会拒绝偏离站立姿态超过 1.2 rad 的姿态；不要从 `passive` 直接进入。
 2. 让机器人悬空、脚离地。运行 `bash scripts/pm01/start_proteus.sh --record`，10 秒内不按任何键。它应该和 `passive` 一样安静。
-3. 按 **i** 进行插值。双臂会抬到接近水平，这是 walk 第一帧。
-4. 放低吊架直到脚轻触地面，再按 **]** 进入策略 Hold。
-5. 逐步转移负载，然后按 **空格** 播放。
+3. 按 **a** 进行插值。双臂会抬到接近水平，这是 walk 第一帧。
+4. 放低吊架直到双脚承担体重（吊绳放松，但仍能接住摔倒），再按一次 **a** 进入策略 Hold。
+5. 按 **s** 播放。
 
 单靠阻尼撑不住站立的机器人（见 `walk-deploy-005`），因此每一步吊架都必须能接住它。
 
@@ -436,8 +513,8 @@ bash scripts/pm01/start_proteus.sh \
 启动器自动加载 PM01 环境，先执行只读检查，再创建控制接口。默认 CPU 策略频率 50 Hz，
 独立 ROS 命令线程 500 Hz。`PROTEUS_POLICY_CONFIG` 可覆盖策略路径。
 
-键位：**i** 用 10 秒整形到动作首帧；**]** 开启策略 Hold；**空格**播放/暂停；
-**o** 进入阻尼；**Ctrl+C** 退出。整形和初次 Hold 时保持吊架保护。控制接口在
+键位（与 ET1 一致）：**a** 用 10 秒整形到动作首帧；再按 **a** 开启策略 Hold；**s** 播放/暂停；
+**空格** 或 **x** 进入阻尼；**Ctrl+C** 退出。整形和初次 Hold 时保持吊架保护。控制接口在
 `joint_bridge` 下启动后、整形前发送的是阻尼，不能独立支撑站立。显式切换离开该模式后，
 接口把控制权交还固件。
 

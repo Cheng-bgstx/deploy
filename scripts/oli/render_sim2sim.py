@@ -77,7 +77,7 @@ class VideoSim(IntegratedSim2Sim):
             self.renderer.update_scene(data, camera=self.camera)
             canvas.paste(Image.fromarray(self.renderer.render()), (x, 72))
         draw = ImageDraw.Draw(canvas)
-        robot_label = 'AgiBot Lingxi X2' if self.robot_cfg.name == 'x2' else 'LimX OLI HU_D04_01'
+        robot_label = {'x2': 'AgiBot Lingxi X2', 'pm01': 'EngineAI PM01'}.get(self.robot_cfg.name, 'LimX OLI HU_D04_01')
         draw.text((20, 8), f'{robot_label} | Proteus WAMSeq | sim2sim', font=self.font, fill='white')
         draw.text((20, 42), self.label, font=self.small, fill='#9ecbdc')
         for x, text in [(16, 'REFERENCE'), (656, 'POLICY + MuJoCo physics')]:
@@ -122,13 +122,14 @@ def main(default_robot='oli'):
     parser.add_argument('--initial-pause-s', type=float, default=1)
     parser.add_argument('--fps', type=int, default=25)
     parser.add_argument('--label', default='OLI motion reference')
+    parser.add_argument('--sim-dt', type=float, help='Physics timestep (default: the simulator default)')
     args = parser.parse_args()
     robot_name = get_robot_cfg(args.robot).name
     default_policy = ('checkpoints/proteus/proteus_wamseq_62/lingxi_x2/policy-sim.yaml' if robot_name == 'x2'
                       else 'checkpoints/proteus/proteus_wamseq_62/limx_oli_edu/policy-sim.yaml')
     sim_args = IntegratedSim2SimArgs(robot=args.robot, policy_config=args.policy_config or default_policy,
         motion_path=args.motion_path, headless=True, initial_pause_s=args.initial_pause_s,
-        max_runtime_s=args.duration, seed=0)
+        max_runtime_s=args.duration, seed=0, **({'sim_dt': args.sim_dt} if args.sim_dt else {}))
     VideoSim(sim_args, args.output, args.fps, args.label).record_video()
 
 
