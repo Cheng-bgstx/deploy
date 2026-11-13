@@ -13,7 +13,16 @@ class PicoButtonState:
     B: bool = False
 
 
-def resolve_keyboard_control_mode(keycode: str) -> ControlMode | None:
+KeyboardLayout = Literal["default", "et1"]
+
+# Key that plays or pauses the motion from Hold (or Go with the Planner), per layout.
+KEYBOARD_PLAY_KEYS: dict[str, tuple[str, ...]] = {"default": ("space", " "), "et1": ("s",)}
+
+
+def resolve_keyboard_control_mode(keycode: str, layout: KeyboardLayout = "default") -> ControlMode | None:
+    if layout == "et1":
+        # ET1 operator keys: a shapes, a again (after shaping) enters Hold, s plays, space or x stops.
+        return {"a": "init", "space": "zero", " ": "zero", "x": "zero"}.get(keycode.lower())
     return {
         "i": "init",
         "o": "zero",

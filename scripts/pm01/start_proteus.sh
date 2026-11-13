@@ -12,5 +12,5 @@ fi
 exec uv run --no-sync python -m sim2real.rl_policy.tracking \
   --robot pm01 --robot-io inline \
   --policy-config "${PROTEUS_POLICY_CONFIG:-checkpoints/proteus/wsq61/engineai_pm01/policy.yaml}" \
-  --rl-rate 50 --inference-backend onnx-cpu --controller keyboard \
+  --rl-rate 50 --inference-backend onnx-cpu --controller keyboard --keyboard-layout et1 \
   --motion-backend npz --motion-path "$motion" "$@"

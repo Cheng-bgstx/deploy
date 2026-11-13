@@ -212,7 +212,8 @@ class BasePolicy:
         controller_type = self.controller_type
         if controller_type == "keyboard":
             print("Using keyboard")
-            self.keyboard_controller = KeyboardController()
+            layout = getattr(self.args, "keyboard_layout", "default")
+            self.keyboard_controller = KeyboardController() if layout == "default" else KeyboardController(layout)
             self.key_pressed = self.keyboard_controller.key_pressed
             return self.keyboard_controller
 
@@ -380,18 +381,17 @@ class BasePolicy:
             self.wc_msg = self.joystick_controller.state
 
         mode = self.controller.get_control_mode()
-        if (
+        repeat_init_enters_policy = getattr(self.controller, "repeat_init_enters_policy", False) or (
             self.joystick_controller is not None
             and self.controller is self.joystick_controller
             and getattr(self.controller, "_g1_controls", True)
-            and mode == "init"
-            and self.state_dict.get("control_mode") == "init"
-        ):
-            # The second A takes over only after the shaping interpolation.
-            # A during Hold/Go starts a fresh shaping sequence; Select returns
-            # to zero, so the next A is always the first press again.
+        )
+        if repeat_init_enters_policy and mode == "init" and self.state_dict.get("control_mode") == "init":
+            # The second A (G1 handset, or a in the ET1 keyboard layout) takes over only after the shaping
+            # interpolation. A during Hold/Go starts a fresh shaping sequence; stop returns to zero, so the
+            # next A is always the first press again.
             if self.init_count <= round(10.0 / self.rl_dt):
-                logger.warning("Joystick: A ignored; Shaping is still in progress. Press A again when complete.")
+                logger.warning(f"{self.controller.name}: A ignored; Shaping is still in progress. Press A again when complete.")
                 mode = None
             else:
                 mode = "policy"
@@ -729,6 +729,8 @@ class BasePolicyArgs:
     robot_interface: str = "eth0"
     robot_ip: str = "127.0.0.1"
     controller: Literal["keyboard", "joystick", "pico"] = "keyboard"
+    keyboard_layout: Literal["default", "et1"] = "default"
+    """Keyboard keys: default i shape, ] Hold, space play, o stop; et1 a shape, a again Hold, s play, space stop."""
     pico_zmq_connect: str = f"tcp://127.0.0.1:{PORTS['pico_controller']}"
     record: bool = False
     record_output: str | None = None

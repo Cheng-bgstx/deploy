@@ -5,14 +5,17 @@ import threading
 
 from loguru import logger
 
-from sim2real.rl_policy.control_mode import resolve_keyboard_control_mode
+from sim2real.rl_policy.control_mode import KeyboardLayout, resolve_keyboard_control_mode
 from sim2real.rl_policy.controllers.base import ControllerBase
 
 
 class KeyboardController(ControllerBase):
     name = "keyboard"
 
-    def __init__(self) -> None:
+    def __init__(self, layout: KeyboardLayout = "default") -> None:
+        self.layout = layout
+        # In the ET1 layout the shaping key also takes over: a second press after shaping enters Hold.
+        self.repeat_init_enters_policy = layout == "et1"
         self.key_pressed: set[str] = set()
         self._pending_control_mode = None
         self._pending_extra_keys: list[str] = []
@@ -30,7 +33,7 @@ class KeyboardController(ControllerBase):
                     return
                 self.key_pressed.add(keycode)
                 with self._lock:
-                    mode = resolve_keyboard_control_mode(keycode)
+                    mode = resolve_keyboard_control_mode(keycode, self.layout)
                     if mode is not None:
                         self._pending_control_mode = mode
                     else:
