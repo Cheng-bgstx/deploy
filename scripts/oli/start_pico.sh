@@ -16,12 +16,12 @@ case "$mode" in
     publisher_ip="${1:-127.0.0.1}"
     [[ $# -eq 0 ]] || shift
     io_args=(--robot-io zmq)
-    policy="checkpoints/proteus/wsq61/limx_oli_edu/policy-sim.yaml"
+    policy="checkpoints/proteus/proteus_wamseq_62/limx_oli_edu/policy-sim.yaml"
     if [[ "$mode" == robot ]]; then
       export ROBOT_TYPE=HU_D04_01
       io_args=(--robot-io inline --robot-ip "${1:-127.0.0.1}")
       [[ $# -eq 0 ]] || shift
-      policy="checkpoints/proteus/wsq61/limx_oli_edu/policy.yaml"
+      policy="checkpoints/proteus/proteus_wamseq_62/limx_oli_edu/policy.yaml"
     fi
     exec uv run --no-sync python -m sim2real.rl_policy.tracking --robot oli "${io_args[@]}" \
       --policy-config "$policy" --rl-rate 50 --inference-backend onnx-cpu --controller pico \

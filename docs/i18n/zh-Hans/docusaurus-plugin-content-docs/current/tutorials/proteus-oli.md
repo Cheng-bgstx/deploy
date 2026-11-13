@@ -5,17 +5,14 @@ slug: /tutorials/proteus-oli
 
 # 在 LimX OLI 上部署 Proteus WAMSeq
 
-## 默认 checkpoint（2026-11-04）
+## 默认 checkpoint
 
-准备与启动脚本现默认使用 **wsq61**（`wsq61_wam_61robots_30000.pt`），
-策略目录为 `checkpoints/proteus/wsq61/limx_oli_edu/`。
-使用 `policy.yaml` 进行真机部署、`policy-sim.yaml` 进行测量根位置的仿真；
-G1/ET1 PC 与 ET1 板载部署使用本分支生成的 `policy-pc.yaml`。
-actor 使用十步 WAMSeq 历史窗口与有效位掩码，关节/形态合约保持原样。
-将完整策略目录（ONNX、YAML、合约 JSON）随代码一起复制到部署机器；原动作库路径保持不变。
-checkpoint SHA256：`1d1c65ddf5706b940744d87e2f86f7cea453c9240bcccc12d31923211f694bba`。
-来源记录在 `checkpoints/proteus/wsq61/source/export.json`，已有数值比较及短时仿真记录在
-`docs/experiments/proteus-wsq61.json`。下文旧版本的性能和真机记录不能作为 wsq61 的验收数据。
+OLI 脚本默认使用 `checkpoints/proteus/proteus_wamseq_62/limx_oli_edu/`，也就是下文运行审计所用的 actor。
+**wsq61** actor（`wsq61_wam_61robots_30000.pt`，SHA256
+`1d1c65ddf5706b940744d87e2f86f7cea453c9240bcccc12d31923211f694bba`，来源记录在
+`checkpoints/proteus/wsq61/source/export.json`，数值记录在 `docs/experiments/proteus-wsq61.json`）可作为替代：
+显式传入它的 `policy.yaml` 即可。下文结果不能作为 wsq61 的验收数据。
+真机用 `policy.yaml`，测量根位置的仿真用 `policy-sim.yaml`；把完整策略目录（ONNX、YAML、合约 JSON）随代码一起复制到部署机器。
 
 本适配面向 **HU_D04_01 / limx_oli_edu，31 个虚拟 PR 关节**，使用 Proteus 的
 `wamseq` 分支、本仓库的 Tracking / 集成 sim2sim 运行时和
@@ -327,3 +324,43 @@ uv pip install --python venv/pico/.venv/bin/python pytest \
 HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --project venv/pico --no-sync python -m pytest \
   tests/test_pico_retarget_profiles.py tests/test_pico_hand_grip.py -q
 ```
+
+## Proteus 原版仿真对照（2026-11-03）
+
+在发现 Q1/T800 的仿真步长问题后，已将本分支与 **未修改** 的 Proteus `wamseq`
+`1e0e038` 仿真器对照。两边使用相同的已准备本体模型、共享 WAMSeq 权重和完全相同的
+50 Hz 参考数组；参考只打包成原生 `MotionLibrary`，没有重新 retarget。
+每条原版动作也通过实际 `deploy/sim2sim.py` CLI 运行。
+这里控制了本体模型版本，并未重建缺失的原始训练资产。
+
+seed 为 0，策略 50 Hz。对双方共有的播放帧 1..T-1 各取首个物理采样，在 contract 的
+14 个 tracking body 上计算平均世界位置误差。本地保留启动时 1 s 策略 Hold，
+原版保留原生启动方式和参考速度；最后一列仅改变本地物理步长。
+该统一采样指标与历史视频指标可能因采样时相略有差异，较早 OLI 实验还使用了不同的
+根部参考强制设置。本次全部使用 `policy-sim.yaml` 和实测世界根部平移。
+
+| 参考动作 | 本地 5 ms（cm） | 原版 0.625 ms（cm） | 本地 0.625 ms（cm） |
+| --- | ---: | ---: | ---: |
+| walk | 12.91 | 12.74 | 12.73 |
+| aiming | 12.27 | 12.21 | 12.23 |
+| dance2 | 13.55 | 12.78 | 12.51 |
+| dance1 | 12.09 | 11.56 | 12.25 |
+
+这些参考上 **未发现类似的步长数值不稳定或明显运行时差距**。原版的平均 body 误差也为
+11.56–12.78 cm，减小本地步长仅带来有限的位置精度变化。
+步行动作的本地/原版关节加速度 RMS 为 17.07/18.40 rad/s²，未出现 Q1 的
+87.11/33.83 rad/s² 差距。因此保留 OLI 的现有仿真默认值。
+仅凭这组对照，还不能把剩余跟踪误差归因于权重、参考 retarget 或模型版本中的某一项。
+
+已在 399 个共同物理状态上对照原版的 proprioception、action history 和有效位。
+统一使用即时 FK 和单位参考四元数后，task/action 最大差分别为
+6.56e-07/9.54e-06，action history 和有效位完全一致。
+未经诊断调整的原版 body 变换缓存比 qpos 滞后一个物理步；实际原版 rollout 保留了
+这一小幅观测时序差异。
+
+机器可读记录为 `docs/experiments/proteus-oli-runtime-audit.json`，包含源/产物哈希、
+准确命令、原版 CLI 结果、三种运行设置和观测诊断。调试脚本及实际物理轨迹/视频归档于
+`outputs/proteus_oli_x2_audit/20261103_171600/`。差分检查器能够检出已知有问题的
+Q1/T800 轨迹，而 OLI/X2 的九条参考在两种本地步长下均未触发该差距检查。
+该检查针对已观测到的数值退化，不是绝对跟踪质量阈值。
+本次排查没有修改运行时代码、策略权重或真机/PICO 行为。
