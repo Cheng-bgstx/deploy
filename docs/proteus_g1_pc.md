@@ -2,6 +2,12 @@
 
 To run the same stack on the G1's own Orin instead, see [Proteus G1 on the robot's Orin](proteus_g1_onboard.md).
 
+The launchers default to the hardware-tested `checkpoints/proteus/proteus_wamseq_62/unitree_g1`. The per-robot
+branches also exported the **wsq61** actor (`wsq61_wam_61robots_30000.pt`, SHA256
+`1d1c65ddf5706b940744d87e2f86f7cea453c9240bcccc12d31923211f694bba`, provenance in
+`checkpoints/proteus/wsq61/source/export.json`); select it with
+`PROTEUS_POLICY_DIR=checkpoints/proteus/wsq61/unitree_g1`. The hardware results below do not cover wsq61.
+
 Run CPU ONNX Tracking at 50 Hz and the Python SDK2 Bridge at 200 Hz on the PC. Tracking reads the cached NPZ reference; the G1 receives joint position/velocity targets, feedforward torque and PD gains over DDS. This route uses the existing Python 3.10 environment, SDK2, CycloneDDS and ZMQ. It does not require the aarch64 inline `unitree_interface` module.
 
 The launcher defaults ONNX, OpenMP and BLAS to one CPU thread. Unbounded ONNX thread pools can consume many cores between 50 Hz inference calls and compete with DDS callbacks. A prior log also recorded a 174 ms command-send delay. The launcher now uses a shared 250 ms I/O timeout instead of the former 100 ms limit, so brief gaps do not latch a stop. Both settings apply when new processes start. Existing processes do not pick up launcher edits. Do not run policy benchmarks or simulation alongside a hardware test.
@@ -29,7 +35,7 @@ Rehearse the actual Tracking controller without DDS or hardware:
 
 ```bash
 "$SIM2REAL_PYTHON" scripts/g1/validate_proteus_deployment.py \
-  --policy-config checkpoints/proteus/proteus_60/unitree_g1/policy-pc.yaml \
+  --policy-config checkpoints/proteus/wsq61/unitree_g1/policy-pc.yaml \
   --npz-playback-limit-s 3
 ```
 

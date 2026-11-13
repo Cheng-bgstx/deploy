@@ -354,3 +354,9 @@ class proteus_slot_action_history(_ProteusObservation):
 
 class proteus_valid_history(_ProteusObservation):
     output_name = "valid_hist"
+
+
+class proteus_history_valid(_ProteusObservation):
+    """Same mask as ``proteus_valid_history``; the name used by policies exported on the per-robot branches."""
+
+    output_name = "valid_hist"

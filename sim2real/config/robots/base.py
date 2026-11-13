@@ -33,7 +33,7 @@ XROBOT_BODY_QUAT_W_KEY = "xrobot_body_quat_w"
 
 UNITREE_GO_DDS_ROBOT_NAMES = frozenset({"h1", "go2"})
 UNITREE_HG_DDS_ROBOT_NAMES = frozenset(
-    {"g1", "g1_real", "h1_2", "h1_2_21dof", "h1_2_27dof"}
+    {"g1", "g1_real", "h1_2", "h1_2_21dof", "h1_2_27dof", "et1", "galbot_et1"}
 )
 
 
@@ -66,6 +66,10 @@ class RobotCfg:
     unitree_legged_const: Mapping[str, int | float] = field(
         default_factory=lambda: dict(UNITREE_LEGGED_CONST)
     )
+    # Unitree DDS motor slot of each joint (joint_names order); empty means joint i is slot i.
+    unitree_motor_indices: tuple[int, ...] = ()
+    # LowCmd mode_machine; None copies it from the latest LowState.
+    unitree_mode_machine: int | None = 5
     root_joint_names: tuple[str, ...] = ("floating_base_joint", "pelvis_root")
     viewer_track_body_names: tuple[str, ...] = ("pelvis",)
     elastic_band_attach_body_names: tuple[str, ...] = ("torso_link", "base_link")
@@ -90,6 +94,17 @@ class RobotCfg:
         if self.mjcf_path is None:
             raise ValueError(f"Robot '{self.name}' does not define mjcf_path")
         return resolve_asset_reference(self.mjcf_path)
+
+    def resolve_unitree_motor_indices(self) -> tuple[int, ...]:
+        if not self.unitree_motor_indices:
+            return tuple(range(len(self.joint_names)))
+        indices = tuple(int(index) for index in self.unitree_motor_indices)
+        if len(indices) != len(self.joint_names) or len(set(indices)) != len(indices):
+            raise ValueError(
+                f"Robot '{self.name}': unitree_motor_indices must give one distinct slot "
+                f"per joint, got {indices}"
+            )
+        return indices
 
 
 def normalize_name_list(values: Sequence[object] | None) -> list[str] | None:

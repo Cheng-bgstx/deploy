@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import tempfile
+import xml.etree.ElementTree as ET
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -49,7 +50,11 @@ def _inject_floor_scene_xml(xml_text: str) -> str:
     worldbody_close = xml_text.find("</worldbody>")
     if worldbody_close < 0:
         raise ValueError("Expected </worldbody> block in MJCF")
-    return xml_text[:worldbody_close] + VIEWER_WORLDBODY_XML + xml_text[worldbody_close:]
+    # Vendor models such as OLI already contain a floor. Adding another plane also
+    # duplicates its name and prevents MuJoCo from compiling the scene.
+    has_floor = any(g.get("type") == "plane" for g in ET.fromstring(xml_text).findall("worldbody/geom"))
+    worldbody_xml = "" if has_floor else VIEWER_WORLDBODY_XML
+    return xml_text[:worldbody_close] + worldbody_xml + xml_text[worldbody_close:]
 
 
 @contextmanager
@@ -163,6 +168,16 @@ def load_sim_model(
         logger.warning("load_sim_model currently ignores non-default ground_rgb={}", ground_rgb)
     with _temp_scene_with_floor(mjcf_path) as scene_mjcf_path:
         spec = mujoco.MjSpec.from_file(str(scene_mjcf_path))
+        if robot_cfg.name in {"oli", "x2"}:
+            # Proteus OLI / X2: floor contact only, no robot self-collisions
+            # and no passive joint damping (the controller supplies kd).
+            for geom in spec.geoms:
+                if geom.type == mujoco.mjtGeom.mjGEOM_PLANE:
+                    geom.contype, geom.conaffinity = 2, 1
+                elif geom.contype or geom.conaffinity:
+                    geom.contype, geom.conaffinity = 1, 2
+            for joint in spec.joints:
+                joint.damping = np.zeros_like(np.atleast_1d(joint.damping))
         if robot_cfg.name == "h2":
             # Match mimic-lite H2 CollisionCfg: foot contacts need tangential friction.
             for geom in spec.geoms:

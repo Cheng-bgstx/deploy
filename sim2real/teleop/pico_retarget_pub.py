@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Live PICO/XRobot -> G1 ZMQ publisher.
+Live PICO/XRobot -> robot ZMQ publisher.
 
-This script reads XR body data from XRobotStreamer, retargets to Unitree G1 with
+This script reads XR body data from XRobotStreamer, retargets with robot-specific
 GMR, forward-kinematics the resulting MuJoCo qpos, and publishes a canonical
 motion payload over ZMQ.
 """
@@ -255,16 +255,19 @@ def _hand_grip_message_from_data(controller_data: object) -> HandGripMessage:
 
 def _resolve_gmr_target_robot(robot_cfg: RobotCfg) -> str:
     try:
-        return {"g1": "unitree_g1", "h2": "unitree_h2"}[robot_cfg.name]
+        return {"g1": "unitree_g1", "h2": "unitree_h2", "oli": "limx_oli_edu",
+                "x2": "lingxi_x2"}[robot_cfg.name]
     except KeyError as exc:
         raise ValueError(f"Pico retargeting does not support {robot_cfg.name}") from exc
 
 
 def _register_gmr_robot(robot_cfg: RobotCfg, target_robot: str) -> None:
-    if target_robot == "unitree_h2":
+    if robot_cfg.name in {"h2", "oli", "x2"}:
         from general_motion_retargeting.params import IK_CONFIG_DICT, ROBOT_XML_DICT
         ROBOT_XML_DICT[target_robot] = robot_cfg.resolve_mjcf_path()
-        IK_CONFIG_DICT["xrobot"][target_robot] = Path(__file__).with_name("configs") / "xrobot_to_h2.json"
+        IK_CONFIG_DICT.setdefault("xrobot", {})[target_robot] = (
+            Path(__file__).with_name("configs") / f"xrobot_to_{robot_cfg.name}.json"
+        )
 
 
 class LiveRetargetPublisher:
@@ -279,12 +282,32 @@ class LiveRetargetPublisher:
         self.streamer = XRobotStreamer()
         target_robot = _resolve_gmr_target_robot(self.robot_cfg)
         _register_gmr_robot(self.robot_cfg, target_robot)
-        self.retarget = GMR(
+        human_height = float(args.actual_human_height)
+        if not np.isfinite(human_height) or human_height <= 0:
+            raise ValueError("actual_human_height must be finite and positive")
+        normalize_height = self.robot_cfg.name in {"oli", "x2"}
+        retarget_type = GMR
+        if self.robot_cfg.name == "x2":
+            from sim2real.teleop.x2_retarget import X2Retargeter
+            retarget_type = X2Retargeter
+        self.retarget = retarget_type(
             src_human="xrobot",
             tgt_robot=target_robot,
-            actual_human_height=float(args.actual_human_height),
+            actual_human_height=None if normalize_height else human_height,
             verbose=bool(args.verbose),
         )
+        if self.robot_cfg.name == "x2":
+            self.retarget.reference_dt = 1.0 / self.publish_hz
+        if normalize_height:
+            profile = json.loads((Path(__file__).with_name("configs")
+                                  / f"xrobot_to_{self.robot_cfg.name}.json").read_text())
+            # Live XR positions already have the operator's physical dimensions.
+            # Normalize them to the calibration stature, rather than applying
+            # GMR's legacy actual/assumed ratio a second time to a taller body.
+            ratio = float(profile["human_height_assumption"]) / human_height
+            self.retarget.human_scale_table = {
+                name: scale * ratio for name, scale in self.retarget.human_scale_table.items()
+            }
 
         self.mjcf_path = _resolve_publisher_mjcf_path(args.mjcf_path, self.robot_cfg)
         self.fk_model = mujoco.MjModel.from_xml_path(str(self.mjcf_path))
@@ -866,6 +889,12 @@ class LiveRetargetPublisher:
                 print("[Info] XR body data reconnected; marking next motion payload as first frame")
 
             raw_min_body_z = float(min(np.asarray(pose[0], dtype=np.float32)[2] for pose in smplx_data.values()))
+            if self.robot_cfg.name == "x2":
+                # Match the calibrated ankle-position / toe-orientation tasks.
+                for side in ("Left", "Right"):
+                    if f"{side}_Ankle" in smplx_data and f"{side}_Foot" in smplx_data:
+                        smplx_data[f"{side}FootMod"] = [smplx_data[f"{side}_Ankle"][0].copy(),
+                                                        smplx_data[f"{side}_Foot"][1].copy()]
             motion_first_frame = self._consume_live_first_frame_flag()
             smplx_data = self._transform_live_body_pose_dict(smplx_data)
             with ScopedTimer(MIN_HEIGHT_TIMER_NAME):

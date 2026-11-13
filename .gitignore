@@ -16,6 +16,7 @@ stubs
 !/tests/test_sonic_dict_policy.py
 !/tests/test_hand_grip.py
 !/tests/test_pico_hand_grip.py
+!/tests/test_pico_retarget_profiles.py
 !/tests/test_dh116s_keyboard_control.py
 !/tests/test_bfm_zero_observations.py
 !/tests/test_proteus_observations.py
@@ -32,6 +33,7 @@ stubs
 !/tests/test_planner_reference.py
 !/tests/test_planner_depth.py
 !/tests/test_planner_real_robot.py
+!/tests/test_unitree_joystick_transport.py
 /third_party/*
 !/third_party/dh116s_sdk/
 /third_party/dh116s_sdk/*
@@ -95,3 +97,7 @@ MANIFEST
 !/third_party/wheels/README.md
 /third_party/wheels/*.whl
 .scratch/
+
+!/tests/test_oli.py
+
+!/tests/test_x2.py

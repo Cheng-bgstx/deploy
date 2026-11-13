@@ -418,22 +418,47 @@ HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run sim2real/rl_policy/tracking.p
 - Reference Source 在整次运行中固定不变（`--motion-backend`）。
 - 两种模式都必须传 `--motion-path`。它的第 0 帧既是 Shaping 的目标，也是 Hold 时的
   Reference。
-- `--controller joystick` 在写死的网口 `eth0` 上读取 Unitree 手柄。如果 Host 连接
-  机器人的网口不叫这个名字，请用键盘。
+- 使用 Unitree 手柄时，传入 `--controller joystick --robot-interface
+  <host_ethernet_interface>`。手柄订阅使用指定的网口，默认值为 `eth0`。
+  G1 从 `rt/lowstate` 中读取内嵌的 `wireless_remote` 数据，不依赖独立的
+  `rt/wirelesscontroller` 发布者。
 - 按 Ctrl+C 停止 `tracking.py`。用 Planner 时，worker 子进程会打印一段
   `KeyboardInterrupt` traceback，不影响使用。
 
-### 操作按键：A → R1 → B → R2 {#operator-keys}
+### 操作按键：A → A → Start；Select 停止 {#operator-keys}
 
-| 按键 | 键盘 / 手柄 | 阶段 | File Playback | Planner |
+按前文准备好根 Python 环境、转换后的 ft500ema / take1512、DP 权重和机载深度程序后，
+可以使用部署启动脚本；脚本从自身位置定位仓库，不依赖当前工作目录。在仓库根目录执行：
+
+```bash
+# 终端 1：释放内置运动控制，启动 Bridge。
+bash scripts/g1/scalecar/start_bridge.sh
+# 终端 2：启动使用 Unitree 手柄的真机 Tracker。
+bash scripts/g1/scalecar/start_tracker.sh
+```
+
+默认使用 `.venv/bin/python`、Host 网口 `enp5s0`、机载 `unitree@192.168.123.164`、
+ft500ema 和 take1512。可通过 `SCALECAR_PYTHON`、`G1_INTERFACE`、`G1_SSH_HOST`、
+`G1_DEPTH_EXECUTABLE`、`SCALECAR_POLICY_CONFIG`、`SCALECAR_MOTION_PATH` 覆盖；
+额外的 CLI 参数会直接传入程序。Tracker 终端日志保存在
+`outputs/real_runs/<timestamp>/tracker.log`，正常退出时在同目录保存 `tracking.npz`。
+`SCALECAR_RUN_DIR` 可指定输出目录。脚本显式设置 HF 离线变量，使用已准备好的根环境，
+不执行依赖安装。模型文件、环境和运行输出属于外部资产，不纳入 Git。
+
+| 阶段 | 键盘 | Unitree 手柄 | File Playback | Planner |
 | --- | --- | --- | --- | --- |
-| A | `i` / A | Shaping（塑形） | 移动到 Motion 第 0 帧的姿态，并按软关节限位裁剪。 | 同左，并且会丢弃已生效的 Go。 |
-| R1 | `]` / R1 | Tracker 接管：Hold | Reference 冻结在 Motion 第 0 帧。 | 同左，并且会丢弃已生效的 Go，所以 R1 总是意味着 Hold。 |
-| B | 空格 / B | Go | 切换播放 / 暂停。第一次按下开始回放 Motion；回放结束后 Tracker 停在 Final Hold（末帧保持）。 | 只在 Hold 中有效。第一次按下请求 Go，在下一拍检查（骨盆高度、深度帧龄、Planner 预热）。被拒绝时机器人停在 Hold，可以再按 B。被接受后，Hold 持续到第一个 Chunk（规划块）到达，之后由 Planner 驱动 Reference。之后再按会被忽略。在 Shaping 或 E-stop 中按 B 会被忽略，并打印警告。 |
-| R2 | `o` / R2 | E-stop（急停） | 每个关节的目标都跟随该关节的实测位置。 | 同左，并且会丢弃 Go。重新开始用 A → R1 → B。 |
+| Shaping（塑形） | `i` | 第一次 A | 移动到 Motion 第 0 帧的姿态，并按软关节限位裁剪。 | 同左，并且会丢弃已生效的 Go。 |
+| Tracker 接管：Hold | `]` | 塑形完成后的第二次 A | Reference 冻结在 Motion 第 0 帧。 | 同左，并且会丢弃已生效的 Go。 |
+| Go | 空格 | Start | 切换播放 / 暂停。第一次按下开始回放 Motion；回放结束后 Tracker 停在 Final Hold（末帧保持）。 | 只在 Hold 中有效。第一次按下请求 Go，在下一拍检查（骨盆高度、深度帧龄、Planner 预热）。被拒绝时机器人停在 Hold，可以再按 Start / 空格。被接受后，Hold 持续到第一个 Chunk（规划块）到达，之后由 Planner 驱动 Reference。之后再按会被忽略。在 Shaping 或 E-stop 中请求 Go 会被忽略，并打印警告。 |
+| E-stop（急停） | `o` | Select | 每个关节的目标都跟随该关节的实测位置。 | 同左，并且会丢弃 Go。重新开始用 A → A → Start。 |
 
-Pico 没有 B（它的 B 是 E-stop），所以用 Planner 时，Go 只能从键盘或 Unitree 手柄
-发出。
+两次 A 是分开的按下，每次松开后再按下一次。50 Hz 下塑形约需 10 s，等终端打印
+`Joystick: Shaping complete` 后再按第二次 A；提前按会被忽略，完成后需重新按。
+长按 A 只算一次。在 Hold / Go 中按 A 会重新塑形。Select 优先于同时按下的 A / Start，
+并重置启动顺序；一直按住的 Start 需松开后重按。R1 / B / R2 不再控制这些阶段。
+机器人吊起时只用 A → A 做塑形 / Hold，Select 停止，不按 Start。
+
+Pico 不能请求 Planner Go；使用键盘空格或 Unitree 手柄 Start。
 
 ### Planner 模式下的终端信息 {#terminal-messages-with-the-planner}
 
@@ -458,11 +483,11 @@ Planner: first Chunk applied 0.060 s after Go
 或者 `Planner: Go refused, staying in Hold: <reason>`，原因可能是骨盆高度检查未
 通过、Planner 预热未完成、深度过旧（`depth is 0.350 s old (limit 0.2 s)`），或者
 深度 / worker 出错。在车辆 sim2sim 中，Go 时的站立骨盆高度约 0.79 m。E-stop、
-Shaping 或再次按 R1 时会打印 `Planner: Go dropped (...)`；随后 Planner 会重新执行一次
+Shaping 或再次接管时会打印 `Planner: Go dropped (...)`；随后 Planner 会重新执行一次
 预热规划，下一次 Go 要等它完成。如果 worker 崩溃过，要等它重启后这次预热才会完成。
 
 如果 worker 在首次 Go 前的 Hold 阶段故障，Planner 也会自动重新预热。预热请求或回复
-丢失时会自动重试。恢复期间机器人保持 Hold；恢复后需要再次按 B 请求 Go。
+丢失时会自动重试。恢复期间机器人保持 Hold；恢复后需要再次按 Start / 空格请求 Go。
 
 Go 之后每 5 s 打印一行统计：规划次数、延迟 p50/p95、迟到的 Chunk、覆盖耗尽、深度
 帧龄和 Planner 的阶段。

@@ -2,6 +2,12 @@
 
 如需在 G1 自带的 Orin 上运行同一套程序，见 [Proteus G1 在机器人 Orin 上运行](proteus-g1-onboard.md)。
 
+启动脚本默认使用经过真机测试的 `checkpoints/proteus/proteus_wamseq_62/unitree_g1`。各机器人分支还导出了
+**wsq61** actor（`wsq61_wam_61robots_30000.pt`，SHA256
+`1d1c65ddf5706b940744d87e2f86f7cea453c9240bcccc12d31923211f694bba`，来源记录在
+`checkpoints/proteus/wsq61/source/export.json`）；设置
+`PROTEUS_POLICY_DIR=checkpoints/proteus/wsq61/unitree_g1` 即可选用。下文的真机结果不覆盖 wsq61。
+
 PC 上运行 50 Hz 的 CPU ONNX Tracking 和 200 Hz 的 Python SDK2 Bridge。Tracking 从本地缓存读取 NPZ 参考动作；G1 通过 DDS 接收关节位置、速度目标、前馈力矩和 PD 增益。沿用现有 Python 3.10、SDK2、CycloneDDS 和 ZMQ 环境，无需 aarch64 inline 路径的 `unitree_interface`。
 
 启动器默认将 ONNX、OpenMP 和 BLAS 限制为一个 CPU 线程。未限制的 ONNX 线程池可能在 50 Hz 推理间隔期间占用多个核心，与 DDS 回调竞争。之前的日志也记录过一次 174 ms 的指令发送延迟。启动器现将统一 I/O 超时窗口从 100 ms 改为 250 ms，短时间隔不会锁定停止。这两项设置在新进程启动时生效，现有进程不会读取启动脚本的修改。真机测试期间不要并行运行策略基准测试或仿真。
@@ -29,7 +35,7 @@ export SIM2REAL_PYTHON=/absolute/path/to/existing/.venv/bin/python
 
 ```bash
 "$SIM2REAL_PYTHON" scripts/g1/validate_proteus_deployment.py \
-  --policy-config checkpoints/proteus/proteus_60/unitree_g1/policy-pc.yaml \
+  --policy-config checkpoints/proteus/wsq61/unitree_g1/policy-pc.yaml \
   --npz-playback-limit-s 3
 ```
 

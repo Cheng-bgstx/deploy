@@ -5,6 +5,10 @@ sidebar_position: 2
 
 This tutorial uses the teleop publisher for live Pico / XR retargeting, its built-in mjviser server to inspect the retargeted G1 motion, and the root project tracking policy for execution.
 
+For HU_D04_01, follow [Proteus OLI](./proteus-oli.md#pico-whole-body-teleoperation)
+for its calibrated IK profile, neutral startup reference and separate simulator /
+LimX SDK launch commands. Select the robot on both the publisher and policy sides.
+
 ## 1. Start the Pico retarget publisher
 
 ```bash
@@ -104,3 +108,6 @@ the hands. Use `--hand-dir left` or `--hand-dir right` for staged bring-up.
 ## Next Steps
 
 - [Motion Recording](/tutorials/motion-recording)
+
+Lingxi X2 has its own [Proteus X2 PICO procedure](./proteus-x2.md#pico-whole-body-teleoperation),
+including the X2 IK profile and AimDK launcher.

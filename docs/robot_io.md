@@ -66,6 +66,10 @@ uv run sim2real/rl_policy/tracking.py \
 Add `--interface <robot_network_interface>` to the bridge command only when the
 robot network interface is not the default `eth0`.
 
+The Galbot ET1 does not use this bridge: `scripts/et1/hdep_bridge.py` on the ET1
+board speaks Galbot's HDEP and offers the same ZMQ contract; see
+[Proteus on the Galbot ET1 board](./proteus_et1_onboard.md). The ET1 has no inline mode.
+
 ## ZMQ With `scripts/g1/real_bridge_cpp.py`
 
 This mode keeps the same ZMQ contract as `scripts/g1/real_bridge.py`, but the bridge uses
