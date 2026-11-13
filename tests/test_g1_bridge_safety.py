@@ -457,6 +457,7 @@ def test_reference_entry_is_smooth_and_blocks_start_until_hold(monkeypatch):
     start, target = np.zeros(29), np.ones(29)
     tracker.state_processor = SimpleNamespace(joint_pos=start)
     tracker.target_postprocessor = None
+    tracker.pose_target_limits = None
     tracker.motion_first_frame_joint_pos = lambda: target
     tracker._reference_entry_target = None
     tracker._reference_entry_count = 0

@@ -20,3 +20,4 @@ Runtime artifacts，包括 JetPack 5 预编译包：
 [Proteus 众擎 T800](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-t800.md): `--robot t800`; 包含全身 IK、ZMQ 动作/按钮、仿真与真机启动入口。
 
 [Proteus 众擎 PM01](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-pm01.md): `--robot pm01`; 24 关节 PM01/pm_v2、全身 IK、ZMQ 动作/按钮及匹配的旧版 ROS 消息。
+[Proteus 启元 Q1](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-q1.md): `--robot q1`; 包含全身 IK、ZMQ 动作/按钮、仿真与真机启动入口。

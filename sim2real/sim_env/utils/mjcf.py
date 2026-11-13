@@ -7,6 +7,7 @@ import tempfile
 import xml.etree.ElementTree as ET
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Callable
 
 import mujoco
 import numpy as np
@@ -172,6 +173,7 @@ def load_sim_model(
     robot_cfg: RobotCfg,
     *,
     ground_rgb: tuple[float, float, float] = (0.2, 0.3, 0.4),
+    customize_spec: Callable[[mujoco.MjSpec], None] | None = None,
 ) -> mujoco.MjModel:
     mjcf_path = robot_cfg.resolve_mjcf_path()
     if ground_rgb != (0.2, 0.3, 0.4):
@@ -211,4 +213,6 @@ def load_sim_model(
                 len(added_joint_names),
                 ", ".join(added_joint_names),
             )
+        if customize_spec is not None:
+            customize_spec(spec)
         return spec.compile()

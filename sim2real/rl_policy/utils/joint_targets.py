@@ -26,9 +26,19 @@ targets are left untouched:
       left_knee_joint: [-0.0131, 2.8056]
     max_target_velocity_rad_s: 15.0   # times the runtime control period (1 / rl_rate)
 
-Either key alone enables only its half. When soft limits are configured,
-``BasePolicy`` also clips the ``shaping_target: motion_first_frame`` target.
-Without postprocessing, first-frame shaping uses the original motion target.
+Either key alone enables only its half.
+
+Pose targets the robot interpolates to before policy control (the
+``shaping_target: motion_first_frame`` Shaping target and the
+``reference_entry_s`` transition) are clipped by
+``JointTargetPostprocessor.pose_limits_from_policy_config``: the optional
+``shaping_joint_pos_limits`` (same format), else ``soft_joint_pos_limits``.
+Without either key, first-frame shaping uses the original motion target.
+``shaping_joint_pos_limits`` never clips policy targets. A robot IO layer may
+still clip them: ``NamedJointCodec`` (Q1) clips every command to the model joint
+range under its default ``policy_limit_mode: clip``, so there the rate limit would
+run on targets the robot never receives. Its ``pass`` and ``feedforward`` modes
+handle out-of-range policy targets instead (``robot_io_options``).
 """
 
 from __future__ import annotations
@@ -43,6 +53,34 @@ from sim2real.utils.strings import resolve_matching_names_values
 
 
 WARNING_INTERVAL_S = 1.0
+POLICY_LIMITS_KEY = "soft_joint_pos_limits"
+SHAPING_LIMITS_KEY = "shaping_joint_pos_limits"
+
+
+def _limits_from_config(
+    limits_cfg: dict[str, Any],
+    key: str,
+    joint_names: list[str],
+    policy_joint_names: Sequence[str],
+) -> tuple[np.ndarray, np.ndarray]:
+    lower = np.full(len(joint_names), -np.inf)
+    upper = np.full(len(joint_names), np.inf)
+    indices, names, bounds = resolve_matching_names_values(
+        dict(limits_cfg), joint_names, preserve_order=True, strict=True
+    )
+    for index, name, bound in zip(indices, names, bounds):
+        low, high = (float(value) for value in bound)
+        if not (np.isfinite(low) and np.isfinite(high) and low <= high):
+            raise ValueError(
+                f"{key}[{name}] must be finite [lower, upper] "
+                f"with lower <= upper, got {bound}"
+            )
+        lower[index] = low
+        upper[index] = high
+    missing = [name for name in policy_joint_names if name not in names]
+    if missing:
+        raise ValueError(f"{key} must cover every policy joint; missing {missing}")
+    return lower, upper
 
 
 class JointTargetPostprocessor:
@@ -82,7 +120,7 @@ class JointTargetPostprocessor:
         but they must cover every joint in ``policy_joint_names``. Joints
         outside the policy are left unbounded.
         """
-        limits_cfg = policy_config.get("soft_joint_pos_limits")
+        limits_cfg = policy_config.get(POLICY_LIMITS_KEY)
         max_velocity = policy_config.get("max_target_velocity_rad_s")
         if limits_cfg is None and max_velocity is None:
             return None
@@ -91,23 +129,9 @@ class JointTargetPostprocessor:
         lower = np.full(len(joint_names), -np.inf)
         upper = np.full(len(joint_names), np.inf)
         if limits_cfg is not None:
-            indices, names, bounds = resolve_matching_names_values(
-                dict(limits_cfg), joint_names, preserve_order=True, strict=True
+            lower, upper = _limits_from_config(
+                limits_cfg, POLICY_LIMITS_KEY, joint_names, policy_joint_names
             )
-            for index, name, bound in zip(indices, names, bounds):
-                low, high = (float(value) for value in bound)
-                if not (np.isfinite(low) and np.isfinite(high) and low <= high):
-                    raise ValueError(
-                        f"soft_joint_pos_limits[{name}] must be finite [lower, upper] "
-                        f"with lower <= upper, got {bound}"
-                    )
-                lower[index] = low
-                upper[index] = high
-            missing = [name for name in policy_joint_names if name not in names]
-            if missing:
-                raise ValueError(
-                    f"soft_joint_pos_limits must cover every policy joint; missing {missing}"
-                )
 
         max_delta = None
         if max_velocity is not None:
@@ -118,6 +142,27 @@ class JointTargetPostprocessor:
                 )
             max_delta = max_velocity * float(control_dt)
         return cls(lower=lower, upper=upper, max_delta=max_delta, joint_names=joint_names)
+
+    @classmethod
+    def pose_limits_from_policy_config(
+        cls,
+        policy_config: dict[str, Any],
+        *,
+        joint_names: Sequence[str],
+        policy_joint_names: Sequence[str],
+    ) -> "JointTargetPostprocessor | None":
+        """Clip-only limits for pre-policy pose targets, or None when unset.
+
+        Uses ``shaping_joint_pos_limits`` when set, else ``soft_joint_pos_limits``.
+        Only ``clip()`` is meant to be called on the result.
+        """
+        key = SHAPING_LIMITS_KEY if policy_config.get(SHAPING_LIMITS_KEY) is not None else POLICY_LIMITS_KEY
+        limits_cfg = policy_config.get(key)
+        if limits_cfg is None:
+            return None
+        joint_names = list(joint_names)
+        lower, upper = _limits_from_config(limits_cfg, key, joint_names, policy_joint_names)
+        return cls(lower=lower, upper=upper, max_delta=None, joint_names=joint_names)
 
     def clip(self, joint_pos: np.ndarray) -> np.ndarray:
         """Clip joint positions to the soft limits."""

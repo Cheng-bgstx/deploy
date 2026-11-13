@@ -12,8 +12,8 @@ from sim2real.config.robots import get_robot_cfg
 
 ROOT = Path(__file__).resolve().parents[1]
 PROFILES = sorted((ROOT / 'sim2real/teleop/configs').glob('xrobot_to_*.json'))
-PROFILES = [p for p in PROFILES if p.stem.removeprefix('xrobot_to_') in {'oli', 'x2', 'a3'}]
-PROFILES = [p for p in PROFILES if p.stem.removeprefix('xrobot_to_') in {'oli', 'x2', 'a3', 't800', 'pm01'}]
+PROFILES = [p for p in PROFILES if p.stem.removeprefix('xrobot_to_') in {'oli', 'x2', 'a3', 't800', 'pm01', 'q1'}]
+
 
 @pytest.mark.parametrize('path', PROFILES, ids=lambda p: p.stem)
 def test_xrobot_profile_is_valid_for_target_contract(path):

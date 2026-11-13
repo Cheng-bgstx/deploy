@@ -1,5 +1,8 @@
 outputs*
 
+# Local policy runtime recordings.
+policy_tracking_record_*.npz
+
 checkpoints
 .vscode
 stubs

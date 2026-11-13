@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")/../.."
+export HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1
+export SIM2REAL_ORT_NUM_THREADS="${SIM2REAL_ORT_NUM_THREADS:-1}"
+motion="checkpoints/primebot_q1/motions/motions/walk1_subject1.npz"
+if [[ $# -gt 0 && "$1" != -* ]]; then motion="$1"; shift; fi
+policy="${PROTEUS_POLICY_CONFIG:-checkpoints/proteus/wsq61/primebot_q1/policy-pc.yaml}"
+if [[ ! -f "$policy" ]]; then
+  echo 'Prepare the Q1 hardware overlay with python -m scripts.q1.prepare_deployment (see the Q1 tutorial).' >&2
+  exit 1
+fi
+exec uv run --no-sync python -m sim2real.rl_policy.tracking \
+  --robot q1 --robot-io inline \
+  --policy-config "$policy" \
+  --rl-rate 50 --inference-backend onnx-cpu --controller keyboard \
+  --motion-backend npz --motion-path "$motion" "$@"

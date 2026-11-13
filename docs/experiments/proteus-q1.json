@@ -1,0 +1,516 @@
+{
+  "date": "2026-11-03",
+  "branch": "feat/proteus-wamseq-primebot-q1",
+  "proteus_source_commit": "1e0e0381bdec73652f8aa90b871f2980586bb52a",
+  "lafan_source_commit": "94084601bacdf9cc3764b5c73daaeccae6035fac",
+  "policy_comparison": {
+    "release": "proteus_wamseq_62",
+    "actor_kind": "wam_seq",
+    "contract": "primebot_q1",
+    "robot": "q1",
+    "far_offset": 16,
+    "passed": true,
+    "max_abs_error": 0.0,
+    "tolerance": 1e-06,
+    "num_samples": 64,
+    "seed": 0,
+    "method": "standard-normal inputs in sim2real layout; the released actor gets them with a batch axis and the contract's morph; action is compared with actions[driven slots], next_slot_action with actions",
+    "sources": {
+      "proteus_actor.onnx": "33bc2ff91f5322abb9e939e5f691e62c03897906161ba1ab2bee9b0533fb9df1",
+      "primebot_q1.json": "6d79d3784198740b5c2ab3e43edb05f257a6290f0741498468a5ee34f713bfc1"
+    },
+    "artifact": {
+      "policy.onnx": {
+        "sha256": "36b922400d304913cb96ce0870e14bd12fc9b5ac76a88d838244b00a205895bc",
+        "ir_version": 8,
+        "opset": {
+          "ai.onnx": 17
+        },
+        "inputs": {
+          "proprioception": [
+            10,
+            68
+          ],
+          "task": [
+            6,
+            253
+          ],
+          "action_history": [
+            10,
+            31
+          ],
+          "history_valid": [
+            10
+          ]
+        },
+        "outputs": {
+          "action": [
+            22
+          ],
+          "next_slot_action": [
+            31
+          ]
+        }
+      }
+    },
+    "versions": {
+      "onnx": "1.17.0",
+      "onnxruntime": "1.23.2"
+    }
+  },
+  "model_validation": {
+    "robot": "q1",
+    "contract": "primebot_q1",
+    "source_xml": "/home/galbot/projects/primebot-q1-urdf/xml/q1_v3.xml",
+    "source_xml_sha256": "f427baa7c37905358ad86499a3df654c7676eec5658c2d3da356863bcde571cc",
+    "spec_sha256": "9a9adc9f139bff515fb8883f168d1612d87f7fa2e802e670133b76588db39732",
+    "vendor_mass_kg": 16.917288,
+    "training_mass_kg": 16.917288,
+    "mass_difference_kg": 0.0,
+    "max_joint_axis_error": 0.0,
+    "joint_limit_overrides": {},
+    "joints_fixed_at_zero": [],
+    "prepared_xml_sha256": "aabf81ab8e654c8dbadf651b96d8615266a29859d2a77ed39967ba3b118c72a1"
+  },
+  "motion_manifest": {
+    "format_version": 2,
+    "dataset_name": "q1_lafan",
+    "mjcf": "../../../third_party/primebot_q1/model/visual.xml",
+    "motions_subdir": "motions",
+    "timestep": 0.033333,
+    "qpos_dim": 29,
+    "qpos_names": [
+      "root_tx",
+      "root_ty",
+      "root_tz",
+      "root_qw",
+      "root_qx",
+      "root_qy",
+      "root_qz",
+      "left_hip_pitch_joint",
+      "left_hip_roll_joint",
+      "left_hip_yaw_joint",
+      "left_knee_joint",
+      "left_ankle_pitch_joint",
+      "left_ankle_roll_joint",
+      "right_hip_pitch_joint",
+      "right_hip_roll_joint",
+      "right_hip_yaw_joint",
+      "right_knee_joint",
+      "right_ankle_pitch_joint",
+      "right_ankle_roll_joint",
+      "waist_roll_joint",
+      "waist_yaw_joint",
+      "left_shoulder_pitch_joint",
+      "left_shoulder_roll_joint",
+      "left_shoulder_yaw_joint",
+      "left_elbow_joint",
+      "right_shoulder_pitch_joint",
+      "right_shoulder_roll_joint",
+      "right_shoulder_yaw_joint",
+      "right_elbow_joint"
+    ],
+    "num_motions": 3,
+    "source": {
+      "kind": "LAFAN1 human mocap solved by target-model IK",
+      "motions": [
+        {
+          "file": "motions/walk1_subject1.npz",
+          "frames": 240,
+          "bvh": "walk1_subject1.bvh",
+          "bvh_sha256": "4c9d591f323ffa660d9de6ef20c5d7077e66b2102a009feedf01afa22a6fbc73",
+          "start_s": 0.0,
+          "duration_s": 7.99992,
+          "ground_shift_range_m": [
+            -0.027929596735849833,
+            -0.005682153632901532
+          ]
+        },
+        {
+          "file": "motions/dance1_subject1.npz",
+          "frames": 240,
+          "bvh": "dance1_subject1.bvh",
+          "bvh_sha256": "9a285b61bb0446aa4c919c62247ff895eb158bc693be3b7477d31ef070995d73",
+          "start_s": 0.0,
+          "duration_s": 7.99992,
+          "ground_shift_range_m": [
+            -0.026065191519363817,
+            -0.005572027134486651
+          ]
+        },
+        {
+          "file": "motions/fightAndSports1_subject4.npz",
+          "frames": 240,
+          "bvh": "fightAndSports1_subject4.bvh",
+          "bvh_sha256": "205396f5a212419b721c2d3b1f9072d625718567354ee623f89beacc84d5b98c",
+          "start_s": 0.0,
+          "duration_s": 7.99992,
+          "ground_shift_range_m": [
+            -0.03810275711478893,
+            0.016058681792164426
+          ]
+        }
+      ],
+      "profile_sha256": "8114b2a8a13c111845f3dea1effd0578cb5ff888942b343a1ae999991dba2c17",
+      "max_joint_speed_rad_s": 12.0,
+      "root_xy": "recentered at first frame",
+      "quaternion": "wxyz"
+    },
+    "total_hours": 0.006666600000000001
+  },
+  "pico_profile": {
+    "method": "neutral FK morphology transfer of calibrated human frames; target IK",
+    "source_config": "xrobot_to_g1.json",
+    "source_sha256": "34ff208990409365928e86a433d7201c268b690cac40b4c09eb83a1067d63a0b",
+    "target_spec_sha256": "9a9adc9f139bff515fb8883f168d1612d87f7fa2e802e670133b76588db39732",
+    "generator": "scripts/proteus/build_retarget_profiles.py"
+  },
+  "pico_profile_sha256": "2aa782f5b3c0139fd3bb6ab82b123984b26bca5a8b83bc307f26650d21b0efa2",
+  "commands": [
+    [
+      "uv",
+      "run",
+      "--no-sync",
+      "python",
+      "-m",
+      "scripts.q1.prepare"
+    ],
+    [
+      "uv",
+      "run",
+      "--no-sync",
+      "python",
+      "-m",
+      "scripts.proteus.evaluate",
+      "--robot",
+      "q1",
+      "--policy-config",
+      "checkpoints/proteus/proteus_wamseq_62/primebot_q1/policy-sim.yaml",
+      "--dataset",
+      "checkpoints/primebot_q1/motions",
+      "--output",
+      "outputs/q1/eval-native-resolution"
+    ],
+    [
+      "uv",
+      "run",
+      "--no-sync",
+      "python",
+      "-m",
+      "pytest",
+      "tests/test_proteus_transport.py",
+      "tests/test_proteus_observations.py",
+      "tests/test_robot_io.py",
+      "tests/test_command_sender.py",
+      "tests/test_oli.py",
+      "tests/test_x2.py",
+      "-q"
+    ],
+    [
+      "uv",
+      "run",
+      "--project",
+      "venv/pico",
+      "--no-sync",
+      "python",
+      "-m",
+      "pytest",
+      "tests/test_pico_retarget_profiles.py",
+      "-q"
+    ]
+  ],
+  "evaluation": {
+    "robot": "q1",
+    "policy": "/home/galbot/projects/sim2real-wt/q1/checkpoints/proteus/proteus_wamseq_62/primebot_q1/policy-sim.yaml",
+    "dataset": "/home/galbot/projects/sim2real-wt/q1/checkpoints/primebot_q1/motions",
+    "passed": true,
+    "motions": [
+      {
+        "motion": "/home/galbot/projects/sim2real-wt/q1/checkpoints/primebot_q1/motions/motions/dance1_subject1.npz",
+        "policy": "/home/galbot/projects/sim2real-wt/q1/checkpoints/proteus/proteus_wamseq_62/primebot_q1/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "b60ac70dad133a70f2e34b07e476ea2d92e292f5f89783b2a238bdc9c7873c11",
+        "policy_yaml_sha256": "d2e110a7e78b8d566c0a8f17b3e5db6cede5cba36f1d5f94b8f8a829a4276ba2",
+        "onnx_sha256": "36b922400d304913cb96ce0870e14bd12fc9b5ac76a88d838244b00a205895bc",
+        "manifest_sha256": "d24f77217fcfde4215d2b489d94325dc4317b6e32c8f59dbf0ad2d0534085d48",
+        "prepared_mjcf_sha256": "aabf81ab8e654c8dbadf651b96d8615266a29859d2a77ed39967ba3b118c72a1",
+        "sim_dt_s": 0.000625,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.04882869869470596,
+        "max_frame_world_body_error_m": 0.08032801002264023,
+        "mean_local_body_error_m": 0.023089047521352768,
+        "world_root_endpoint_error_m": 0.08460716903209686,
+        "separate_start_frame_root_error_m": 0.12339001148939133,
+        "min_playback_root_height_m": 0.37644171714782715,
+        "root_trajectory": "outputs/q1/eval-native-resolution/dance1_subject1.root.npz",
+        "trajectory": "outputs/q1/eval-native-resolution/dance1_subject1.trajectory.npz",
+        "passed": true
+      },
+      {
+        "motion": "/home/galbot/projects/sim2real-wt/q1/checkpoints/primebot_q1/motions/motions/fightAndSports1_subject4.npz",
+        "policy": "/home/galbot/projects/sim2real-wt/q1/checkpoints/proteus/proteus_wamseq_62/primebot_q1/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "a35cb8917bfb4efb755cb960e0055b6862709d745402146e794f535daa21ef93",
+        "policy_yaml_sha256": "d2e110a7e78b8d566c0a8f17b3e5db6cede5cba36f1d5f94b8f8a829a4276ba2",
+        "onnx_sha256": "36b922400d304913cb96ce0870e14bd12fc9b5ac76a88d838244b00a205895bc",
+        "manifest_sha256": "d24f77217fcfde4215d2b489d94325dc4317b6e32c8f59dbf0ad2d0534085d48",
+        "prepared_mjcf_sha256": "aabf81ab8e654c8dbadf651b96d8615266a29859d2a77ed39967ba3b118c72a1",
+        "sim_dt_s": 0.000625,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.04058476537466049,
+        "max_frame_world_body_error_m": 0.10412836074829102,
+        "mean_local_body_error_m": 0.026255933567881584,
+        "world_root_endpoint_error_m": 0.043879102915525436,
+        "separate_start_frame_root_error_m": 0.08265542984008789,
+        "min_playback_root_height_m": 0.3330935537815094,
+        "root_trajectory": "outputs/q1/eval-native-resolution/fightAndSports1_subject4.root.npz",
+        "trajectory": "outputs/q1/eval-native-resolution/fightAndSports1_subject4.trajectory.npz",
+        "passed": true
+      },
+      {
+        "motion": "/home/galbot/projects/sim2real-wt/q1/checkpoints/primebot_q1/motions/motions/walk1_subject1.npz",
+        "policy": "/home/galbot/projects/sim2real-wt/q1/checkpoints/proteus/proteus_wamseq_62/primebot_q1/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "584b02686a743f577a510114eb29f530683477b119b02d386854b85d5f68d82c",
+        "policy_yaml_sha256": "d2e110a7e78b8d566c0a8f17b3e5db6cede5cba36f1d5f94b8f8a829a4276ba2",
+        "onnx_sha256": "36b922400d304913cb96ce0870e14bd12fc9b5ac76a88d838244b00a205895bc",
+        "manifest_sha256": "d24f77217fcfde4215d2b489d94325dc4317b6e32c8f59dbf0ad2d0534085d48",
+        "prepared_mjcf_sha256": "aabf81ab8e654c8dbadf651b96d8615266a29859d2a77ed39967ba3b118c72a1",
+        "sim_dt_s": 0.000625,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.044619783759117126,
+        "max_frame_world_body_error_m": 0.07999897748231888,
+        "mean_local_body_error_m": 0.0181330144405365,
+        "world_root_endpoint_error_m": 0.01743391714990139,
+        "separate_start_frame_root_error_m": 0.03555728867650032,
+        "min_playback_root_height_m": 0.3854652941226959,
+        "root_trajectory": "outputs/q1/eval-native-resolution/walk1_subject1.root.npz",
+        "trajectory": "outputs/q1/eval-native-resolution/walk1_subject1.trajectory.npz",
+        "passed": true
+      }
+    ]
+  },
+  "hardware_tested": false,
+  "physical_pico_tested": false,
+  "test_results": {
+    "runtime": "47 passed, 1 skipped, 1 warning in 4.15s",
+    "pico": "13 passed, 1 warning in 12.35s"
+  },
+  "hardware_interface_source": {
+    "repository": "PrimebotTech/primebot-q1-sdk",
+    "commit": "7310314eee058323a2c15ab1f4f947df4112573e",
+    "physical_tested": false
+  },
+  "legacy_5ms_evaluation": {
+    "robot": "q1",
+    "policy": "/home/galbot/projects/sim2real-wt/q1/checkpoints/proteus/proteus_wamseq_62/primebot_q1/policy-sim.yaml",
+    "dataset": "/home/galbot/projects/sim2real-wt/q1/checkpoints/primebot_q1/motions",
+    "passed": true,
+    "motions": [
+      {
+        "motion": "/home/galbot/projects/sim2real-wt/q1/checkpoints/primebot_q1/motions/motions/dance1_subject1.npz",
+        "policy": "/home/galbot/projects/sim2real-wt/q1/checkpoints/proteus/proteus_wamseq_62/primebot_q1/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "b60ac70dad133a70f2e34b07e476ea2d92e292f5f89783b2a238bdc9c7873c11",
+        "policy_yaml_sha256": "d2e110a7e78b8d566c0a8f17b3e5db6cede5cba36f1d5f94b8f8a829a4276ba2",
+        "onnx_sha256": "36b922400d304913cb96ce0870e14bd12fc9b5ac76a88d838244b00a205895bc",
+        "manifest_sha256": "d24f77217fcfde4215d2b489d94325dc4317b6e32c8f59dbf0ad2d0534085d48",
+        "prepared_mjcf_sha256": "aabf81ab8e654c8dbadf651b96d8615266a29859d2a77ed39967ba3b118c72a1",
+        "sim_dt_s": 0.005,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.06240566447377205,
+        "max_frame_world_body_error_m": 0.10702187567949295,
+        "mean_local_body_error_m": 0.026572335511446,
+        "world_root_endpoint_error_m": 0.08453115075826645,
+        "separate_start_frame_root_error_m": 0.1474934220314026,
+        "min_playback_root_height_m": 0.3740006387233734,
+        "root_trajectory": "outputs/q1/eval-verified/dance1_subject1.root.npz",
+        "trajectory": "outputs/q1/eval-verified/dance1_subject1.trajectory.npz",
+        "passed": true
+      },
+      {
+        "motion": "/home/galbot/projects/sim2real-wt/q1/checkpoints/primebot_q1/motions/motions/fightAndSports1_subject4.npz",
+        "policy": "/home/galbot/projects/sim2real-wt/q1/checkpoints/proteus/proteus_wamseq_62/primebot_q1/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "a35cb8917bfb4efb755cb960e0055b6862709d745402146e794f535daa21ef93",
+        "policy_yaml_sha256": "d2e110a7e78b8d566c0a8f17b3e5db6cede5cba36f1d5f94b8f8a829a4276ba2",
+        "onnx_sha256": "36b922400d304913cb96ce0870e14bd12fc9b5ac76a88d838244b00a205895bc",
+        "manifest_sha256": "d24f77217fcfde4215d2b489d94325dc4317b6e32c8f59dbf0ad2d0534085d48",
+        "prepared_mjcf_sha256": "aabf81ab8e654c8dbadf651b96d8615266a29859d2a77ed39967ba3b118c72a1",
+        "sim_dt_s": 0.005,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.04503840580582619,
+        "max_frame_world_body_error_m": 0.11004608124494553,
+        "mean_local_body_error_m": 0.029880689457058907,
+        "world_root_endpoint_error_m": 0.05813559889793396,
+        "separate_start_frame_root_error_m": 0.1063266173005104,
+        "min_playback_root_height_m": 0.33340978622436523,
+        "root_trajectory": "outputs/q1/eval-verified/fightAndSports1_subject4.root.npz",
+        "trajectory": "outputs/q1/eval-verified/fightAndSports1_subject4.trajectory.npz",
+        "passed": true
+      },
+      {
+        "motion": "/home/galbot/projects/sim2real-wt/q1/checkpoints/primebot_q1/motions/motions/walk1_subject1.npz",
+        "policy": "/home/galbot/projects/sim2real-wt/q1/checkpoints/proteus/proteus_wamseq_62/primebot_q1/policy-sim.yaml",
+        "seed": 0,
+        "motion_sha256": "584b02686a743f577a510114eb29f530683477b119b02d386854b85d5f68d82c",
+        "policy_yaml_sha256": "d2e110a7e78b8d566c0a8f17b3e5db6cede5cba36f1d5f94b8f8a829a4276ba2",
+        "onnx_sha256": "36b922400d304913cb96ce0870e14bd12fc9b5ac76a88d838244b00a205895bc",
+        "manifest_sha256": "d24f77217fcfde4215d2b489d94325dc4317b6e32c8f59dbf0ad2d0534085d48",
+        "prepared_mjcf_sha256": "aabf81ab8e654c8dbadf651b96d8615266a29859d2a77ed39967ba3b118c72a1",
+        "sim_dt_s": 0.005,
+        "policy_dt_s": 0.02,
+        "initial_hold_s": 1.0,
+        "final_hold_s": 1.0,
+        "last_motion_index": 398,
+        "completed": true,
+        "finite": true,
+        "mean_world_body_error_m": 0.04303450882434845,
+        "max_frame_world_body_error_m": 0.08355788886547089,
+        "mean_local_body_error_m": 0.021811984479427338,
+        "world_root_endpoint_error_m": 0.041675712913274765,
+        "separate_start_frame_root_error_m": 0.055537376552820206,
+        "min_playback_root_height_m": 0.3553624451160431,
+        "root_trajectory": "outputs/q1/eval-verified/walk1_subject1.root.npz",
+        "trajectory": "outputs/q1/eval-verified/walk1_subject1.trajectory.npz",
+        "passed": true
+      }
+    ]
+  },
+  "simulation_resolution_regression": {
+    "command": [
+      "uv",
+      "run",
+      "--no-sync",
+      "python",
+      "-m",
+      "pytest",
+      "tests/test_proteus_sim_resolution.py",
+      "-q"
+    ],
+    "before": "Q1 acceleration RMS 87.11 rad/s\u00b2 > 60",
+    "after": "1 passed, 1 warning in 5.25s",
+    "full_suite_result": "48 passed, 1 skipped, 1 warning in 6.95s"
+  },
+  "source_runtime_comparison": {
+    "source_commit": "1e0e0381bdec73652f8aa90b871f2980586bb52a",
+    "source_unchanged": true,
+    "asset_control": "Both runners use the same verified prepared MJCF; this tests runtime differences, not a different vendor revision.",
+    "motion_control": "Exact sim2real 50-Hz tensors exported to Proteus MotionLibrary by body/joint name. No re-retargeting.",
+    "original_cli": {
+      "robot": "primebot_q1",
+      "success_rate": 1.0,
+      "motions": {
+        "walk1_subject1": {
+          "success": true,
+          "mean_error": 0.04390133172273636
+        }
+      }
+    },
+    "original_trace": {
+      "robot": "q1",
+      "name": "original",
+      "mode": "source",
+      "frames": 398,
+      "physics": {
+        "dt": 0.000625,
+        "substeps": 8,
+        "servo": true,
+        "elliptic": true,
+        "initial_pause": 0.0,
+        "initial_velocity": "reference"
+      },
+      "mean_world_body_error_m": 0.04381112975749425,
+      "max_world_body_error_m": 0.08255069899470066,
+      "joint_position_rmse_rad": 0.10065289484219606,
+      "joint_velocity_rmse_rad_s": 0.8630654821427919,
+      "joint_acceleration_rms_rad_s2": 33.832395231092896,
+      "min_root_z": 0.37202864774490735,
+      "max_root_z": 0.4444657919425855,
+      "source_cli_metric": 0.04390133172273636,
+      "library": "/home/galbot/projects/sim2real/outputs/proteus_source_comparison/20261103_165540/q1_library",
+      "library_index_sha256": "11db2b327785340cb0b52ac5a1b6312215facfa12959d068f1c35c524387919e",
+      "onnx_sha256": "33bc2ff91f5322abb9e939e5f691e62c03897906161ba1ab2bee9b0533fb9df1"
+    },
+    "old_5ms_trace": {
+      "robot": "q1",
+      "name": "delivered",
+      "mode": "current",
+      "frames": 398,
+      "physics": {
+        "dt": 0.005,
+        "servo": false,
+        "elliptic": false,
+        "initial_pause": 1.0,
+        "initial_velocity": "zero"
+      },
+      "mean_world_body_error_m": 0.04321810888772475,
+      "max_world_body_error_m": 0.0873877462859645,
+      "joint_position_rmse_rad": 0.10925879103188976,
+      "joint_velocity_rmse_rad_s": 1.3783978411278295,
+      "joint_acceleration_rms_rad_s2": 87.11144479651995,
+      "min_root_z": 0.3555420731206616,
+      "max_root_z": 0.4409655514845228,
+      "source_cli_metric": null,
+      "library": "/home/galbot/projects/sim2real/outputs/proteus_source_comparison/20261103_165540/q1_library",
+      "library_index_sha256": "11db2b327785340cb0b52ac5a1b6312215facfa12959d068f1c35c524387919e",
+      "onnx_sha256": "33bc2ff91f5322abb9e939e5f691e62c03897906161ba1ab2bee9b0533fb9df1"
+    },
+    "new_0625ms_trace": {
+      "robot": "q1",
+      "name": "small_step_hold",
+      "mode": "current",
+      "frames": 398,
+      "physics": {
+        "dt": 0.000625,
+        "servo": false,
+        "elliptic": false,
+        "initial_pause": 1.0,
+        "initial_velocity": "zero"
+      },
+      "mean_world_body_error_m": 0.046779456039131063,
+      "max_world_body_error_m": 0.07886194304539396,
+      "joint_position_rmse_rad": 0.09748105363108077,
+      "joint_velocity_rmse_rad_s": 0.6946954248996738,
+      "joint_acceleration_rms_rad_s2": 28.42166616811331,
+      "min_root_z": 0.38543541168395695,
+      "max_root_z": 0.43001974539455506,
+      "source_cli_metric": null,
+      "library": "/home/galbot/projects/sim2real/outputs/proteus_source_comparison/20261103_165540/q1_library",
+      "library_index_sha256": "11db2b327785340cb0b52ac5a1b6312215facfa12959d068f1c35c524387919e",
+      "onnx_sha256": "33bc2ff91f5322abb9e939e5f691e62c03897906161ba1ab2bee9b0533fb9df1"
+    },
+    "source_files_sha256": {
+      "ScaleTrack/deploy/sim2sim.py": "0f2f0eabe2f4584ed98bb5d9925415c94c3c297a314629e612004fddd75eed27",
+      "ScaleTrack/deploy/proteus/rollout.py": "279619bd9571a65858c900abe7aecd5e363dd87fac9f65e4f75567809bb42791",
+      "ScaleTrack/deploy/proteus/mujoco_robot.py": "2e14152d42c1f5c2074acd7110ce47212217d662ecb3c4dfdac3f56fbe745a59"
+    },
+    "comparison_video": "/home/galbot/projects/sim2real/outputs/proteus_source_comparison/20261103_165540/videos/q1_delivered_vs_original.mp4",
+    "new_comparison_video": "/home/galbot/projects/sim2real/outputs/proteus_source_comparison/20261103_165540/videos/q1_small_step_hold_vs_original.mp4"
+  }
+}

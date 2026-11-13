@@ -20,3 +20,4 @@ Runtime artifacts, including JetPack 5 prebuilt packages:
 [Proteus EngineAI T800](../../docs/tutorials/proteus-t800.md): `--robot t800`; body IK, ZMQ motion/buttons, simulation and hardware launchers.
 
 [Proteus EngineAI PM01](../../docs/tutorials/proteus-pm01.md): `--robot pm01`; 24-joint PM01/pm_v2, body IK, ZMQ motion/buttons and matching legacy ROS messages.
+[Proteus Primebot Q1](../../docs/tutorials/proteus-q1.md): `--robot q1`; body IK, ZMQ motion/buttons, simulation and hardware launchers.

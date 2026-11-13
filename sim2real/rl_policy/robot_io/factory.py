@@ -35,6 +35,10 @@ def create_robot_io(
         from sim2real.rl_policy.robot_io.t800 import T800RobotIO
 
         return T800RobotIO(robot_cfg, **(options or {}))
+    if robot_cfg.name == "q1":
+        from sim2real.rl_policy.robot_io.q1 import Q1RobotIO
+
+        return Q1RobotIO(robot_cfg, **(options or {}))
     if robot_cfg.name == "x2":
         from sim2real.rl_policy.robot_io.x2 import X2RobotIO
 

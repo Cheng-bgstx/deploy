@@ -67,6 +67,7 @@ uv run sim2real/rl_policy/tracking.py \
 | Proteus WAMSeq AgiBot Expedition A3 | `checkpoints/proteus/proteus_wamseq_62/agibot_a3/policy.yaml` | 30 关节、多条 LAFAN 动作和 PICO；[教程](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-a3.md)。 |
 | Proteus WAMSeq EngineAI T800 | `checkpoints/proteus/proteus_wamseq_62/engineai_t800/policy.yaml` | 25 关节、多条 LAFAN 动作和 PICO；[教程](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-t800.md)。 |
 | Proteus WAMSeq EngineAI PM01 | `checkpoints/proteus/wsq61/engineai_pm01/policy.yaml` | 24 关节 PM01/pm_v2、旧版 ROS 接口、LAFAN 动作和 PICO；[教程](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-pm01.md)。 |
+| Proteus WAMSeq Primebot Q1 | `checkpoints/proteus/proteus_wamseq_62/primebot_q1/policy.yaml` | 22 关节、多条 LAFAN 动作和 PICO；[教程](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-q1.md)。 |
 | BFM-Zero | `checkpoints/bfm-zero/exp_lafan40-100style_update_z10/policy.yaml` | Latent-conditioned motion tracker。 |
 | TeleopIT | `checkpoints/teleopit/policy.yaml` | TeleopIT policy wrapper。 |
 | Humanoid-GPT | `checkpoints/humanoid-gpt/policy.yaml` | Humanoid-GPT policy wrapper。 |

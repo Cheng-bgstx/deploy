@@ -177,6 +177,175 @@ def test_q1_missing_imu_configuration_fails_before_ros_import():
         Q1RobotIO(get_robot_cfg('q1'))
 
 
+def test_named_ros_accepts_action_manager_keyword_commands():
+    from sim2real.rl_policy.robot_io.ros2_named import NamedRosRobotIO
+    from sim2real.rl_policy.utils.command_sender import ActionManager
+    codec = codec_for('q1')
+    feed(codec)
+    io = NamedRosRobotIO.__new__(NamedRosRobotIO)
+    io.codec = codec
+    manager = ActionManager(codec.cfg, {
+        'joint_kp': {'.*': 10.}, 'joint_kd': {'.*': 1.},
+        'default_joint_pos': {'.*': 0.},
+    }, io)
+    n = len(codec.cfg.joint_names)
+    manager.send_command(np.full(n, .1), np.zeros(n), np.zeros(n))
+    np.testing.assert_allclose(codec.command[0], .1)
+    np.testing.assert_allclose(codec.command[3], 10.)
+
+
+def test_disarmed_ros_transport_does_not_publish_until_shaping():
+    from sim2real.rl_policy.robot_io.ros2_named import NamedRosRobotIO
+    io = NamedRosRobotIO.__new__(NamedRosRobotIO)
+    io.codec = codec_for('q1')
+    feed(io.codec)
+    io._armed = False
+    # A disarmed publish must not even construct a message, including on close.
+    io._publish()
+    io._publish(force_damping=True)
+    assert io.codec.error is None
+    io.set_control_mode('zero', 1)
+    assert not io._armed
+    io.set_control_mode('init', 2)
+    assert io._armed
+
+
+def test_q1_shaping_returns_gradually_from_measured_position_outside_model_range():
+    codec = codec_for('q1')
+    codec.allow_init_from_measured = True
+    feed(codec)
+    names = codec.groups['body']
+    index = names.index('waist_roll_joint')
+    measured = codec.state['body'][1][0].copy()
+    measured[index] = .26
+    codec.state['body'][1][0][index] = .26
+    n = len(names)
+    codec.mode = 'init'
+    def command(q):
+        codec.write_command(q, np.zeros(n), np.zeros(n), np.ones(n), np.ones(n))
+        return codec.command_groups()['body'][0, index]
+    assert command(measured) == pytest.approx(.26)
+    target = measured.copy()
+    target[index] = .25
+    assert command(target) == pytest.approx(.25)
+    target[index] = .4
+    assert command(target) == pytest.approx(.26)  # cannot go farther out
+    codec.mode = 'policy'
+    assert command(target) == pytest.approx(.22)  # policy retains model limits
+
+
+
+def test_q1_unclipped_policy_positions_keep_offset_but_shaping_still_clips():
+    cfg = get_robot_cfg('q1')
+    codec = NamedJointCodec(cfg, {'body': cfg.joint_names}, damping=5., allow_init_from_measured=True,
+                            policy_limit_mode='pass')
+    feed(codec)
+    names = codec.groups['body']
+    n, index = len(names), names.index('left_ankle_pitch_joint')
+    lo, _ = codec.limits['left_ankle_pitch_joint']
+    target = codec.state['body'][1][0].copy()
+    target[index] = lo - .15
+    def settle():
+        codec.write_command(target, np.zeros(n), np.full(n, 1e4), np.ones(n), np.ones(n))
+        for _ in range(10):  # the 0.2 rad per-publish step bound still applies
+            values = codec.command_groups()['body']
+        return values
+    codec.mode = 'init'
+    assert settle()[0, index] == pytest.approx(lo)  # Shaping keeps the model range
+    codec.mode = 'policy'
+    values = settle()
+    assert values[0, index] == pytest.approx(lo - .15)  # policy keeps the actor's PD offset
+    assert values[2, index] == pytest.approx(cfg.joint_effort_limit['left_ankle_pitch_joint'])  # effort still bounded
+
+
+def test_q1_feedforward_limit_mode_is_a_virtual_stop():
+    cfg = get_robot_cfg('q1')
+    codec = NamedJointCodec(cfg, {'body': cfg.joint_names}, damping=5., allow_init_from_measured=True,
+                            policy_limit_mode='feedforward', limit_feedforward_band_rad=.1)
+    feed(codec)
+    names = codec.groups['body']
+    n, index = len(names), names.index('left_ankle_pitch_joint')
+    lo, _ = codec.limits['left_ankle_pitch_joint']
+    target = codec.state['body'][1][0].copy()
+    target[index] = lo - .15
+    def settle(kp=8.4):
+        codec.write_command(target, np.zeros(n), np.zeros(n), np.full(n, kp), np.ones(n))
+        for _ in range(10):
+            values = codec.command_groups()['body']
+        return values[0, index], values[2, index]
+    codec.mode = 'init'
+    assert settle() == pytest.approx((lo, 0.))  # Shaping: clip, no feedforward
+    codec.mode = 'policy'
+    assert settle() == pytest.approx((lo, 8.4 * -.15))  # well inside the range: the unclipped PD torque
+    codec.state['body'][1][0][index] = lo + .05
+    assert settle() == pytest.approx((lo, .5 * 8.4 * -.15))  # half way through the band
+    codec.state['body'][1][0][index] = lo - .02
+    assert settle() == pytest.approx((lo, 0.))  # past the limit: plain clip
+    codec.state['body'][1][0][index] = 0.
+    limit = cfg.joint_effort_limit['left_ankle_pitch_joint']
+    assert settle(kp=1e4) == pytest.approx((lo, -limit))  # effort bound still applies
+    with pytest.raises(ValueError, match='policy_limit_mode'):
+        NamedJointCodec(cfg, {'body': cfg.joint_names}, policy_limit_mode='unclipped')
+
+def test_q1_full_command_preserves_feedback_slots_and_all_joint_fields(monkeypatch):
+    """Replay the observed Q1 layout into the actual serializer and a slot-based HAL.
+
+    The public example sends full commands in feedback order. Merely labelling a
+    policy-ordered array by name does not protect a receiver that consumes slots.
+    """
+    import sys
+    from types import ModuleType
+    from sim2real.rl_policy.robot_io.ros2_named import NamedRosRobotIO
+    from sim2real.rl_policy.robot_io.q1 import Q1RobotIO
+    # Run the actual Q1 constructor, replacing only ROS transport creation.
+    messages = ModuleType('aimdk_msgs.msg')
+    messages.JointCommand = messages.JointCommandArray = messages.JointStateArray = object
+    monkeypatch.setitem(sys.modules, 'aimdk_msgs.msg', messages)
+    def offline_transport(self, cfg, *, groups, preserve_feedback_order=False, **options):
+        self.codec = NamedJointCodec(cfg, groups, damping=options['damping'])
+        self._preserve_feedback_order = preserve_feedback_order
+    monkeypatch.setattr(NamedRosRobotIO, '__init__', offline_transport)
+    cfg = get_robot_cfg('q1')
+    wire = [
+        'left_shoulder_pitch_joint', 'left_shoulder_roll_joint', 'left_shoulder_yaw_joint', 'left_elbow_joint',
+        'right_shoulder_pitch_joint', 'right_shoulder_roll_joint', 'right_shoulder_yaw_joint', 'right_elbow_joint',
+        'waist_yaw_joint', 'left_hip_pitch_joint', 'left_hip_roll_joint', 'left_hip_yaw_joint', 'left_knee_joint',
+        'left_ankle_pitch_joint', 'left_ankle_roll_joint', 'waist_roll_joint',
+        'right_hip_pitch_joint', 'right_hip_roll_joint', 'right_hip_yaw_joint', 'right_knee_joint',
+        'right_ankle_pitch_joint', 'right_ankle_roll_joint',
+    ]
+    io = Q1RobotIO(cfg, imu_topic='/aima/hal/imu/state')
+    codec = io.codec
+    feed(codec)
+    measured = {n: .5*(cfg.joint_pos_lower_limit[n]+cfg.joint_pos_upper_limit[n]) for n in wire}
+    codec.receive_group('body', NS(header=stamp(2), joints=[
+        NS(name=n, position=measured[n], velocity=0., effort=0.) for n in wire]))
+    io._sequence = 0
+    io._array_type = lambda: NS(header=NS(stamp=None), joints=[])
+    io._joint_type = lambda: NS()
+    io._node = NS(get_clock=lambda: NS(now=lambda: NS(to_msg=lambda: 'stamp')))
+    sent = []
+    io._publishers = {'body': NS(publish=sent.append)}
+    io.set_control_mode('init', 1)
+    q = np.array([measured[n] for n in cfg.joint_names])
+    dq, tau, kp, kd = [np.arange(22, dtype=float)*.001+base for base in (.01, .1, 10., 1.)]
+    io.write_command(q_target=q, dq_target=dq, tau_ff=tau, kp=kp, kd=kd)
+    io._publish()
+    assert codec.error is None
+    assert [j.name for j in sent[-1].joints] == wire
+    for slot, name in enumerate(wire):
+        command = sent[-1].joints[slot]
+        index = cfg.joint_names.index(name)
+        np.testing.assert_allclose(
+            [command.position, command.velocity, command.effort, command.stiffness, command.damping],
+            [v[index] for v in (q, dq, tau, kp, kd)], rtol=1e-6)
+    io.set_control_mode('zero', 2)
+    io._publish()
+    assert [j.name for j in sent[-1].joints] == wire
+    np.testing.assert_allclose([j.position for j in sent[-1].joints], [measured[n] for n in wire])
+    assert all(j.stiffness == 0. and j.damping == 5. for j in sent[-1].joints)
+
+
 @pytest.mark.parametrize('name', ROBOTS)
 def test_imu_mount_transform(name):
     codec = codec_for(name)

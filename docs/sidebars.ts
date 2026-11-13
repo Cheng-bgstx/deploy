@@ -53,6 +53,7 @@ const sidebars: SidebarsConfig = {
         'tutorials/proteus-a3',
         'tutorials/proteus-t800',
         'tutorials/proteus-pm01',
+        'tutorials/proteus-q1',
       ],
     },
     'faq',
