@@ -14,7 +14,7 @@ Large runtime artifacts are not stored in git. Download the shared
 [sim2real artifacts](https://drive.google.com/drive/folders/1lrPyiiy7anyG3P4wHNIQQQlydboLPd9e)
 folder and place `checkpoints/` and `third_party/` at the repo root.
 
-See [Download Artifacts](./docs/artifacts.md) for the expected directory
+See [Download Artifacts](./docs/reference/artifacts.md) for the expected directory
 layout and onboard dependency notes.
 
 ## Quick Start
@@ -64,7 +64,7 @@ Currently supported adapted / distributed checkpoint families:
 | GRIT v0.0.1 | `checkpoints/grit/v0_0_1/policy.yaml` | Nine-frame reference context and ten-frame proprioceptive history. |
 | ScaleBFM | `checkpoints/scalebfm` | ScaleBFM Humanoid Transformer XL and M ONNX exports from [WeishuaiZeng/ScaleBFM](https://huggingface.co/WeishuaiZeng/ScaleBFM). |
 | Proteus | `checkpoints/proteus/proteus_wamseq_62/unitree_g1/policy.yaml` | The 62-robot Proteus WAMSeq actor (hardware-tested on G1; the wsq61 actor is an alternative) from [ScaleBFM](https://github.com/zengweishuai/ScaleBFM), wrapped for the G1 by `scripts/export_proteus_onnx.py`; see [Run External Policies](./docs/tutorials/run-external-policies.md#proteus). |
-| Proteus ET1 | `checkpoints/proteus/proteus_60/galbot_et1/policy.yaml` | Proteus on the Galbot ET1 (`--robot et1`), run on the ET1 board; see [Proteus on the Galbot ET1 board](./docs/proteus_et1_onboard.md). |
+| Proteus ET1 | `checkpoints/proteus/proteus_60/galbot_et1/policy.yaml` | Proteus on the Galbot ET1 (`--robot et1`), run on the ET1 board; see [Proteus on the Galbot ET1 board](./docs/reference/proteus-et1-onboard.md). |
 | Proteus WAMSeq AgiBot Expedition A3 | `checkpoints/proteus/proteus_wamseq_62/agibot_a3/policy.yaml` | 30 joints, multiple LAFAN motions and PICO; [guide](./docs/tutorials/proteus-a3.md). |
 | Proteus WAMSeq EngineAI T800 | `checkpoints/proteus/wsq61/engineai_t800/policy.yaml` | 25 joints, multiple LAFAN motions and PICO; [guide](./docs/tutorials/proteus-t800.md). |
 | Proteus WAMSeq EngineAI PM01 | `checkpoints/proteus/wsq61/engineai_pm01/policy.yaml` | 24-joint PM01/pm_v2, legacy ROS interface, LAFAN motions and PICO; [guide](./docs/tutorials/proteus-pm01.md). |
@@ -106,7 +106,7 @@ uses `uv sync --extra inference-cpu --extra robot-g1`. See
 - [Offline Motion Tracking Tutorial](./docs/tutorials/offline-motion-tracking.md)
 - [Pico Teleoperation Tutorial](./docs/tutorials/pico-teleoperation.md)
 - [Scalecar Vehicle Entry Tutorial](./docs/tutorials/scalecar-vehicle-entry.md)
-- [Proteus on the Galbot ET1 board](./docs/proteus_et1_onboard.md)
+- [Proteus on the Galbot ET1 board](./docs/reference/proteus-et1-onboard.md)
 
 ## Citation
 

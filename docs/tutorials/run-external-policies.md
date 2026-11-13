@@ -34,7 +34,7 @@ value.
 | ScaleBFM XL | `checkpoints/scalebfm/humanoid_transformer_xl/policy.yaml` | Normal G1 motion stream. |
 | ScaleBFM M | `checkpoints/scalebfm/humanoid_transformer_m/policy.yaml` | Normal G1 motion stream. |
 | Proteus G1 | `checkpoints/proteus/proteus_60/unitree_g1/policy.yaml` | Normal G1 motion stream; generated from the Proteus checkout, see [Proteus](#proteus). |
-| Proteus ET1 | `checkpoints/proteus/proteus_60/galbot_et1/policy.yaml` | Galbot ET1 (`--robot et1`), run on the ET1 board; see [Proteus on the Galbot ET1 board](../proteus_et1_onboard.md). |
+| Proteus ET1 | `checkpoints/proteus/proteus_60/galbot_et1/policy.yaml` | Galbot ET1 (`--robot et1`), run on the ET1 board; see [Proteus on the Galbot ET1 board](../reference/proteus-et1-onboard.md). |
 | Proteus WAMSeq OLI | `checkpoints/proteus/proteus_wamseq_62/limx_oli_edu/policy.yaml` | LimX HU_D04_01 (`--robot oli`); see [Proteus on OLI](./proteus-oli.md). |
 | Proteus WAMSeq X2 | `checkpoints/proteus/proteus_wamseq_62/lingxi_x2/policy.yaml` | AgiBot Lingxi X2 Ultra (`--robot x2`); see [Proteus on X2](./proteus-x2.md). |
 | BFM-Zero | `checkpoints/bfm-zero/exp_lafan40-100style_update_z10/policy.yaml` | Requires the checkpoint-specific MJCF override for ZMQ publishers. |
@@ -118,7 +118,7 @@ HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run sim2real/rl_policy/tracking.p
 
 A robot outside the release needs its own contract (`scripts/build_proteus_contract.py`,
 then `export_proteus_onnx.py --contract-dir`). For the Galbot ET1 see
-[Proteus on the Galbot ET1 board](../proteus_et1_onboard.md).
+[Proteus on the Galbot ET1 board](../reference/proteus-et1-onboard.md).
 
 ### HoloMotion v1.4.0
 

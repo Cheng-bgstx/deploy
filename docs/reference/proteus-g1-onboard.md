@@ -1,6 +1,6 @@
 # Proteus G1 on the robot's Orin
 
-The same Bridge (200 Hz, BridgeSafety) and Tracking (50 Hz, CPU ONNX) as [the external PC deployment](proteus_g1_pc.md), run on the G1's own Orin NX (`ssh g1`, 192.168.123.164, robot LAN on `eth0`). Control code, safety behaviour and the remote flow are unchanged: A → A → wait for Hold ready → lower the gantry → Start, Select to stop. The PC only deploys, starts and collects logs, so a PC sleep, a PC network-card fault or a pulled cable no longer cuts the control loop.
+The same Bridge (200 Hz, BridgeSafety) and Tracking (50 Hz, CPU ONNX) as [the external PC deployment](proteus-g1-pc.md), run on the G1's own Orin NX (`ssh g1`, 192.168.123.164, robot LAN on `eth0`). Control code, safety behaviour and the remote flow are unchanged: A → A → wait for Hold ready → lower the gantry → Start, Select to stop. The PC only deploys, starts and collects logs, so a PC sleep, a PC network-card fault or a pulled cable no longer cuts the control loop.
 
 The Orin runs JetPack 5.1.1 (Ubuntu 20.04, glibc 2.31, system Python 3.8) and has no internet. Everything lives in one directory, `/home/unitree/proteus_g1_onboard`, with nothing installed system-wide and no root needed:
 

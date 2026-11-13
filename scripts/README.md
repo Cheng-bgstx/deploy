@@ -177,7 +177,7 @@ For live PICO, each robot's `start_pico.sh sim` + `start_pico.sh policy-sim` run
 ### 4. Hardware preflight
 
 - [ ] `checkpoints/` and `third_party/` are present (runtime artifacts, not in git; see
-      [`docs/artifacts.md`](../docs/artifacts.md)). Inference uses the root project; teleop uses `venv/pico`.
+      [`docs/reference/artifacts.md`](../docs/reference/artifacts.md)). Inference uses the root project; teleop uses `venv/pico`.
 - [ ] `HF_HUB_OFFLINE=1` and `HF_HUB_DISABLE_TELEMETRY=1` are exported in the shell and persisted in the
       robot user's `~/.bashrc`. The launchers export both; add them to every manual command.
 - [ ] Network: the robot LAN is reachable from the machine that runs the Tracker, with the right interface
@@ -306,7 +306,7 @@ Notes:
 | EngineAI T800 | Simulation tested; hardware untested | `checkpoints/proteus/wsq61/engineai_t800/policy.yaml` | [t800](./t800/README.md) |
 | AgiBot Lingxi X2 | Onboard gantry trials on 2026-11-12 (Shaping worked; arm/hip oscillation, damped overlay fixed in simulation only) | `checkpoints/proteus/proteus_wamseq_62/lingxi_x2` (`policy-pc-damped.yaml`, `start_proteus_onboard.sh`) | [x2](./x2/README.md) |
 | LimX OLI | Simulation tested; hardware untested | `checkpoints/proteus/proteus_wamseq_62/limx_oli_edu/policy.yaml` | [oli](./oli/README.md) |
-| Unitree H2 | Robot model and PICO retargeting only; no hardware I/O | — | [`docs/h2.md`](../docs/h2.md) |
+| Unitree H2 | Robot model and PICO retargeting only; no hardware I/O | — | [`docs/reference/h2.md`](../docs/reference/h2.md) |
 
 Default policies are the ones the robot's `start_proteus.sh` (G1: `start_proteus_pc.sh`, ET1:
 `start_proteus_onboard.sh`) uses; `PROTEUS_POLICY_CONFIG` or `PROTEUS_POLICY_DIR` overrides them where

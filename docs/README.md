@@ -23,13 +23,13 @@ Chinese docs: [`i18n/zh-Hans/docusaurus-plugin-content-docs/current/`](./i18n/zh
 
 ## Reference
 
-- [Download Artifacts](./artifacts.md)
-- [Tracking Framework](./tracking_framework.md)
-- [Pico To G1](./pico_to_g1.md)
-- [Teleop Implementation](./teleop_impl.md)
-- [Yaw Alignment](./policy_yaw_alignment.md)
-- [Motion Stream Disconnects](./motion_stream_disconnects.md)
-- [NPZ Motion Publisher](./npz_motion_publisher.md)
-- [SONIC SMPL Input](./sonic_smpl_input.md)
-- [XRobot gRPC JetPack 5](./xrobot_grpc_jetpack5.md)
-- [XRoboToolkit PC Service ARM64 Build](./xrobotoolkit_pc_service_arm64_build.md)
+- [Download Artifacts](./reference/artifacts.md)
+- [Tracking Framework](./reference/tracking-framework.md)
+- [Pico To G1](./reference/pico-to-g1.md)
+- [Teleop Implementation](./reference/teleop-implementation.md)
+- [Yaw Alignment](./reference/policy-yaw-alignment.md)
+- [Motion Stream Disconnects](./reference/motion-stream-disconnects.md)
+- [NPZ Motion Publisher](./reference/npz-motion-publisher.md)
+- [SONIC SMPL Input](./reference/sonic-smpl-input.md)
+- [XRobot gRPC JetPack 5](./reference/xrobot-grpc-jetpack5.md)
+- [XRoboToolkit PC Service ARM64 Build](./reference/xrobotoolkit-pc-service-arm64-build.md)

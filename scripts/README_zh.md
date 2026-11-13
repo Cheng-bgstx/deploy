@@ -169,7 +169,7 @@ Final Hold 中的漂移。Q1 有单独的离线演练 `scripts/q1/validate_deplo
 ### 4. 真机上电前检查
 
 - [ ] `checkpoints/` 和 `third_party/` 已就位（运行时产物，不在 git 中；见
-      [`docs/artifacts.md`](../docs/artifacts.md)）。推理用根项目环境，遥操作用 `venv/pico`。
+      [`docs/reference/artifacts.md`](../docs/reference/artifacts.md)）。推理用根项目环境，遥操作用 `venv/pico`。
 - [ ] shell 中已导出 `HF_HUB_OFFLINE=1` 和 `HF_HUB_DISABLE_TELEMETRY=1`，并写入机器人用户的 `~/.bashrc`。
       启动脚本会导出这两个变量；手动执行的命令也要带上。
 - [ ] 网络：运行 Tracker 的机器能访问机器人局域网，网卡设置正确（`G1_INTERFACE`、`--robot-interface`、
@@ -292,7 +292,7 @@ Controller 按键映射（来自 `sim2real/rl_policy/control_mode.py`、`control
 | EngineAI T800 | 仿真已测试；真机未测试 | `checkpoints/proteus/wsq61/engineai_t800/policy.yaml` | [t800](./t800/README_zh.md) |
 | AgiBot 灵犀 X2 | 2026-11-12 板载吊架试验（Shaping 正常；手臂/髋部振荡，加阻尼 overlay 仅在仿真中验证） | `checkpoints/proteus/proteus_wamseq_62/lingxi_x2`（`policy-pc-damped.yaml`，`start_proteus_onboard.sh`） | [x2](./x2/README_zh.md) |
 | LimX OLI | 仿真已测试；真机未测试 | `checkpoints/proteus/proteus_wamseq_62/limx_oli_edu/policy.yaml` | [oli](./oli/README_zh.md) |
-| Unitree H2 | 仅有机器人模型和 PICO 重定向；无硬件 I/O | — | [`docs/h2.md`](../docs/h2.md) |
+| Unitree H2 | 仅有机器人模型和 PICO 重定向；无硬件 I/O | — | [`docs/reference/h2.md`](../docs/reference/h2.md) |
 
 默认策略指各机器人 `start_proteus.sh`（G1 为 `start_proteus_pc.sh`，ET1 为 `start_proteus_onboard.sh`）
 使用的策略；启动脚本支持时，可用 `PROTEUS_POLICY_CONFIG` 或 `PROTEUS_POLICY_DIR` 覆盖。

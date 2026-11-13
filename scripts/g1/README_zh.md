@@ -211,6 +211,6 @@ Select 或故障后，用 A → A → Start 重新开始。
 - [机器人 I/O](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/robot_io.md) ·
   [根项目](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/getting-started/root-project.md) ·
   [网络配置](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/getting-started/network-configuration.md)
-- [Scalecar 上车](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/scalecar-vehicle-entry.md) · [ADR（英文）](../../docs/adr/)
+- [Scalecar 上车](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/scalecar-vehicle-entry.md) · [ADR（英文）](../../docs/adr)
 - [Pico 遥操作](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/pico-teleoperation.md) ·
   [PICO 到 G1 映射](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/reference/pico-to-g1.md)

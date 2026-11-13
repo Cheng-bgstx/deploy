@@ -13,7 +13,7 @@ ET1 route from another branch was intentionally not merged.
 
 | Item | Value |
 | --- | --- |
-| Hardware | Tested on the robot. After the takeover and GC-stall fixes (commit `8da006e`), every takeover completed and proteus_60 `11_slow_close` played to the end and held standing; WAM-62 stood (`01_idle`); `shanshenbu` opening stand held, the full dance over-rotates after ~8 s. Details: [hardware status](../../docs/proteus_et1_onboard.md#hardware-status) |
+| Hardware | Tested on the robot. After the takeover and GC-stall fixes (commit `8da006e`), every takeover completed and proteus_60 `11_slow_close` played to the end and held standing; WAM-62 stood (`01_idle`); `shanshenbu` opening stand held, the full dance over-rotates after ~8 s. Details: [hardware status](../../docs/reference/proteus-et1-onboard.md#hardware-status) |
 | `--robot` | `galbot_et1` (alias `et1`) — `sim2real/config/robots/__init__.py` |
 | Joints | 26: 6 per leg, waist roll/yaw, 5 per arm, head pitch/yaw |
 | Robot I/O | `--robot-io zmq` on 127.0.0.1 ⇄ `hdep_bridge.py` ⇄ HDEP (`libhdep_bridge_galbot_et1.so.2.2.0`) |
@@ -50,7 +50,7 @@ Related files elsewhere:
 - `sim2real/rl_policy/observations/galbot_track.py` — 111-dim observation of Galbot tracking actors.
 - `scripts/g1/prepare_proteus_deployment.py`, `scripts/g1/validate_proteus_deployment.py`, `scripts/export_proteus_onnx.py`, `scripts/prepare_proteus_test_motions.py` — shared Proteus tooling used with `--robot galbot_et1`.
 - Tests: `tests/test_et1_bridge.py`, `tests/test_et1_config.py`, `tests/test_galbot_track_obs.py`.
-- Docs: `docs/proteus_et1_onboard.md` and its Chinese twin.
+- Docs: `docs/reference/proteus-et1-onboard.md` and its Chinese twin.
 
 ## Setup
 
@@ -209,6 +209,6 @@ Board-side state check without control: `probe/full_state_probe 192.168.123 prob
 
 ## Further reading
 
-- [docs/proteus_et1_onboard.md](../../docs/proteus_et1_onboard.md)
+- [docs/reference/proteus-et1-onboard.md](../../docs/reference/proteus-et1-onboard.md)
 - Chinese: [proteus-et1-onboard.md](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/reference/proteus-et1-onboard.md)
 - Generic workflow: [../README.md](../README.md)

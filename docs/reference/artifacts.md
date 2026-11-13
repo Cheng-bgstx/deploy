@@ -47,7 +47,7 @@ third_party/prebuilt/jetpack5-aarch64/
 
 The Galbot ET1 MJCF is not vendored: `--robot et1` reads it from Galbot's et1-dep
 delivery checkout (`ET1_DEP_ROOT`, default `~/et1-dep`), see
-[Proteus on the Galbot ET1 board](./proteus_et1_onboard.md).
+[Proteus on the Galbot ET1 board](./proteus-et1-onboard.md).
 
 Do not commit downloaded artifact contents. Keep refreshed artifacts in the
 Google Drive folder and keep local paths matching the layout above.

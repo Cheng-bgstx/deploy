@@ -49,7 +49,7 @@ ET1 路线在本次合并中有意未保留。
 - `sim2real/rl_policy/observations/galbot_track.py`：Galbot 跟踪 actor 的 111 维观测。
 - `scripts/g1/prepare_proteus_deployment.py`、`scripts/g1/validate_proteus_deployment.py`、`scripts/export_proteus_onnx.py`、`scripts/prepare_proteus_test_motions.py`：通用 Proteus 工具，配合 `--robot galbot_et1` 使用。
 - 测试：`tests/test_et1_bridge.py`、`tests/test_et1_config.py`、`tests/test_galbot_track_obs.py`。
-- 文档：`docs/proteus_et1_onboard.md` 及其中文版。
+- 文档：`docs/reference/proteus-et1-onboard.md` 及其中文版。
 
 ## 准备
 
@@ -203,5 +203,5 @@ python scripts/et1/prepare_galbot_track_policy.py \
 ## 延伸阅读
 
 - 中文：[proteus-et1-onboard.md](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/reference/proteus-et1-onboard.md)
-- English: [docs/proteus_et1_onboard.md](../../docs/proteus_et1_onboard.md)
+- English: [docs/reference/proteus-et1-onboard.md](../../docs/reference/proteus-et1-onboard.md)
 - 通用流程：[../README_zh.md](../README_zh.md)

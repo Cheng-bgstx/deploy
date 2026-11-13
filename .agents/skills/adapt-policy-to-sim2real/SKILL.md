@@ -16,13 +16,13 @@ Use this skill when bringing a policy checkpoint from any training repo into `/h
    - action scaling, action order, default pose, PD gains,
    - robot asset, joint names, body names, and motion format.
 2. Trace the actual runtime code path, not only config names. Read the training policy wrapper, observation manager/builder, history buffers, normalization/scaling, action postprocessing, and export code before writing sim2real code.
-3. Export one complete ONNX per policy mode for sim2real. Keep all encoder/decoder wiring inside the graph, but expose semantic multi-key inputs such as `g1_input`, `smpl_input`, and `proprioception`. Do not export one pre-concatenated `obs_dict` input, and do not require `sim2real/sim2real/rl_policy/base_policy.py` to load multiple model pieces. If the source only exports split encoder/decoder ONNX files, use `scripts/merge_encoder_decoder_onnx.py` or patch the source exporter so the merged graph retains separate semantic inputs.
+3. Export one complete ONNX per policy mode for sim2real. Keep all encoder/decoder wiring inside the graph, but expose semantic multi-key inputs such as `g1_input`, `smpl_input`, and `proprioception`. Do not export one pre-concatenated `obs_dict` input, and do not require `sim2real/rl_policy/base_policy.py` to load multiple model pieces. If the source only exports split encoder/decoder ONNX files, use `scripts/merge_encoder_decoder_onnx.py` or patch the source exporter so the merged graph retains separate semantic inputs.
 4. Verify ONNX I/O with `onnxruntime` before writing YAML:
    - every input name must match one `observation.<group>` name in deploy YAML,
    - each input dimension must equal only that semantic group's ordered components,
    - output action dimension and order must match `policy_joint_names`,
    - prefer unbatched inputs for the ordinary sim2real BasePolicy path.
-5. Implement every training observation in `sim2real/sim2real/rl_policy/observations` or reuse an existing implementation only after proving it is semantically identical.
+5. Implement every training observation in `sim2real/rl_policy/observations` or reuse an existing implementation only after proving it is semantically identical.
 6. Match training observation semantics exactly:
    - component order and group order,
    - history order and stride,

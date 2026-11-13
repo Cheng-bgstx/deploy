@@ -1,6 +1,6 @@
 # Proteus G1 from an external PC
 
-To run the same stack on the G1's own Orin instead, see [Proteus G1 on the robot's Orin](proteus_g1_onboard.md).
+To run the same stack on the G1's own Orin instead, see [Proteus G1 on the robot's Orin](proteus-g1-onboard.md).
 
 The launchers default to the hardware-tested `checkpoints/proteus/proteus_wamseq_62/unitree_g1`. The per-robot
 branches also exported the **wsq61** actor (`wsq61_wam_61robots_30000.pt`, SHA256

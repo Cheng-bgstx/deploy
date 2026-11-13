@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PC-side control of the Proteus G1 onboard deployment (docs/proteus_g1_onboard.md).
+# PC-side control of the Proteus G1 onboard deployment (docs/reference/proteus-g1-onboard.md).
 #   onboard.sh deploy   push code, policies, motions and the environment (scripts/g1/deploy_onboard.sh)
 #   onboard.sh start    launch on the Orin, detached from SSH: a dropped SSH session or cable does not stop control
 #   onboard.sh status   Orin controller processes and the latest Bridge state

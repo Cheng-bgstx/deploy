@@ -14,7 +14,7 @@ English version: [README.md](./README.md)
 [sim2real artifacts](https://drive.google.com/drive/folders/1lrPyiiy7anyG3P4wHNIQQQlydboLPd9e)
 下载，把 `checkpoints/` 和 `third_party/` 放到 repo 根目录。
 
-目录结构和 onboard 依赖说明见 [Download Artifacts](./docs/artifacts.md)。
+目录结构和 onboard 依赖说明见 [Download Artifacts](./docs/reference/artifacts.md)。
 
 ## 快速开始
 

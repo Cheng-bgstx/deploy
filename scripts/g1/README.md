@@ -12,7 +12,7 @@ Both run either on an external PC wired to the robot (`start_proteus_pc.sh`) or 
 
 | Item | Value |
 | --- | --- |
-| Hardware status | External PC: hardware-tested with the default wsq62 actor ([README](../../README.md), [PC doc](../../docs/proteus_g1_pc.md); hardware incidents recorded 2026-11-04). Onboard Orin: read-only timing runs on 2026-11-05; [the onboard doc](../../docs/proteus_g1_onboard.md) still says the onboard path has not been tested on hardware. |
+| Hardware status | External PC: hardware-tested with the default wsq62 actor ([README](../../README.md), [PC doc](../../docs/reference/proteus-g1-pc.md); hardware incidents recorded 2026-11-04). Onboard Orin: read-only timing runs on 2026-11-05; [the onboard doc](../../docs/reference/proteus-g1-onboard.md) still says the onboard path has not been tested on hardware. |
 | `--robot` alias | `g1` (`G1_CFG.name`, `sim2real/config/robots/__init__.py`) |
 | Joints | 29 (6 per leg, 3 waist, 7 per arm) |
 | Robot I/O | `--robot-io zmq` + `scripts/g1/real_bridge.py` (`unitree_sdk2py`, CycloneDDS 0.10.2, `hg` LowState/LowCmd). Inline `--robot-io inline` (`unitree_interface`, aarch64 only) exists but the Proteus launchers do not use it. |
@@ -46,7 +46,7 @@ Related files elsewhere:
 | Robot config | `sim2real/config/robots/g1.py` (joint limits, `safe_joint_kp/kd`, armature, MJCF `hf://elijahgalahad/g1_xmls@main/g1-mode_13_15.xml`) |
 | Robot I/O | `sim2real/rl_policy/robot_io/zmq.py`, `bridge_safety.py`, `g1.py` (inline), `g1_debug_mode.py` (MotionSwitcher release) |
 | Controllers | `sim2real/rl_policy/controllers/unitree_joystick.py` (`joystick`), `bridge_joystick.py` (onboard), `keyboard.py` (sim) |
-| Teleop | `sim2real/teleop/pico_retarget_pub.py` (GMR `xrobot_to_g1` from `venv/pico`), [docs/pico_to_g1.md](../../docs/pico_to_g1.md) |
+| Teleop | `sim2real/teleop/pico_retarget_pub.py` (GMR `xrobot_to_g1` from `venv/pico`), [docs/reference/pico-to-g1.md](../../docs/reference/pico-to-g1.md) |
 | Scalecar tooling | `scripts/scalecar/` (scene build, motion conversion), `docs/adr/` |
 | Tests | `tests/test_g1_bridge_safety.py`, `tests/test_planner_real_robot.py` |
 | Setup skill | `.agents/skills/configure-g1-sim2real/` (`scripts/inspect_host.sh`, `scripts/verify_install.py`) |
@@ -67,7 +67,7 @@ Related files elsewhere:
    `onboard.sh` expect an SSH alias `g1` in `~/.ssh/config` (override with `G1_HOST`). See
    [Network Configuration](../../docs/getting-started/network-configuration.md).
 3. **Artifacts (not in git).** `checkpoints/proteus/...` and `third_party/` come from the shared Google Drive folder
-   (`gdrive:projects/simple-tracking/sim2real`, [Download Artifacts](../../docs/artifacts.md)). Cache the G1 MJCF and the
+   (`gdrive:projects/simple-tracking/sim2real`, [Download Artifacts](../../docs/reference/artifacts.md)). Cache the G1 MJCF and the
    motion dataset once with network access; `prepare_proteus_motion.py` downloads the pinned source clip.
 4. **Offline Hugging Face.** In every shell, and in `~/.bashrc` on the robot:
 
@@ -210,9 +210,9 @@ After Select or a fault restart with A → A → Start.
 
 ## Detailed docs
 
-- [Proteus G1 from an external PC](../../docs/proteus_g1_pc.md)
-- [Proteus G1 on the robot's Orin](../../docs/proteus_g1_onboard.md)
+- [Proteus G1 from an external PC](../../docs/reference/proteus-g1-pc.md)
+- [Proteus G1 on the robot's Orin](../../docs/reference/proteus-g1-onboard.md)
 - [Robot I/O](../../docs/robot_io.md) · [Root Project](../../docs/getting-started/root-project.md) ·
   [Network Configuration](../../docs/getting-started/network-configuration.md)
-- [Scalecar Vehicle Entry](../../docs/tutorials/scalecar-vehicle-entry.md) · [ADRs](../../docs/adr/)
-- [Pico Teleoperation](../../docs/tutorials/pico-teleoperation.md) · [PICO to G1 mapping](../../docs/pico_to_g1.md)
+- [Scalecar Vehicle Entry](../../docs/tutorials/scalecar-vehicle-entry.md) · [ADRs](../../docs/adr)
+- [Pico Teleoperation](../../docs/tutorials/pico-teleoperation.md) · [PICO to G1 mapping](../../docs/reference/pico-to-g1.md)
