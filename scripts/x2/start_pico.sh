@@ -16,11 +16,11 @@ case "$mode" in
     publisher_ip="${1:-127.0.0.1}"
     [[ $# -eq 0 ]] || shift
     io_args=(--robot-io zmq)
-    policy="checkpoints/proteus/wsq61/lingxi_x2/policy-sim.yaml"
+    policy="checkpoints/proteus/proteus_wamseq_62/lingxi_x2/policy-sim.yaml"
     if [[ "$mode" == robot ]]; then
       # Source ROS 2 + AimDK in this shell and release native mc ownership first.
       io_args=(--robot-io inline)
-      policy="checkpoints/proteus/wsq61/lingxi_x2/policy.yaml"
+      policy="checkpoints/proteus/proteus_wamseq_62/lingxi_x2/policy.yaml"
     fi
     exec uv run --no-sync python -m sim2real.rl_policy.tracking --robot x2 "${io_args[@]}" \
       --policy-config "$policy" --rl-rate 50 --inference-backend onnx-cpu --controller pico \

@@ -19,7 +19,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--duration', type=float, default=10.)
     parser.add_argument('--policy-config', type=Path, default=Path(
-        'checkpoints/proteus/wsq61/lingxi_x2/policy.yaml'))
+        'checkpoints/proteus/proteus_wamseq_62/lingxi_x2/policy.yaml'))
     parser.add_argument('--output', type=Path)
     parser.add_argument('--require-exclusive-control', action='store_true',
                         help='Fail if another node publishes HAL joint commands; does not take control.')

@@ -628,10 +628,13 @@ class BasePolicy:
         self.total_inference_cnt = total_inference_cnt
         self.perf_dict = {}
         # Setup leaves hundreds of thousands of long-lived objects (motion datasets, FK caches, the
-        # inference runtime). A full collection that scans them took 442 ms on the ET1 board and stalled
-        # a control step past the bridge timeout; freezing them keeps later collections to new objects.
+        # inference runtime). A full collection that scans them took 442 ms on the ET1 board and 600 ms on
+        # the X2's RK3588, stalling a control step past the bridge timeout. Collect once now and freeze the
+        # survivors, then re-freeze periodically so long-lived state such as the --record frames never makes
+        # an automatic collection slow.
         gc.collect()
         gc.freeze()
+        logger.info("Froze {} startup objects out of the garbage collector", gc.get_freeze_count())
 
         try:
             scheduler = sched.scheduler(time.perf_counter, time.sleep)
@@ -643,6 +646,8 @@ class BasePolicy:
                 
                 next_run_time += self.rl_dt
                 self.total_inference_cnt += 1
+                if self.total_inference_cnt % 250 == 0:
+                    gc.freeze()  # O(1): moves objects that survived the last 5 s out of later collections
 
                 if self.total_inference_cnt % 100 == 0:
                     print(f"total_inference_cnt: {self.total_inference_cnt}")

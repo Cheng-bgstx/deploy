@@ -21,8 +21,9 @@ MAX_HOLD_GAP_NS = 1_000_000_000
 
 class BridgeSafety:
     def __init__(self, cfg: RobotCfg, timeout_s: float = 0.1, target_margin_rad: float = 0.0,
-                 hold_through_gaps: bool = False):
+                 hold_through_gaps: bool = False, max_kd: float = 10.0):
         """``target_margin_rad``: how far past the joint range a position target may point.
+        ``max_kd``: the largest damping gain a command may carry.
         ``hold_through_gaps``: once active, a LowState or Tracker command gap keeps sending the last command (its PD
         targets) instead of latching damping, and control resumes when fresh data returns; late or repeated commands
         are dropped. A gap longer than ``MAX_HOLD_GAP_NS`` or a restarted robot tick still latches: the robot may have
@@ -33,7 +34,9 @@ class BridgeSafety:
         if not 0 <= target_margin_rad <= 1.5:
             raise ValueError("target_margin_rad must be in [0, 1.5]")
         self.count = len(cfg.joint_names)
+        self.joint_names = list(cfg.joint_names)
         self.timeout_ns = int(timeout_s * 1e9)
+        self.max_kd = float(max_kd)
         self.hold_through_gaps = hold_through_gaps
         self.lower = np.array([cfg.joint_pos_lower_limit[n] for n in cfg.joint_names]) - target_margin_rad
         self.upper = np.array([cfg.joint_pos_upper_limit[n] for n in cfg.joint_names]) + target_margin_rad
@@ -57,6 +60,8 @@ class BridgeSafety:
         self.active = False
         self.arm_pending = False
         self.arm_time_ns = 0
+        # Range of measured joint positions since the latest A: shaping starts from wherever the robot was then.
+        self._init_lo = self._init_hi = None
         self._selected = False
         self._a = False
         self._zero_ack_generation = None
@@ -88,6 +93,9 @@ class BridgeSafety:
         if self.state is None or state.tick != self.state.tick:
             self.state_time_ns = now_ns
         self.state = state
+        if self._init_lo is not None:
+            np.minimum(self._init_lo, state.joint_positions, out=self._init_lo)
+            np.maximum(self._init_hi, state.joint_positions, out=self._init_hi)
         selected, a = bool(keys & (1 << 3)), bool(keys & (1 << 8))
         if selected and not self._selected:
             self.latch("Select", fault=False)
@@ -97,6 +105,8 @@ class BridgeSafety:
             acknowledged = not self.latched or self._zero_ack_generation is not None
             if acknowledged and self.ready(now_ns):
                 self.arm_time_ns = now_ns
+                self._init_lo = state.joint_positions.astype(np.float64)
+                self._init_hi = self._init_lo.copy()
         self._selected, self._a = selected, a
 
     def ready(self, now_ns: int) -> bool:
@@ -111,17 +121,22 @@ class BridgeSafety:
                             and np.all(np.abs(cmd.q_target - self.state.joint_positions) <= 0.05))
         lower, upper = self.lower, self.upper
         if cmd.control_mode == "init" and self.state is not None and self.state.joint_positions.shape == (self.count,):
-            # Shaping starts wherever the robot is: a joint already past a limit may be held
-            # there or brought back, never commanded further out than it is.
+            # Shaping interpolates from the pose the Tracker measured after A towards the default pose. A joint
+            # already past a limit (a limp robot hanging on the gantry) may be held there or brought back, never
+            # commanded further out than it has been since A. The start pose, not only the current one, is
+            # allowed: a swinging joint can move back inside the limit faster than the target follows.
             lower = np.minimum(lower, self.state.joint_positions)
             upper = np.maximum(upper, self.state.joint_positions)
+            if self._init_lo is not None and self._init_lo.shape == lower.shape:
+                lower = np.minimum(lower, self._init_lo)
+                upper = np.maximum(upper, self._init_hi)
         valid = (all(a.shape == (self.count,) and np.isfinite(a).all() for a in arrays)
                  and (follows_measured or (np.all(cmd.q_target >= lower - 0.02)
                                           and np.all(cmd.q_target <= upper + 0.02)))
                  and np.all(np.abs(cmd.dq_target) <= self.velocity)
                  and np.all(np.abs(cmd.tau_ff) <= self.effort)
                  and np.all((cmd.kp >= 0) & (cmd.kp <= 400))
-                 and np.all((cmd.kd >= 0) & (cmd.kd <= 10))
+                 and np.all((cmd.kd >= 0) & (cmd.kd <= self.max_kd))
                  and cmd.control_mode in {"zero", "init", "policy"}
                  and cmd.source_time_ns is not None)
         fresh = (valid
@@ -132,7 +147,7 @@ class BridgeSafety:
         if valid and not fresh and self.hold_through_gaps:
             return False  # A late or repeated command after a gap; the newer one stays in force.
         if not fresh:
-            self.latch("invalid, expired or out-of-order command")
+            self.latch(f"invalid, expired or out-of-order command ({self._why_rejected(cmd, now_ns, lower, upper, valid)})")
             return False
         self.command = cmd
         self.last_sequence, self.last_source_ns = cmd.sequence, cmd.source_time_ns
@@ -148,6 +163,28 @@ class BridgeSafety:
             self.arm_pending = not self.active
             self.arm_time_ns = 0
         return True
+
+    def _why_rejected(self, cmd, now_ns, lower, upper, valid) -> str:
+        """Name the first failed check, for the bridge log."""
+        try:
+            if valid:
+                if not 0 <= now_ns - cmd.source_time_ns <= self.timeout_ns:
+                    return f"{cmd.control_mode} command {(now_ns - cmd.source_time_ns) / 1e6:.0f} ms old"
+                return f"{cmd.control_mode} command out of order (sequence {cmd.sequence} after {self.last_sequence})"
+            names = self.joint_names
+            for label, bad in (("q_target below limit", cmd.q_target < lower - 0.02),
+                               ("q_target above limit", cmd.q_target > upper + 0.02),
+                               ("dq_target", np.abs(cmd.dq_target) > self.velocity),
+                               ("tau_ff", np.abs(cmd.tau_ff) > self.effort),
+                               ("kp", (cmd.kp < 0) | (cmd.kp > 400)), ("kd", (cmd.kd < 0) | (cmd.kd > self.max_kd))):
+                if np.any(bad):
+                    i = int(np.flatnonzero(bad)[0])
+                    return (f"{cmd.control_mode}: {label} at {names[i]}: q_target {cmd.q_target[i]:+.3f}, "
+                            f"limits [{lower[i]:+.3f}, {upper[i]:+.3f}]"
+                            + (f", measured {self.state.joint_positions[i]:+.3f}" if self.state is not None else ""))
+            return f"{cmd.control_mode}: malformed or non-finite command"
+        except Exception as exc:  # diagnostics must never mask the stop itself
+            return f"unclassified ({exc})"
 
     def takeover_finished(self, success: bool, now_ns: int):
         self.arm_pending = False

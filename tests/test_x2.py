@@ -186,3 +186,20 @@ def test_reference_conversion_keeps_named_columns_and_absolute_root(tmp_path):
     model = mujoco.MjModel.from_xml_path(str(X2_CFG.mjcf_path))
     for i, name in enumerate(names):
         np.testing.assert_allclose(qpos[:, model.joint(name).qposadr[0]], dof[:, i], atol=1e-7)
+
+
+def test_edu_without_head_uses_default_head_pose_and_never_commands_head():
+    codec = X2StateCommand(X2_CFG, head_present=False)
+    for group in ('leg', 'waist', 'arm'):
+        codec.receive_group(group, group_packet(group, reversed_order=True))
+    codec.receive_imu(imu_packet())
+    state = codec.read_state()
+    assert state is not None
+    head = [X2_CFG.joint_names.index(n) for n in X2_AIMDK_GROUPS['head']]
+    body = [i for i in range(31) if i not in head]
+    np.testing.assert_allclose(state.qpos[7:][body], np.arange(31)[body] * .01)
+    np.testing.assert_allclose(state.qpos[7:][head], np.asarray(X2_CFG.default_qpos[7:])[head])
+    np.testing.assert_array_equal(state.qvel[6:][head], 0)
+    codec.mode = 'policy'
+    codec.write_command(np.zeros(31), np.zeros(31), np.zeros(31), np.full(31, 20.), np.full(31, 2.))
+    assert set(codec.command_groups()) == {'leg', 'waist', 'arm'}

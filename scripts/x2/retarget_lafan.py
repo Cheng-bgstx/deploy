@@ -45,8 +45,10 @@ def main():
     p.add_argument('--start-s', type=float, default=0)
     p.add_argument('--duration', type=float, default=8)
     p.add_argument('--output', required=True, type=Path)
+    p.add_argument('--hold-s', type=float, default=0.,
+                   help='prepend this long a still copy of the first frame (pick a start where the person stands)')
     args = p.parse_args()
-    if args.start_s < 0 or args.duration <= 0:
+    if args.start_s < 0 or args.duration <= 0 or args.hold_s < 0:
         raise ValueError('Invalid motion interval')
     output = args.output.resolve()
     if (output / 'manifest.json').exists():
@@ -89,6 +91,8 @@ def main():
         shifts.append(shift)
     qpos[:, :2] -= qpos[0, :2].copy()
     qpos[:, 3:7] /= np.linalg.norm(qpos[:, 3:7], axis=1, keepdims=True)
+    if args.hold_s:
+        qpos = np.concatenate([np.repeat(qpos[:1], round(args.hold_s / dt), axis=0), qpos])
     output.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(output / 'gmr_raw.npz', qpos=raw)
     save_motion(output / 'motions' / f'{args.bvh.stem}.npz', qpos)
@@ -102,7 +106,7 @@ def main():
               'height_normalization': '1.8 / 1.75', 'joint_speed_bound_rad_s': ik.max_joint_speed,
               'grounding': 'per-frame lowest vendor sole contact sphere to z=0',
               'ground_shift_min_m': min(shifts), 'ground_shift_max_m': max(shifts),
-              'root_xy': 'first frame recentered to zero'}
+              'root_xy': 'first frame recentered to zero', 'hold_first_frame_s': args.hold_s}
     write_manifest(output, dataset_name=f'x2_lafan_{args.bvh.stem}', mjcf=X2_CFG.resolve_mjcf_path(),
                    timestep=dt, qpos_names=qpos_names_from_model(ik.model), num_motions=1,
                    source=source, total_hours=len(qpos) * dt / 3600)

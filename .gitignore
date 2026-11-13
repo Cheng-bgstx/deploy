@@ -104,6 +104,7 @@ MANIFEST
 !/tests/test_oli.py
 
 !/tests/test_x2.py
+!/tests/test_x2_bridge.py
 
 !/tests/test_proteus_transport.py
 

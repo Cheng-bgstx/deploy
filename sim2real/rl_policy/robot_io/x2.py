@@ -5,6 +5,7 @@ The historical 'torso' IMU topic is the pelvis IMU, not the articulated chest IM
 """
 from __future__ import annotations
 
+import os
 import threading
 import time
 
@@ -16,21 +17,32 @@ from sim2real.rl_policy.robot_io.base import RobotIO, RobotState
 from sim2real.utils.math import quat_conjugate, quat_mul, quat_rotate_numpy
 
 
+def _cpu_set(text):
+    """'5' or '5,7' -> {5, 7}; empty or None -> empty set."""
+    return {int(c) for c in (text or '').replace(' ', '').split(',') if c}
+
+
 class X2StateCommand:
     """Pure array/message boundary; no ROS imports, suitable for offline checks."""
 
     def __init__(self, cfg: RobotCfg, *, timeout_s=.25, head_pitch_enabled=False,
-                 imu_to_pelvis_wxyz=(1., 0., 0., 0.)):
+                 imu_to_pelvis_wxyz=(1., 0., 0., 0.), head_present=True):
         self.cfg, self.timeout_s = cfg, float(timeout_s)
         if cfg.name != 'x2' or self.timeout_s <= 0:
             raise ValueError('X2 backend requires robot=x2 and positive timeout_s')
-        self.head_pitch_enabled = bool(head_pitch_enabled)
+        self.head_present = bool(head_present)
+        self.head_pitch_enabled = bool(head_pitch_enabled) and self.head_present
         self.rotation = self.vector(imu_to_pelvis_wxyz, 4)
         if np.linalg.norm(self.rotation) < 1e-6:
             raise ValueError('Invalid IMU extrinsic quaternion')
         self.rotation /= np.linalg.norm(self.rotation)
+        # X2 EDU has no head joints: no head topics are subscribed or commanded, and
+        # the policy observes the head fixed at its default pose.
         self.group_ids = {g: np.array([cfg.joint_names.index(n) for n in names])
-                          for g, names in X2_AIMDK_GROUPS.items()}
+                          for g, names in X2_AIMDK_GROUPS.items() if self.head_present or g != 'head'}
+        self.absent_ids = (np.array([], dtype=int) if self.head_present else
+                           np.array([cfg.joint_names.index(n) for n in X2_AIMDK_GROUPS['head']]))
+        self.default_joint_pos = np.asarray(cfg.default_qpos[7:], dtype=np.float32)
         self.groups, self.imu = {}, None
         self.command = None
         self.command_time = 0.
@@ -103,6 +115,7 @@ class X2StateCommand:
             qvel = np.zeros(6 + len(self.cfg.joint_names), dtype=np.float32)
             tau = np.zeros(len(self.cfg.joint_names), dtype=np.float32)
             qpos[3:7], qvel[3:6] = self.imu[1:]
+            qpos[7 + self.absent_ids] = self.default_joint_pos[self.absent_ids]
             for group, ids in self.group_ids.items():
                 q, dq, effort = self.groups[group][1]
                 qpos[7 + ids], qvel[6 + ids], tau[ids] = q, dq, effort
@@ -130,7 +143,7 @@ class X2StateCommand:
                 values[1].fill(0)
                 values[2].fill(0)
                 values[3].fill(0)
-            if not self.head_pitch_enabled:
+            if self.head_present and not self.head_pitch_enabled:
                 i = self.cfg.joint_names.index('head_pitch_joint')
                 for a in values:
                     a[i] = 0.
@@ -139,7 +152,8 @@ class X2StateCommand:
 
 class X2RobotIO(RobotIO):
     def __init__(self, cfg: RobotCfg, *, publish_hz=500., timeout_s=.25, head_pitch_enabled=False,
-                 imu_to_pelvis_wxyz=(1., 0., 0., 0.), imu_topic='/aima/hal/imu/torso/state'):
+                 imu_to_pelvis_wxyz=(1., 0., 0., 0.), imu_topic='/aima/hal/imu/torso/state',
+                 head_present=True, read_only=False):
         if publish_hz <= 0:
             raise ValueError('publish_hz must be positive')
         try:
@@ -153,25 +167,42 @@ class X2RobotIO(RobotIO):
         except ImportError as exc:
             raise ImportError('Source ROS 2 Humble and the X2 AimDK install/setup.bash before running inline X2') from exc
         self.codec = X2StateCommand(cfg, timeout_s=timeout_s, head_pitch_enabled=head_pitch_enabled,
-                                   imu_to_pelvis_wxyz=imu_to_pelvis_wxyz)
+                                   imu_to_pelvis_wxyz=imu_to_pelvis_wxyz, head_present=head_present)
         self._joint_type, self._array_type = JointCommand, JointCommandArray
+        # Read-only (dry run): no command publisher or timer exists, so nothing can reach the HAL.
+        self.read_only = bool(read_only) or os.environ.get('SIM2REAL_X2_READ_ONLY') == '1'
+        # Optional CPU split (RK3588 isolcpus cores do not load-balance): the ROS context, its DDS
+        # threads and the executor are created while this thread is pinned to SIM2REAL_X2_IO_CPUS,
+        # so they inherit it; the caller then moves to SIM2REAL_X2_POLICY_CPUS for inference.
+        io_cpus = _cpu_set(os.environ.get('SIM2REAL_X2_IO_CPUS'))
+        policy_cpus = _cpu_set(os.environ.get('SIM2REAL_X2_POLICY_CPUS'))
+        caller_cpus = os.sched_getaffinity(0)
+        if io_cpus:
+            os.sched_setaffinity(0, io_cpus)
         self._context = Context()
         rclpy.init(context=self._context)
         self._node = Node('sim2real_x2', context=self._context)
         rx = QoSProfile(depth=1, reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         tx = QoSProfile(depth=1, reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.VOLATILE)
         self._publishers, self._subscriptions = {}, []
-        for group in X2_AIMDK_GROUPS:
+        for group in self.codec.group_ids:
             prefix = f'/aima/hal/joint/{group}'
-            self._publishers[group] = self._node.create_publisher(JointCommandArray, prefix + '/command', tx)
+            if not self.read_only:
+                self._publishers[group] = self._node.create_publisher(JointCommandArray, prefix + '/command', tx)
             self._subscriptions.append(self._node.create_subscription(JointStateArray, prefix + '/state',
                 lambda msg, g=group: self.codec.receive_group(g, msg), rx))
         self._subscriptions.append(self._node.create_subscription(Imu, imu_topic, self.codec.receive_imu, rx))
-        self._timer = self._node.create_timer(1 / publish_hz, self._publish)
+        self._timer = None if self.read_only else self._node.create_timer(1 / publish_hz, self._publish)
+        if self.read_only:
+            print('X2RobotIO: READ-ONLY, no joint commands are published')
         self._executor = SingleThreadedExecutor(context=self._context)
         self._executor.add_node(self._node)
         self._thread = threading.Thread(target=self._executor.spin, name='x2-aimdk', daemon=True)
         self._thread.start()
+        if io_cpus or policy_cpus:
+            os.sched_setaffinity(0, policy_cpus or caller_cpus)
+            print(f'X2RobotIO: ROS I/O on CPUs {sorted(io_cpus or caller_cpus)}, '
+                  f'policy on CPUs {sorted(os.sched_getaffinity(0))}')
 
     def read_state(self):
         return self.codec.read_state()
@@ -201,6 +232,12 @@ class X2RobotIO(RobotIO):
                 self.codec.error = exc
 
     def close(self):
+        if self.read_only:
+            self._executor.shutdown(timeout_sec=1.)
+            self._thread.join(timeout=1.)
+            self._node.destroy_node()
+            self._context.shutdown()
+            return
         self._timer.cancel()
         # Finish any in-flight normal publish before replacing it with damping.
         self._executor.shutdown(timeout_sec=1.)

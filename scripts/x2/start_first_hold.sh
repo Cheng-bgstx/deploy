@@ -20,7 +20,7 @@ uv run --no-sync python scripts/x2/check_feedback.py --duration 5 \
 # The static reference does not introduce a dynamic tracking clip.
 exec uv run --no-sync python -m sim2real.rl_policy.tracking \
   --robot x2 --robot-io inline \
-  --policy-config checkpoints/proteus/wsq61/lingxi_x2/policy.yaml \
+  --policy-config checkpoints/proteus/proteus_wamseq_62/lingxi_x2/policy.yaml \
   --rl-rate 50 --inference-backend onnx-cpu --controller keyboard \
   --motion-backend npz --motion-path outputs/x2/pico_hold \
   --record --record-output "outputs/x2/first_hold_$(date +%Y%m%d_%H%M%S).npz"

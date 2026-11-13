@@ -50,6 +50,7 @@ const sidebars: SidebarsConfig = {
         {type: 'doc', id: 'proteus_et1_onboard', label: 'Proteus ET1 (Onboard)'},
         'tutorials/proteus-oli',
         'tutorials/proteus-x2',
+        'tutorials/proteus-x2-onboard',
         'tutorials/proteus-a3',
         'tutorials/proteus-t800',
         'tutorials/proteus-pm01',
