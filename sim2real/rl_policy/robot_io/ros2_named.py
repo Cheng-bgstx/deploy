@@ -3,6 +3,8 @@
 Wire message types and topics are supplied by each verified vendor adapter. No
 ROS dependency is imported until constructing the transport; the codec is testable.
 """
+import os
+import sys
 import threading
 import time
 
@@ -154,7 +156,7 @@ class NamedJointCodec:
 
 class NamedRosRobotIO(RobotIO):
     def __init__(self, cfg, *, groups, topics, types, imu_topic, publish_hz=500.,
-                 codec_type=NamedJointCodec, imu_type=None, **codec_options):
+                 codec_type=NamedJointCodec, imu_type=None, spin_hz=None, spin_cpu=None, **codec_options):
         if not imu_topic:
             raise ValueError('Configure a verified pelvis IMU sensor_msgs/Imu topic in robot_io_options.imu_topic')
         if not np.isfinite(publish_hz) or publish_hz <= 0:
@@ -181,8 +183,37 @@ class NamedRosRobotIO(RobotIO):
         self._timer = self._node.create_timer(1 / publish_hz, self._publish)
         self._executor = SingleThreadedExecutor(context=self._context)
         self._executor.add_node(self._node)
-        self._thread = threading.Thread(target=self._executor.spin, name=f'{cfg.name}-hal', daemon=True)
+        # spin_hz paces the callback thread: each cycle runs at most one callback per subscription and timer, so
+        # feeds published faster than Python can decode (EngineAI joint and IMU state) cannot keep it busy. The
+        # depth-1 queues keep only the newest sample, so feedback is at most one cycle old. spin_cpu pins that
+        # thread to one CPU; the GIL switch interval then drops to 1 ms so it delays the policy thread less.
+        if spin_hz is not None and not (np.isfinite(spin_hz) and spin_hz > 0):
+            raise ValueError('spin_hz must be finite and positive')
+        self._spin_period = None if spin_hz is None else 1. / float(spin_hz)
+        self._spin_cpu = None if spin_cpu is None else int(spin_cpu)
+        if self._spin_cpu is not None:
+            sys.setswitchinterval(min(sys.getswitchinterval(), .001))
+        self._stopping = threading.Event()
+        self._thread = threading.Thread(target=self._spin, name=f'{cfg.name}-hal', daemon=True)
         self._thread.start()
+
+    def _spin(self):
+        if self._spin_cpu is not None:
+            os.sched_setaffinity(0, {self._spin_cpu})  # 0 is the calling thread
+        if self._spin_period is None:
+            self._executor.spin()
+            return
+        deadline = time.monotonic()
+        while not self._stopping.is_set() and self._context.ok():
+            # Subclasses may add subscriptions after the thread starts: count them each cycle (plus the timer).
+            for _ in range(len(self._subscriptions) + 1):
+                self._executor.spin_once(timeout_sec=0)
+            deadline += self._spin_period
+            delay = deadline - time.monotonic()
+            if delay > 0:
+                self._stopping.wait(delay)
+            else:
+                deadline = time.monotonic()
 
     def read_state(self):
         return self.codec.read_state()
@@ -220,6 +251,7 @@ class NamedRosRobotIO(RobotIO):
 
     def close(self):
         self._timer.cancel()
+        self._stopping.set()
         self._executor.shutdown(timeout_sec=1.)
         self._thread.join(timeout=1.)
         for _ in range(5):
