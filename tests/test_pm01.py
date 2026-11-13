@@ -119,7 +119,10 @@ def test_pm01_uses_classic_parser_while_t800_keeps_rl_parser():
     assert T800Codec.parallel_parser_type == 1
 
 
-def test_pm01_transport_forwards_training_gains_and_uses_measured_pose_on_stop():
+def test_pm01_transport_forwards_training_gains_and_uses_measured_pose_on_stop(monkeypatch):
+    monkeypatch.delenv('PM01_ANKLE_PITCH_GAIN_SCALE', raising=False)
+    monkeypatch.delenv('PM01_ARM_KP_SCALE', raising=False)
+    monkeypatch.delenv('PM01_ANKLE_KD_SCALE', raising=False)
     c = codec()  # Reversed runtime order tests name-based SDK mapping too.
     header = NS(stamp=NS(sec=0, nanosec=0))
     c.receive_motion_state(NS(current_motion_task_name='joint_bridge'))
@@ -144,6 +147,46 @@ def test_pm01_transport_forwards_training_gains_and_uses_measured_pose_on_stop()
     c.write_command(*arrays)
     c.mode = 'policy'
     np.testing.assert_array_equal(c.command_groups()['body'], np.array(arrays, dtype=np.float32)[:, ::-1])
+
+
+def test_pm01_gain_scales_apply_to_policy_commands_only(monkeypatch):
+    monkeypatch.setenv('PM01_ANKLE_PITCH_GAIN_SCALE', '0.5')
+    monkeypatch.setenv('PM01_ARM_KP_SCALE', '0.7')
+    monkeypatch.setenv('PM01_ANKLE_KD_SCALE', '1.5')
+    c = codec()
+    assert (c.ankle_pitch_gain_scale, c.arm_kp_scale, c.ankle_kd_scale) == (0.5, 0.7, 1.5)
+    header = NS(stamp=NS(sec=0, nanosec=0))
+    c.receive_motion_state(NS(current_motion_task_name='joint_bridge'))
+    q = np.linspace(-.3, .3, 24)
+    c.receive_group('body', NS(header=header, position=q[::-1].copy(), velocity=[0.]*24, torque=[0.]*24))
+    c.receive_imu(NS(header=header, quaternion=NS(w=1., x=0., y=0., z=0.),
+                     angular_velocity=NS(x=0., y=0., z=0.)))
+    c.mode = 'policy'
+    kp, kd = np.full(24, 37.701), np.full(24, 2.4916)
+    c.write_command(q, np.zeros(24), np.zeros(24), kp, kd)
+    values = c.command_groups()['body']
+    arm = set(PM01_SDK_JOINT_NAMES[13:23])
+    assert len(arm) == 10 and all('SHOULDER' in n or 'ELBOW' in n for n in arm)
+    for i, name in enumerate(PM01_SDK_JOINT_NAMES):
+        ankle = name in ('J04_ANKLE_PITCH_L', 'J10_ANKLE_PITCH_R')
+        roll = name in ('J05_ANKLE_ROLL_L', 'J11_ANKLE_ROLL_R')
+        kp_scale = .5 if ankle else .7 if name in arm else 1.
+        kd_scale = .5 * 1.5 if ankle else 1.5 if roll else 1.
+        np.testing.assert_allclose(values[3, i], 37.701 * kp_scale, rtol=1e-6)
+        np.testing.assert_allclose(values[4, i], 2.4916 * kd_scale, rtol=1e-6)
+    np.testing.assert_array_equal(kp, 37.701)  # caller arrays are not modified
+    c.command_time -= 1.  # the damping fallback keeps the base damping on every joint
+    np.testing.assert_array_equal(c.command_groups()['body'][4], c.damping)
+
+
+@pytest.mark.parametrize('env,value', [('PM01_ANKLE_PITCH_GAIN_SCALE', '0'), ('PM01_ANKLE_PITCH_GAIN_SCALE', '1.5'),
+                                       ('PM01_ANKLE_PITCH_GAIN_SCALE', 'nan'), ('PM01_ARM_KP_SCALE', '0.4'),
+                                       ('PM01_ARM_KP_SCALE', '2'), ('PM01_ANKLE_KD_SCALE', '0.9'),
+                                       ('PM01_ANKLE_KD_SCALE', '4')])
+def test_pm01_gain_scales_reject_out_of_range(monkeypatch, env, value):
+    monkeypatch.setenv(env, value)
+    with pytest.raises(ValueError):
+        codec()
 
 
 def test_pm01_runtime_action_targets_match_canonical_training_formula(monkeypatch):
