@@ -182,7 +182,7 @@ Use this skill when bringing a policy checkpoint from any training repo into `/h
 - `command_multi_future_nonflat` is future joint position plus joint velocity, not body positions.
 - IsaacLab observation history is flattened oldest-to-newest; newest-to-oldest can have the right shape but destabilize SONIC.
 - Use IsaacLab/action order for `policy_joint_names`, `joint_names_simulation`, and motion joint observations when the exported action order comes from GR00T.
-- GR00T export paths may ignore `+exported_policy_path` and still write under the checkpoint's `exported/` directory. Check the actual log line and copy the generated ONNX into `sim2real/checkpoints/...`.
+- GR00T export paths may ignore `+exported_policy_path` and still write under the checkpoint's `exported/` directory. Check the actual log line and copy the generated ONNX into `checkpoints/...`.
 - The canonical SONIC paths are `checkpoints/sonic/release/{g1,smpl}` and `checkpoints/sonic/low_latency/{g1,smpl}`. Release SMPL uses `smpl_input[840]`; low-latency SMPL uses `smpl_input[336]`. All four use `proprioception[930]`.
 - Canonical SONIC graphs expose `action[29]` and the encoder `token[64]`. The runtime consumes `action`; retain `token` for future consumers and verify that exposing it does not change action numerics.
 - Splitting a universal encoder and decoder after export can accidentally retain every tokenizer feature. Use the selected `g1`/`g1_dyn` or `smpl`/`g1_dyn` export, or merge only matching selected encoder/decoder graphs. Verify every named input and compare the multi-key graph numerically against the source policy before writing YAML.
