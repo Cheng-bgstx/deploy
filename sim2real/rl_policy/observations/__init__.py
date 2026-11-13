@@ -7,6 +7,7 @@ from .bfm_zero import *
 from .common import *
 from .humanoid_gpt import *
 from .motion import *
+from .galbot_track import *
 from .mimic_lite import *
 from .proteus import *
 from .scalebfm import *

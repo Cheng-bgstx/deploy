@@ -26,6 +26,8 @@ def _normalize_output_name(name: str):
     key = name
     if key.endswith("_orig"):
         key = key[: -len("_orig")]
+    if key == "actions":  # RSL-RL exports (Galbot et1-dep policies) name the single output "actions"
+        return "action"
     if key.startswith("next_"):
         return ("next", key[len("next_") :])
     return key

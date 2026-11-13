@@ -84,6 +84,32 @@ class SimIO(RobotIO):
                                       out_of_range={self.joint_names[i]: float(cmd.q_target[i]) for i in invalid}))
 
 
+# Bodies of Galbot's tracking reward (env.yaml commands.motion.body_names), used for the error metric.
+GALBOT_TRACK_BODIES = ["pelvis_link", "left_hip_roll_link", "left_knee_link", "left_ankle_roll_link", "right_hip_roll_link",
+                       "right_knee_link", "right_ankle_roll_link", "waist_yaw_link", "left_shoulder_roll_link",
+                       "left_elbow_link", "left_wrist_roll_link", "right_shoulder_roll_link", "right_elbow_link",
+                       "right_wrist_roll_link"]
+
+
+def tracked_body_names(policy_config):
+    if "proteus" in policy_config:
+        return list(policy_config["proteus"]["body_names"])
+    return list(policy_config["galbot_track"].get("body_names", GALBOT_TRACK_BODIES))
+
+
+def aligned_reference_positions(tracking, body_names):
+    """Reference positions (B, 3) of ``body_names`` at the current frame, aligned to the robot as the policy sees them."""
+    if "proteus" in tracking.policy_config:
+        return tracking._proteus_core._reference()[0][0]
+    from sim2real.utils.math import quat_rotate_numpy
+
+    motion = tracking.motion_data
+    index = [list(tracking.motion_body_names).index(n) for n in body_names]
+    pos = np.asarray(motion.body_pos_w[0, 0], dtype=np.float64)[index]
+    align = np.broadcast_to(tracking._galbot_track_core.align, pos.shape[:-1] + (4,))
+    return quat_rotate_numpy(np.ascontiguousarray(align), pos)
+
+
 class SimTracking(Tracking):
     def __init__(self, args, io):
         self._sim_io = io
@@ -113,6 +139,8 @@ class Args:
     hold_s: float = 5.0
     push_velocity_m_s: float = 0.0
     """Seeded horizontal root velocity disturbance 0.5 s after Start; simulation only."""
+    min_forward_m: float = 0.5
+    """walk-hold: the playback must move the robot at least this far forward (negative disables it, e.g. a dance)."""
     max_lateral_error_m: float = 0.2
     """Endpoint lateral error relative to reference allowed by the walk-hold acceptance check."""
     state_gap_at_s: float = 4.6
@@ -125,6 +153,14 @@ class Args:
     """Latency from the Tracker issuing a command to the motors applying it (real PC chain: ZMQ, Bridge, DDS)."""
     joint_friction: str | None = None
     """YAML of joint-name pattern -> dry friction (N m) measured on the robot (sim2real.sim_env.joint_friction)."""
+    landed_offset_m: float = -0.02
+    """Root height relative to the standing height where the ideal gantry releases the robot."""
+    standing_height_m: float | None = None
+    """Standing root height for the gantry (default: the robot config's default root height)."""
+    joint_armature: float | None = None
+    """Override every joint's armature (e.g. 0.01 to match an mjlab-trained Galbot policy's training model)."""
+    joint_frictionloss: float | None = None
+    """Override every joint's frictionloss (N m)."""
     hold_through_gaps: bool = True
     """Bridge keeps the last PD targets through gaps, as the PC launcher does; False latches damping."""
 
@@ -137,6 +173,10 @@ def main(args):
     sim = IntegratedSimRuntime(robot_cfg, sim_dt=0.002, headless=True, key_callback=None)
     if args.joint_friction:
         apply_joint_friction(sim.mj_model, load_joint_friction(args.joint_friction, robot_cfg.joint_names))
+    if args.joint_armature is not None:
+        sim.mj_model.dof_armature[sim.qvel_adrs] = args.joint_armature
+    if args.joint_frictionloss is not None:
+        sim.mj_model.dof_frictionloss[sim.qvel_adrs] = args.joint_frictionloss
     guard = BridgeSafety(robot_cfg, timeout_s=0.25, target_margin_rad=PROTEUS_TARGET_MARGIN_RAD,
                          hold_through_gaps=args.hold_through_gaps)
     io = SimIO(sim, guard, robot_cfg.joint_names)
@@ -145,10 +185,10 @@ def main(args):
                                        robot_io="zmq", controller="joystick", inference_backend="onnx-cpu"), io)
     tracking.total_inference_cnt = 0
     io.io_timeout_ns = round(args.io_timeout_s * 1e9)
-    io.measured_root = not tracking.policy_config["proteus"]["reference_forcing"]
+    io.measured_root = not tracking.policy_config.get("proteus", {}).get("reference_forcing", True)
     # Gantry: hold the root above its standing height, then lower it slightly below.
-    stand_height = robot_cfg.default_qpos[2]
-    hung, landed = stand_height + 0.15, stand_height - 0.02
+    stand_height = robot_cfg.default_qpos[2] if args.standing_height_m is None else args.standing_height_m
+    hung, landed = stand_height + 0.15, stand_height + args.landed_offset_m
     sim.mj_data.qpos[:] = np.array(robot_cfg.default_qpos)
     sim.mj_data.qpos[2] = hung
     mujoco.mj_forward(sim.mj_model, sim.mj_data)
@@ -174,7 +214,7 @@ def main(args):
     frames, timings, transitions, faults, reasons = [], [], [], [], []
     pending = deque()
     previous_mode = None
-    body_names = tracking.policy_config["proteus"]["body_names"]
+    body_names = tracked_body_names(tracking.policy_config)
     body_ids = [sim.mj_model.body(n).id for n in body_names]
     try:
         for step in range(round(end / 0.02)):
@@ -227,8 +267,7 @@ def main(args):
                 sim.sim_step()
             # Compare against the reference as the policy sees it: yaw-aligned to the robot
             # at Hold entry. The raw Motion frame keeps the clip's own heading.
-            aligned_ref = tracking._proteus_core._reference()
-            ref = aligned_ref[0][0]
+            ref = aligned_reference_positions(tracking, body_names)
             actual = sim.mj_data.xpos[body_ids].copy()
             rel_err = np.linalg.norm((actual - actual[0]) - (ref - ref[0]), axis=-1).mean()
             frames.append(dict(time=t, root=sim.mj_data.qpos[:3].copy(), quat=sim.mj_data.qpos[3:7].copy(),
@@ -237,7 +276,7 @@ def main(args):
                                joint_vel=sim.mj_data.qvel[sim.qvel_adrs].copy(),
                                joint_torque=sim.mj_data.actuator_force[sim.act_adrs].copy(),
                                cmd_q=cmd.q_target.copy() if cmd is not None else np.full(len(robot_cfg.joint_names), np.nan),
-                               reference_root=aligned_ref[0][0, 0].copy(),
+                               reference_root=ref[0].copy(),
                                motion_t=int(tracking.motion_t[0]), mode=mode[0], paused=mode[1], relative_error=rel_err,
                                root_xy_error=np.linalg.norm(actual[0, :2] - ref[0, :2]),
                                finite=bool(np.isfinite(sim.mj_data.qpos).all() and np.isfinite(sim.mj_data.qvel).all())))
@@ -250,11 +289,11 @@ def main(args):
     path.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(str(path) + ".npz", **{key: np.array([f[key] for f in frames]) for key in frames[0]})
     free = [f for f in frames if 12.1 + entry_delay <= f["time"] < stop]
-    report = dict(robot=args.robot, seed=args.seed, simulated_seconds=end, reference_forcing=tracking.policy_config["proteus"]["reference_forcing"], joint_friction=args.joint_friction, action_delay_ms=args.action_delay_ms,
+    report = dict(robot=args.robot, seed=args.seed, simulated_seconds=end, reference_forcing=not io.measured_root, joint_friction=args.joint_friction, action_delay_ms=args.action_delay_ms, joint_armature=args.joint_armature, joint_frictionloss=args.joint_frictionloss,
                   npz_playback_limit_s=args.npz_playback_limit_s,
                   scenario=args.scenario, push_velocity_m_s=args.push_velocity_m_s,
                   policy_config=args.policy_config, motion_path=args.motion_path,
-                  actor_kind=tracking.policy_config["proteus"].get("actor_kind", "separate"),
+                  actor_kind=tracking.policy_config.get("proteus", {}).get("actor_kind", "galbot_track" if "galbot_track" in tracking.policy_config else "separate"),
                   measured_root=io.measured_root,
                   shaping_target=tracking.policy_config.get("shaping_target", "default_joint_pos"),
                   reference_entry_s=entry_delay,
@@ -298,7 +337,7 @@ def main(args):
                             and [x["mode"] for x in transitions] == expected_modes)
     if args.scenario == "walk-hold":
         report["walking_passed"] = bool(report["walking"]["upright_all"] and not faults
-                                        and report["walking"]["forward_m"] > .5)
+                                        and report["walking"]["forward_m"] > args.min_forward_m)
         report["max_lateral_error_m"] = args.max_lateral_error_m
         report["straight_tracking_passed"] = abs(report["walking"]["lateral_error_m"]) <= args.max_lateral_error_m
         # A stationary end must stay upright and drift less than 20 cm in five seconds.
