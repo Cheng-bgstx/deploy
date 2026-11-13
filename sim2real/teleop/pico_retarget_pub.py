@@ -256,13 +256,13 @@ def _hand_grip_message_from_data(controller_data: object) -> HandGripMessage:
 def _resolve_gmr_target_robot(robot_cfg: RobotCfg) -> str:
     try:
         return {"g1": "unitree_g1", "h2": "unitree_h2", "oli": "limx_oli_edu",
-                "x2": "lingxi_x2", "a3": "agibot_a3"}[robot_cfg.name]
+                "x2": "lingxi_x2", "a3": "agibot_a3", "t800": "engineai_t800", "pm01": "engineai_pm01"}[robot_cfg.name]
     except KeyError as exc:
         raise ValueError(f"Pico retargeting does not support {robot_cfg.name}") from exc
 
 
 def _register_gmr_robot(robot_cfg: RobotCfg, target_robot: str) -> None:
-    if robot_cfg.name in {"h2", "oli", "x2", "a3"}:
+    if robot_cfg.name in {"h2", "oli", "x2", "a3", "t800", "pm01"}:
         from general_motion_retargeting.params import IK_CONFIG_DICT, ROBOT_XML_DICT
         ROBOT_XML_DICT[target_robot] = robot_cfg.resolve_mjcf_path()
         IK_CONFIG_DICT.setdefault("xrobot", {})[target_robot] = (
@@ -285,9 +285,9 @@ class LiveRetargetPublisher:
         human_height = float(args.actual_human_height)
         if not np.isfinite(human_height) or human_height <= 0:
             raise ValueError("actual_human_height must be finite and positive")
-        normalize_height = self.robot_cfg.name in {"oli", "x2", "a3"}
+        normalize_height = self.robot_cfg.name in {"oli", "x2", "a3", "t800", "pm01"}
         retarget_type = GMR
-        if self.robot_cfg.name == "a3":
+        if self.robot_cfg.name in {"a3", "t800", "pm01"}:
             from sim2real.teleop.proteus_retarget import ProteusRetargeter
             retarget_type = ProteusRetargeter
         if self.robot_cfg.name == "x2":
@@ -299,7 +299,7 @@ class LiveRetargetPublisher:
             actual_human_height=None if normalize_height else human_height,
             verbose=bool(args.verbose),
         )
-        if self.robot_cfg.name in {"x2", "a3"}:
+        if self.robot_cfg.name in {"x2", "a3", "t800", "pm01"}:
             self.retarget.reference_dt = 1.0 / self.publish_hz
         if normalize_height:
             profile = json.loads((Path(__file__).with_name("configs")
@@ -334,7 +334,7 @@ class LiveRetargetPublisher:
             )
 
         self.latest_qpos = self._default_mjcf_qpos()
-        if self.robot_cfg.name in {"q1", "t800", "a3"}:
+        if self.robot_cfg.name in {"q1", "t800", "a3", "pm01"}:
             self.retarget.configuration.update(self.latest_qpos)
         self.paused_qpos = self.latest_qpos.copy()
         (

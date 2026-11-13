@@ -330,12 +330,10 @@ class BasePolicy:
                 "shaping_target must be 'default_joint_pos' or 'motion_first_frame', "
                 f"got {shaping_target!r}"
             )
-        if self.policy_config.get("soft_joint_pos_limits") is None:
-            raise ValueError(
-                "shaping_target: motion_first_frame clips the Motion's first frame "
-                "to soft_joint_pos_limits; set them in the policy YAML"
-            )
-        return self.target_postprocessor.clip(self.motion_first_frame_joint_pos())
+        target = self.motion_first_frame_joint_pos()
+        # First-frame shaping does not imply action clipping. Policies such as
+        # Proteus train on default + scale * action without target postprocessing.
+        return target if self.target_postprocessor is None else self.target_postprocessor.clip(target)
 
     def motion_first_frame_joint_pos(self) -> np.ndarray:
         """Joint positions of the Motion's first frame, in robot joint order."""

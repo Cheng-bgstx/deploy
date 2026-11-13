@@ -13,7 +13,7 @@ from sim2real.config.robots import get_robot_cfg
 ROOT = Path(__file__).resolve().parents[1]
 PROFILES = sorted((ROOT / 'sim2real/teleop/configs').glob('xrobot_to_*.json'))
 PROFILES = [p for p in PROFILES if p.stem.removeprefix('xrobot_to_') in {'oli', 'x2', 'a3'}]
-
+PROFILES = [p for p in PROFILES if p.stem.removeprefix('xrobot_to_') in {'oli', 'x2', 'a3', 't800', 'pm01'}]
 
 @pytest.mark.parametrize('path', PROFILES, ids=lambda p: p.stem)
 def test_xrobot_profile_is_valid_for_target_contract(path):
@@ -141,7 +141,7 @@ def test_pico_retarget_fk_and_named_zmq_buffer(path, human_height, monkeypatch):
                 frames['Left_Wrist'][0] += np.array([0, 0, .25])
             previous = worker.latest_qpos.copy()
             payload = worker.sample_and_retarget()
-            if cfg.name in {'x2', 'q1', 't800', 'a3'}:
+            if cfg.name in {'x2', 'q1', 't800', 'a3', 'pm01'}:
                 indices = [model.joint(n).qposadr[0] for n in cfg.joint_names]
                 assert np.max(np.abs(np.asarray(payload['qpos'])[indices] - previous[indices])) <= .40001
         assert not payload['motion_first_frame']
@@ -159,7 +159,7 @@ def test_pico_retarget_fk_and_named_zmq_buffer(path, human_height, monkeypatch):
         assert buffer.latest_timestamp_ns is not None
         obs = buffer.get_obs()
         np.testing.assert_allclose(obs.joint_pos[0, 0], payload['joint_pos'], atol=1e-5)
-        if cfg.name in {'q1', 't800', 'a3'}:
+        if cfg.name in {'q1', 't800', 'a3', 'pm01'}:
             _run_streamed_proteus_policy(cfg, buffer, obs, q)
         assert np.isfinite(obs.body_pos_w).all()
         worker.streamer.connected = False
@@ -203,8 +203,9 @@ def _run_streamed_proteus_policy(cfg, buffer, motion, qpos):
     import mujoco
     import subprocess
     from sim2real.rl_policy.observations import Observation
-    contracts = {'q1': 'primebot_q1', 't800': 'engineai_t800', 'a3': 'agibot_a3'}
-    folder = ROOT / 'checkpoints/proteus/proteus_wamseq_62' / contracts[cfg.name]
+    contracts = {'q1': 'primebot_q1', 't800': 'engineai_t800', 'pm01': 'engineai_pm01', 'a3': 'agibot_a3'}
+    release = 'wsq61' if cfg.name == 'pm01' else 'proteus_wamseq_62'
+    folder = ROOT / 'checkpoints/proteus' / release / contracts[cfg.name]
     if not (folder / 'policy.onnx').is_file():
         pytest.skip('Export the complete ONNX for the streamed policy integration')
     policy = yaml.safe_load((folder / 'policy.yaml').read_text())

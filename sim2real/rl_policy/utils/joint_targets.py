@@ -26,8 +26,9 @@ targets are left untouched:
       left_knee_joint: [-0.0131, 2.8056]
     max_target_velocity_rad_s: 15.0   # times the runtime control period (1 / rl_rate)
 
-Either key alone enables only its half. ``BasePolicy`` also clips the
-``shaping_target: motion_first_frame`` Shaping target with the same soft limits.
+Either key alone enables only its half. When soft limits are configured,
+``BasePolicy`` also clips the ``shaping_target: motion_first_frame`` target.
+Without postprocessing, first-frame shaping uses the original motion target.
 """
 
 from __future__ import annotations

@@ -326,6 +326,15 @@ def test_shaping_targets_motion_first_frame_within_soft_limits(make_rig, motion_
         np.testing.assert_allclose(command, SHAPING_TARGET, atol=1e-6)
 
 
+def test_motion_first_frame_does_not_require_policy_target_clipping(make_rig, motion_files):
+    motion_files["unclipped"] = motion_dataset(MOTION_FRAME0)
+    rig = make_rig(tracking_config(shaping_target="motion_first_frame"),
+                   policy_cls=Tracking, args_cls=TrackingArgs, motion_path="unclipped")
+    assert rig.policy.target_postprocessor is None
+    commands = run_shaping(rig, np.zeros(len(G1_JOINTS)), ticks=501)
+    np.testing.assert_allclose(commands[-1], MOTION_FRAME0, atol=1e-6)
+
+
 def test_planner_mode_takes_shaping_target_from_the_given_motion(make_rig, motion_files):
     """With a streamed Reference (zmq backend) the Motion file only supplies frame 0."""
     motion_files["take0595"] = motion_dataset(MOTION_FRAME0)
@@ -410,7 +419,6 @@ def _without(limits: dict, joint: str) -> dict:
 @pytest.mark.parametrize(
     ("extra", "message"),
     [
-        ({"shaping_target": "motion_first_frame"}, "soft_joint_pos_limits"),
         ({"shaping_target": "frame0"}, "shaping_target"),
         ({"soft_joint_pos_limits": _without(soft_limits(), "left_knee_joint")}, "left_knee_joint"),
         ({"soft_joint_pos_limits": soft_limits(left_knee=(0.5, -0.5))}, "left_knee_joint"),

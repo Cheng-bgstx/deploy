@@ -17,3 +17,6 @@ Runtime artifacts, including JetPack 5 prebuilt packages:
 - [Tutorial / Motion Recording](../../docs/tutorials/motion-recording.md)
 
 [Proteus AgiBot Expedition A3](../../docs/tutorials/proteus-a3.md): `--robot a3`; body IK, ZMQ motion/buttons, simulation and hardware launchers.
+[Proteus EngineAI T800](../../docs/tutorials/proteus-t800.md): `--robot t800`; body IK, ZMQ motion/buttons, simulation and hardware launchers.
+
+[Proteus EngineAI PM01](../../docs/tutorials/proteus-pm01.md): `--robot pm01`; 24-joint PM01/pm_v2, body IK, ZMQ motion/buttons and matching legacy ROS messages.

@@ -22,7 +22,7 @@ from sim2real.config.robots import get_robot_cfg
 from sim2real.config.robots import proteus_spec
 
 
-def verify(model, cfg, spec):
+def verify(model, cfg, spec, *, axis_atol=1e-5):
     scalar = [model.joint(i).name for i in range(model.njnt)
               if model.jnt_type[i] == mujoco.mjtJoint.mjJNT_HINGE]
     free = [i for i in range(model.njnt) if model.jnt_type[i] == mujoco.mjtJoint.mjJNT_FREE]
@@ -36,14 +36,14 @@ def verify(model, cfg, spec):
     mujoco.mj_kinematics(model, data)
     errors = {n: float(np.abs(data.xaxis[model.joint(n).id] - j['axis']).max())
               for n, j in spec['joints'].items()}
-    if max(errors.values()) > 1e-5:
+    if max(errors.values()) > axis_atol:
         raise ValueError(f'Asset axes differ from training: {errors}')
     for body in cfg.body_names:
         model.body(body)
     return max(errors.values())
 
 
-def prepare(robot, contract, model_dir, xml, license_path=None, fixed_joints=()):
+def prepare(robot, contract, model_dir, xml, license_path=None, fixed_joints=(), *, axis_atol=1e-5):
     cfg = get_robot_cfg(robot)
     spec_path = Path(proteus_spec.__file__).with_name('specs') / f'{contract}.yaml'
     spec = yaml.safe_load(spec_path.read_text())
@@ -69,13 +69,13 @@ def prepare(robot, contract, model_dir, xml, license_path=None, fixed_joints=())
     with tempfile.NamedTemporaryFile(suffix='.xml', dir=source.parent) as temporary:
         tree.write(temporary.name, encoding='utf-8', xml_declaration=True)
         model = mujoco.MjModel.from_xml_path(temporary.name)
-    error = verify(model, cfg, spec)
+    error = verify(model, cfg, spec, axis_atol=axis_atol)
     report = {'robot': robot, 'contract': contract, 'source_xml': str(source),
               'source_xml_sha256': hashlib.sha256(source.read_bytes()).hexdigest(),
               'spec_sha256': hashlib.sha256(spec_path.read_bytes()).hexdigest(),
               'vendor_mass_kg': float(model.body_mass.sum()), 'training_mass_kg': spec['mass'],
               'mass_difference_kg': float(model.body_mass.sum() - spec['mass']),
-              'max_joint_axis_error': error, 'joint_limit_overrides': {}}
+              'max_joint_axis_error': error, 'joint_axis_tolerance': axis_atol, 'joint_limit_overrides': {}}
     report['joints_fixed_at_zero'] = list(fixed_joints)
     target = cfg.mjcf_path
     model_target = target.parents[len(Path(spec['mjcf']).parts) - 3]
@@ -111,7 +111,7 @@ def prepare(robot, contract, model_dir, xml, license_path=None, fixed_joints=())
             element.set('file', os.path.relpath(copied, target.parent))
     tree.write(target, encoding='utf-8', xml_declaration=True)
     final = mujoco.MjModel.from_xml_path(str(target))
-    verify(final, cfg, spec)
+    verify(final, cfg, spec, axis_atol=axis_atol)
     if license_path:
         shutil.copy2(license_path, model_target.parent / license_path.name)
     report['prepared_xml_sha256'] = hashlib.sha256(target.read_bytes()).hexdigest()

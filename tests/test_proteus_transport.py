@@ -12,7 +12,7 @@ from sim2real.config.robots import get_robot_cfg
 from sim2real.rl_policy.robot_io.ros2_named import NamedJointCodec
 
 ROOT = Path(__file__).resolve().parents[1]
-CONTRACTS = {'q1': 'primebot_q1', 't800': 'engineai_t800', 'a3': 'agibot_a3'}
+CONTRACTS = {'q1': 'primebot_q1', 't800': 'engineai_t800', 'pm01': 'engineai_pm01', 'a3': 'agibot_a3'}
 ROBOTS = [n for n, c in CONTRACTS.items() if (ROOT / f'sim2real/config/robots/specs/{c}.yaml').is_file()]
 
 
@@ -22,11 +22,14 @@ def codec_for(name):
         from sim2real.rl_policy.robot_io.a3 import groups
         return NamedJointCodec(cfg, groups(cfg), fixed_joints={'head_pitch_joint': (0, 0, 0, 3, .3)},
             physical_limits={'left_knee_joint': (-.122173, 2.49582)})
-    if name == 't800':
-        from sim2real.rl_policy.robot_io.t800 import T800Codec, T800_SDK_JOINT_NAMES
+    if name in {'t800', 'pm01'}:
+        if name == 'pm01':
+            from sim2real.rl_policy.robot_io.pm01 import PM01Codec as Codec, PM01_SDK_JOINT_NAMES as sdk_names
+        else:
+            from sim2real.rl_policy.robot_io.t800 import T800Codec as Codec, T800_SDK_JOINT_NAMES as sdk_names
         # Deliberately reverse runtime order: SDK mapping must remain by name.
         cfg = replace(cfg, joint_names=tuple(reversed(cfg.joint_names)))
-        return T800Codec(cfg, {'body': T800_SDK_JOINT_NAMES})
+        return Codec(cfg, {'body': sdk_names})
     return NamedJointCodec(cfg, {'body': cfg.joint_names}, damping=5.)
 
 
@@ -37,7 +40,7 @@ def stamp(ns=1):
 def feed(codec, ns=1):
     for group, names in codec.groups.items():
         positions = [float(i) * .001 for i in range(len(names))]
-        if codec.cfg.name == 't800':
+        if codec.cfg.name in {'t800', 'pm01'}:
             msg = NS(header=stamp(ns), position=positions, velocity=[.02] * len(names), torque=[.03] * len(names))
         else:
             msg = NS(header=stamp(ns), joints=[NS(name=n, position=positions[i], velocity=.02, effort=.03)
@@ -45,7 +48,7 @@ def feed(codec, ns=1):
         codec.receive_group(group, msg)
     imu = NS(header=stamp(ns), orientation=NS(w=1., x=0., y=0., z=0.),
              angular_velocity=NS(x=.1, y=.2, z=.3))
-    if codec.cfg.name == 't800':
+    if codec.cfg.name in {'t800', 'pm01'}:
         imu.quaternion = imu.orientation
         codec.receive_motion_state(NS(current_motion_task='joint_bridge'))
     codec.receive_imu(imu)
@@ -117,7 +120,7 @@ def test_bad_feedback_latches_damping(name):
 def test_factory_dispatches_vendor_options(name, monkeypatch):
     from sim2real.rl_policy.robot_io.factory import create_robot_io
     module = importlib.import_module(f'sim2real.rl_policy.robot_io.{name}')
-    attr = {'q1': 'Q1RobotIO', 't800': 'T800RobotIO', 'a3': 'A3RobotIO'}[name]
+    attr = {'q1': 'Q1RobotIO', 't800': 'T800RobotIO', 'pm01': 'PM01RobotIO', 'a3': 'A3RobotIO'}[name]
     seen = []
     monkeypatch.setattr(module, attr, lambda cfg, **kw: seen.append((cfg, kw)) or 'created')
     cfg = get_robot_cfg(name)
@@ -137,11 +140,13 @@ def test_prepared_model_axes_contract_policy_and_portability(name):
     spec = yaml.safe_load((ROOT / f'sim2real/config/robots/specs/{CONTRACTS[name]}.yaml').read_text())
     model = load_sim_model(cfg)
     assert model.nq == cfg.qpos_size and model.nu == len(cfg.joint_names)
-    assert verify(model, cfg, spec) < 1e-5
+    axis_atol = 1e-4 if name == 'pm01' else 1e-5
+    assert verify(model, cfg, spec, axis_atol=axis_atol) < axis_atol
     assert {model.actuator(i).name for i in range(model.nu)} == set(cfg.joint_names)
     text = cfg.mjcf_path.read_text()
     assert '/home/' not in text
-    policy_path = ROOT / f'checkpoints/proteus/proteus_wamseq_62/{CONTRACTS[name]}/policy.yaml'
+    release = 'wsq61' if name == 'pm01' else 'proteus_wamseq_62'
+    policy_path = ROOT / f'checkpoints/proteus/{release}/{CONTRACTS[name]}/policy.yaml'
     if policy_path.is_file():
         policy = yaml.safe_load(policy_path.read_text())
         assert policy['policy_joint_names'] == list(cfg.joint_names)
@@ -179,7 +184,7 @@ def test_imu_mount_transform(name):
     feed(codec)
     msg = NS(header=stamp(2), orientation=NS(w=np.sqrt(.5), x=0., y=0., z=np.sqrt(.5)),
              angular_velocity=NS(x=1., y=0., z=0.))
-    if name == 't800':
+    if name in {'t800', 'pm01'}:
         msg.quaternion = msg.orientation
     codec.receive_imu(msg)
     np.testing.assert_allclose(codec.read_state().qpos[3:7], [1, 0, 0, 0], atol=1e-6)
@@ -192,7 +197,7 @@ def test_ros_serialization_and_mode_generation_invalidate_cached_command(name):
     codec = codec_for(name)
     feed(codec)
     module = importlib.import_module(f'sim2real.rl_policy.robot_io.{name}')
-    cls = getattr(module, {'q1': 'Q1RobotIO', 'a3': 'A3RobotIO', 't800': 'T800RobotIO'}[name])
+    cls = getattr(module, {'q1': 'Q1RobotIO', 'a3': 'A3RobotIO', 't800': 'T800RobotIO', 'pm01': 'PM01RobotIO'}[name])
     io = cls.__new__(cls)
     io.codec = codec
     io._sequence = 0
@@ -204,13 +209,16 @@ def test_ros_serialization_and_mode_generation_invalidate_cached_command(name):
                       for g in codec.groups}
     io.set_control_mode('policy', 1)
     n = len(codec.cfg.joint_names)
-    codec.write_command(np.zeros(n), np.zeros(n), np.zeros(n), np.full(n, 12.), np.full(n, .5))
+    # ActionManager calls RobotIO using these public keyword names.
+    io.write_command(q_target=np.zeros(n), dq_target=np.zeros(n), tau_ff=np.zeros(n),
+                     kp=np.full(n, 12.), kd=np.full(n, .5))
     io._publish()
     assert codec.error is None
-    if name == 't800':
+    if name in {'t800', 'pm01'}:
         msg = sent['body']
-        assert len(msg.position) == 25 and msg.parallel_parser_type == 1
-        assert msg.stiffness == [12.] * 25 and msg.feed_forward_torque == [0.] * 25
+        assert len(msg.position) == len(codec.cfg.joint_names)
+        assert msg.parallel_parser_type == {'t800': 1, 'pm01': 0}[name]
+        assert msg.stiffness == [12.] * len(codec.cfg.joint_names) and msg.feed_forward_torque == [0.] * len(codec.cfg.joint_names)
     else:
         for group, names in codec.groups.items():
             assert [j.name for j in sent[group].joints] == list(names)
@@ -219,8 +227,12 @@ def test_ros_serialization_and_mode_generation_invalidate_cached_command(name):
     io.set_control_mode('policy', 3)
     assert codec.command is None
     io._publish()
-    if name == 't800':
-        assert sent['body'].stiffness == [0.] * 25
+    if name in {'t800', 'pm01'}:
+        assert sent['body'].stiffness == [0.] * len(codec.cfg.joint_names)
+        codec.write_command(np.zeros(n), np.zeros(n), np.zeros(n), np.full(n, 12.), np.full(n, .5))
+        codec.motion_mode_time -= 2.
+        io._publish()
+        assert sent['body'].stiffness == [0.] * len(codec.cfg.joint_names)
         sent.clear()
         codec.receive_motion_state(NS(current_motion_task='pd_stand'))
         io._publish()
