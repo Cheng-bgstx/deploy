@@ -3,7 +3,7 @@
 开始前先克隆仓库：
 
 ```bash
-git clone https://github.com/EGalahad/sim2real
+git clone git@github.com:Cheng-bgstx/deploy.git
 ```
 
 `sim2real` 分成两个环境：

@@ -6,11 +6,11 @@ const config: Config = {
   title: 'sim2real',
   tagline: 'Documentation for sim2sim, sim2real, and teleoperation workflows',
 
-  url: 'https://egalahad.github.io',
-  baseUrl: '/sim2real/',
+  url: 'https://cheng-bgstx.github.io',
+  baseUrl: '/deploy/',
 
-  organizationName: 'EGalahad',
-  projectName: 'sim2real',
+  organizationName: 'Cheng-bgstx',
+  projectName: 'deploy',
 
   onBrokenLinks: 'throw',
   markdown: {
@@ -51,7 +51,7 @@ const config: Config = {
           ],
           sidebarPath: './sidebars.ts',
           routeBasePath: '/',
-          editUrl: 'https://github.com/EGalahad/sim2real/tree/master/docs/',
+          editUrl: 'https://github.com/Cheng-bgstx/deploy/tree/main/docs/',
         },
         blog: false,
         theme: {
@@ -74,16 +74,11 @@ const config: Config = {
           label: 'Docs',
         },
         {
-          to: '/leaderboard',
-          label: 'Leaderboard',
-          position: 'left',
-        },
-        {
           type: 'localeDropdown',
           position: 'right',
         },
         {
-          href: 'https://github.com/EGalahad/sim2real',
+          href: 'https://github.com/Cheng-bgstx/deploy',
           label: 'GitHub',
           position: 'right',
         },
@@ -98,13 +93,12 @@ const config: Config = {
             {label: 'Getting Started', to: '/getting-started/overview'},
             {label: 'Tutorials', to: '/tutorials/offline-motion-tracking'},
             {label: 'Reference', to: '/reference/tracking-framework'},
-            {label: 'Leaderboard', to: '/leaderboard'},
           ],
         },
         {
           title: 'More',
           items: [
-            {label: 'GitHub', href: 'https://github.com/EGalahad/sim2real'},
+            {label: 'GitHub', href: 'https://github.com/Cheng-bgstx/deploy'},
           ],
         },
       ],

@@ -41,8 +41,6 @@
 | `scalecar/` | G1 上车任务工具：构建车辆场景、转换 Scalecar 动作、比对 Reference Token。G1 启动脚本在 `g1/scalecar/` |
 | `proteus/` | 多机器人共用的 Proteus 工具：`prepare_assets.py`（导入并校验 MJCF）、`retarget_lafan.py`、`build_retarget_profiles.py`、`evaluate.py`（在动作库上跑 sim2sim） |
 | `setup/` | G1 网络辅助脚本（热点、笔记本网关）和 XRoboToolkit pybind 安装 |
-| `tracking_experiment/` | 跨代码库跟踪评测与排行榜数据 |
-| `publishers/`、`vis/` | 关节状态 / 动捕发布器和可视化工具 |
 
 ### 共用工具（`scripts/*.py`）
 
@@ -58,6 +56,7 @@
 | `export_scalecar_tracker_onnx.py`、`export_scalebfm_onnx.py` | Scalecar Tracker 与 ScaleBFM 的导出脚本 |
 | `test_policy_inference.py` | 推理后端基准测试 |
 | `record_motion.py`、`view_motion.py`、`process_qpos_data.py` | 录制、查看、平滑 Motion |
+| `compute_tracking_metrics.py` | 从 `--trajectory-output` 轨迹计算动作进度、根部和身体跟踪误差 |
 
 ## 运行时架构
 

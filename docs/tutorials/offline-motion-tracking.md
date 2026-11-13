@@ -60,8 +60,13 @@ uv run sim2real/sim_env/integrated_sim2sim.py \
 Add `--headless` for non-visual runs. The mjviser scene updates once per environment step when a browser client is connected. In mjviser mode, use the `Restart motion` button after the final-frame hold to reset the robot to the first frame and repeat the wait-track-hold sequence.
 
 For quantitative evaluation, add `--trajectory-output <path>.npz` and compute
-motion progress, global root tracking, and local body tracking with the scripts
-under `scripts/tracking_experiment/`.
+motion progress, global root tracking, and local body tracking with
+`scripts/compute_tracking_metrics.py`:
+
+```bash
+uv run scripts/compute_tracking_metrics.py "outputs/rollouts/*.npz" \
+  --output-csv outputs/rollouts/tracking_metrics.csv --output-json outputs/rollouts/tracking_metrics.json
+```
 
 ## Next Steps
 

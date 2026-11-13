@@ -6,7 +6,7 @@ sidebar_position: 1
 Start by cloning the repository:
 
 ```bash
-git clone https://github.com/EGalahad/sim2real
+git clone git@github.com:Cheng-bgstx/deploy.git
 ```
 
 `sim2real` is split into two environments:

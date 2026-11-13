@@ -1,6 +1,6 @@
 # sim2real Docs
 
-Chinese docs: [https://egalahad.github.io/sim2real/zh-Hans/](https://egalahad.github.io/sim2real/zh-Hans/)
+Chinese docs: [`i18n/zh-Hans/docusaurus-plugin-content-docs/current/`](./i18n/zh-Hans/docusaurus-plugin-content-docs/current/intro.md)
 
 ## Getting Started
 

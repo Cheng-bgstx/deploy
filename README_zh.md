@@ -4,9 +4,9 @@ root project 负责 inference、tracking policy，以及 MuJoCo 的 sim / sim2re
 
 English version: [README.md](./README.md)
 
-Full documentation: [https://egalahad.github.io/sim2real/](https://egalahad.github.io/sim2real/)
-
-如果你在找 HDMI 的部署栈，请看 [hdmi tag](https://github.com/EGalahad/sim2real/tree/hdmi)。
+本仓库是我们各款人形机器人（G1、ET1、灵犀 X2、PM01 等）的真机部署代码，fork 自
+[EGalahad/sim2real](https://github.com/EGalahad/sim2real)。请从[真机部署](#真机部署)开始；文档源文件在
+[`docs/`](./docs/README.md)。
 
 ## Runtime Artifacts
 
@@ -73,35 +73,6 @@ uv run sim2real/rl_policy/tracking.py \
 | Humanoid-GPT | `checkpoints/humanoid-gpt/policy.yaml` | Humanoid-GPT policy wrapper。 |
 | TWIST2 | `checkpoints/twist2/policy.yaml` | TWIST2 policy wrapper。 |
 
-### Mimic Lite v1.1
-
-Mimic Lite v1.1 保持 teacher 和 reward target 为 clean，只在 student command 上加入 reference-motion noise；部署输入保持 clean。完整 Train / Adapt / Finetune 使用 8x8192 environments、4000 / 1000 / 2000 updates，实测训练量为 50.106 GPU hours。
-
-| MotionDecode metric | Locomotion-80 | Manipulation-48 | Ground-60 | Dance-40 |
-| --- | ---: | ---: | ---: | ---: |
-| Progress | 99.320% | 93.619% | 65.542% | 55.837% |
-| Tracking Return | 1.9126 | 1.7905 | 0.9198 | 0.9811 |
-| Body position | 25.11 mm | 28.25 mm | 144.66 mm | 43.13 mm |
-| Body orientation | 0.08142 rad | 0.09452 rad | 0.55465 rad | 0.16783 rad |
-| Wrist position | 22.15 mm | 23.57 mm | n/a | n/a |
-| Wrist orientation | 0.07745 rad | 0.09997 rad | n/a | n/a |
-
-可从共享 [sim2real artifacts](https://drive.google.com/drive/folders/1lrPyiiy7anyG3P4wHNIQQQlydboLPd9e) 文件夹下载 `checkpoints/mimic-lite/v1_1`。完整结果见 [Motion Tracking Leaderboard](https://egalahad.github.io/sim2real/zh-Hans/leaderboard)。
-
-![统一的跨代码库动作跟踪评测](assets/mimic_lite_cross_codebase_tracking_eval.png)
-
-图中使用 14 个 policy variants 的全新结果，数据集为 LAFAN-40、PHUMA-30
-和清洗后的 Root-90。Root-90 每段沿标注的前进、后退或侧移方向持续运动，
-root XY 位移为 1.5--3.0 m。
-
-为了公平比较，我们报告每个 policy 所需的 motion-lookahead latency，并将
-其定义为最远 future reference frame 对应的时间。所有数值均采用统一的
-50 Hz reference-motion contract。
-
-| Policy | Mimic Lite v1.1 | MimicLite-ROA | MimicLite-PPO | HEFT | HoloMotion | SONIC | SONIC low-latency | SONIC v1.1 | GRIT v0.0.1 | ScaleBFM XL | ScaleBFM M | Proteus | BFM-Zero | TeleopIT | Humanoid-GPT | TWIST2 |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Motion-lookahead latency | 0.08 s | 0.08 s | 0.08 s | 0.12 s | 0.20 s | 0.90 s | 0.18 s | 0.90 s | 0.26 s | 0.10 s | 0.10 s | 0.32 s | 0.12 s | 0.00 s | 0.02 s | 0.00 s |
-
 ## 真机部署
 
 每款机器人在 [`scripts/`](./scripts/README_zh.md) 下都有自己的文件夹，其中的 README 说明需要调整什么、如何运行。
@@ -132,11 +103,11 @@ Repo skills 统一放在 `.agents/skills/`，无需手动复制到
 
 ## 下一步
 
-- [文档首页](https://egalahad.github.io/sim2real/zh-Hans/)
-- [快速上手](https://egalahad.github.io/sim2real/zh-Hans/getting-started/overview)
-- [Root Project Setup](https://egalahad.github.io/sim2real/zh-Hans/getting-started/root-project)
-- [离线动作跟踪教程](https://egalahad.github.io/sim2real/zh-Hans/tutorials/offline-motion-tracking)
-- [Pico Teleoperation 教程](https://egalahad.github.io/sim2real/zh-Hans/tutorials/pico-teleoperation)
+- [文档首页](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/intro.md)
+- [快速上手](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/getting-started/overview.md)
+- [Root Project Setup](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/getting-started/root-project.md)
+- [离线动作跟踪教程](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/offline-motion-tracking.md)
+- [Pico Teleoperation 教程](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/pico-teleoperation.md)
 - [Scalecar 进车部署教程](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/scalecar-vehicle-entry.md)
 - [Proteus 在 Galbot ET1 板载运行](./docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/reference/proteus-et1-onboard.md)
 

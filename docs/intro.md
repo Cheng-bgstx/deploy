@@ -6,7 +6,6 @@ slug: /
 
 ## Benchmark
 
-- [Motion Tracking Leaderboard](/leaderboard)
 
 ## Getting Started
 

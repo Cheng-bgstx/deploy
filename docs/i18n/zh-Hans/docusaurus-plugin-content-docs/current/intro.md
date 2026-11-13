@@ -5,7 +5,6 @@ slug: /
 
 ## Benchmark
 
-- [动作跟踪排行榜](/leaderboard)
 
 ## Getting Started
 

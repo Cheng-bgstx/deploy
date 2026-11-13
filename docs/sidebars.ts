@@ -3,7 +3,6 @@ import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
 const sidebars: SidebarsConfig = {
   docsSidebar: [
     'intro',
-    'leaderboard',
     {
       type: 'category',
       label: 'Getting Started',
@@ -40,7 +39,6 @@ const sidebars: SidebarsConfig = {
       label: 'Tutorials',
       items: [
         'tutorials/offline-motion-tracking',
-        'tutorials/cross-codebase-evaluation',
         'tutorials/pico-teleoperation',
         'tutorials/motion-recording',
         'tutorials/run-external-policies',

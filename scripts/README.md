@@ -41,8 +41,6 @@ robot config and a PICO retargeting profile but no robot I/O backend and no fold
 | `scalecar/` | G1 vehicle-entry task tooling: Vehicle Scene build, Scalecar motion conversion, Reference Token comparison. The G1 launchers are in `g1/scalecar/` |
 | `proteus/` | Proteus helpers shared by robots: `prepare_assets.py` (stage and verify an MJCF), `retarget_lafan.py`, `build_retarget_profiles.py`, `evaluate.py` (sim2sim over a motion library) |
 | `setup/` | G1 network helpers (hotspot, laptop gateway) and the XRoboToolkit pybind setup |
-| `tracking_experiment/` | Cross-codebase tracking evaluation and leaderboard data |
-| `publishers/`, `vis/` | Joint-state / mocap publishers and visualization utilities |
 
 ### Shared tools (`scripts/*.py`)
 
@@ -58,6 +56,7 @@ robot config and a PICO retargeting profile but no robot I/O backend and no fold
 | `export_scalecar_tracker_onnx.py`, `export_scalebfm_onnx.py` | Exports for the Scalecar Tracker and ScaleBFM |
 | `test_policy_inference.py` | Benchmark policy inference backends |
 | `record_motion.py`, `view_motion.py`, `process_qpos_data.py` | Record, view and smooth Motions |
+| `compute_tracking_metrics.py` | Progress, root and body tracking errors from `--trajectory-output` rollouts |
 
 ## Runtime architecture
 

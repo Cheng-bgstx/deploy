@@ -2,7 +2,7 @@ from pathlib import Path
 
 import numpy as np
 
-from scripts.tracking_experiment.compute_tracking_metrics import (
+from scripts.compute_tracking_metrics import (
     RETURN_BODY_NAMES,
     TERMINATION_PELVIS_HEIGHT_THRESHOLD_M,
     TERMINATION_ANCHOR_BODY_NAME,
@@ -168,7 +168,7 @@ def test_orientation_metrics_capture_local_rotation_error(tmp_path: Path) -> Non
 
 
 def test_summary_weights_each_motion_equally():
-    from scripts.tracking_experiment.compute_tracking_metrics import _summary
+    from scripts.compute_tracking_metrics import _summary
     fields = (
         "progress", "local_body_tracking_error", "local_body_orientation_error",
         "wrist_tracking_error", "wrist_orientation_error", "mpjpe",

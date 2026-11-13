@@ -57,7 +57,12 @@ uv run sim2real/sim_env/integrated_sim2sim.py \
 非可视化运行加 `--headless`。有浏览器 client 连接时，mjviser scene 会每个 env step 更新一次。在 mjviser 模式里，停在最后一帧后点击 `Restart motion` 按钮会回到第一帧，并重新执行等待、跟踪、停在最后一帧的流程。
 
 如果要做定量评测，可以加 `--trajectory-output <path>.npz` 保存完整轨迹，再用
-`scripts/tracking_experiment/` 里的脚本计算动作进度、全局根部跟踪和局部身体跟踪指标。
+`scripts/compute_tracking_metrics.py` 计算动作进度、全局根部跟踪和局部身体跟踪指标：
+
+```bash
+uv run scripts/compute_tracking_metrics.py "outputs/rollouts/*.npz" \
+  --output-csv outputs/rollouts/tracking_metrics.csv --output-json outputs/rollouts/tracking_metrics.json
+```
 
 ## Next Steps
 

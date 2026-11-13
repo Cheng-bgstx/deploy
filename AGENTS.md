@@ -60,7 +60,7 @@
 
 ### Issue tracker
 
-Issues live in GitHub Issues on `dixiatielu/sim2real_scalecar` (the fork, not upstream). See `docs/agents/issue-tracker.md`.
+Issues live in GitHub Issues on `Cheng-bgstx/deploy` (this deployment repo, not upstream). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

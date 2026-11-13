@@ -2,7 +2,7 @@
 
 Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all operations.
 
-**Always target `dixiatielu/sim2real_scalecar`.** Pass `-R dixiatielu/sim2real_scalecar` to every `gh issue` / `gh pr` / `gh label` command, and use `repos/dixiatielu/sim2real_scalecar/...` for `gh api`. This clone also has an `upstream` remote (`EGalahad/sim2real`) and no `gh repo set-default`, so without `-R` gh will usually resolve to upstream.
+**Always target `Cheng-bgstx/deploy`.** Pass `-R Cheng-bgstx/deploy` to every `gh issue` / `gh pr` / `gh label` command, and use `repos/Cheng-bgstx/deploy/...` for `gh api`, so gh never resolves to the upstream `EGalahad/sim2real` or the earlier `dixiatielu/sim2real_scalecar` fork.
 
 ## Conventions
 
