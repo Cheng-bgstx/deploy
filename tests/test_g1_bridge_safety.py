@@ -315,6 +315,35 @@ def test_shaping_starts_from_any_pose_past_the_limits():
     assert not g.accept_command(policy, 1_020_000_000) and g.fault
 
 
+def test_shaping_target_may_trail_a_joint_that_swings_back_inside():
+    # X2 on 2026-11-12: limp on the gantry, waist pitch rested 0.035 rad past its limit. After A the joint swung back
+    # inside faster than the 10 s shaping target moved, and the target (still near the start pose) was rejected.
+    g = BridgeSafety(G1_CFG)
+    j = G1_CFG.joint_names.index("waist_yaw_joint")
+    upper = G1_CFG.joint_pos_upper_limit["waist_yaw_joint"]
+    s = state()
+    s.joint_positions[j] = upper + 0.05
+    g.observe_state(s, 0, 1_000_000_000)
+    assert g.accept_command(command(1_000_000_000), 1_000_000_000)
+    s2 = state(2)
+    s2.joint_positions[j] = upper + 0.05
+    g.observe_state(s2, 1 << 8, 1_010_000_000)  # A pressed at the start pose
+    first = command(1_020_000_000, 2, "init", 1)
+    first.q_target[j] = upper + 0.05
+    assert g.accept_command(first, 1_020_000_000) and g.arm_pending
+    g.takeover_finished(True, 1_020_000_000)
+    s3 = state(3)
+    s3.joint_positions[j] = upper - 0.01  # swung back inside the limit
+    g.observe_state(s3, 0, 1_030_000_000)
+    trailing = command(1_030_000_000, 3, "init", 1)
+    trailing.q_target[j] = upper + 0.049
+    assert g.accept_command(trailing, 1_030_000_000) and not g.latched
+    further = command(1_040_000_000, 4, "init", 1)
+    further.q_target[j] = upper + 0.2  # beyond anywhere the joint has been since A
+    assert not g.accept_command(further, 1_040_000_000) and g.fault
+    assert "q_target above limit at waist_yaw_joint" in g.reason
+
+
 def test_actual_zmq_bridge_arms_on_a_and_detects_tracker_exit(monkeypatch):
     import socket
     import struct

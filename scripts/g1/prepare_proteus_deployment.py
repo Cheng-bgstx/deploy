@@ -19,7 +19,9 @@ class Args:
 
 
 # The Proteus ET1 actor tracks no head body and drives the head to about 1 rad yaw.
-DEFAULT_LOCKED_JOINTS = {"galbot_et1": ("head_pitch_joint", "head_yaw_joint")}
+DEFAULT_LOCKED_JOINTS = {"galbot_et1": ("head_pitch_joint", "head_yaw_joint"),
+                         # X2 Basic reports a constant zero head; the Ultra drives head yaw only.
+                         "x2": ("head_pitch_joint", "head_yaw_joint")}
 
 
 def main(args):
@@ -40,6 +42,10 @@ def main(args):
     cfg["soft_joint_pos_limits"] = {}
     for n in robot_cfg.joint_names:
         low, high = robot_cfg.joint_pos_lower_limit[n], robot_cfg.joint_pos_upper_limit[n]
+        if robot_cfg.name == "x2":
+            # Never wider than the vendor's physical range.
+            from sim2real.config.robots.x2 import X2_VENDOR_LIMITS
+            low, high = max(low, X2_VENDOR_LIMITS[n][0]), min(high, X2_VENDOR_LIMITS[n][1])
         if robot_cfg.name == "g1":
             # Proteus trains without target clipping; bound targets only by what the G1 Bridge accepts.
             cfg["soft_joint_pos_limits"][n] = [low - PROTEUS_TARGET_MARGIN_RAD, high + PROTEUS_TARGET_MARGIN_RAD]

@@ -45,6 +45,7 @@ const sidebars: SidebarsConfig = {
         'tutorials/motion-recording',
         'tutorials/run-external-policies',
         'tutorials/scalecar-vehicle-entry',
+        'tutorials/proteus-x2-onboard',
       ],
     },
     'faq',

@@ -1,3 +1,4 @@
+import gc
 import time
 import numpy as np
 from dataclasses import dataclass, replace
@@ -582,6 +583,14 @@ class BasePolicy:
         self.total_inference_cnt = total_inference_cnt
         self.perf_dict = {}
 
+        # A full garbage collection walks every tracked object: ~370k after the imports, 600 ms on the X2's RK3588,
+        # enough to trip a bridge's command timeout when it fires mid-run. Collect once now and freeze the survivors
+        # (models, configs, modules), then re-freeze periodically so long-lived state such as the --record frames
+        # never makes an automatic collection slow.
+        gc.collect()
+        gc.freeze()
+        logger.info("Froze {} startup objects out of the garbage collector", gc.get_freeze_count())
+
         try:
             scheduler = sched.scheduler(time.perf_counter, time.sleep)
             next_run_time = time.perf_counter()
@@ -592,6 +601,8 @@ class BasePolicy:
                 
                 next_run_time += self.rl_dt
                 self.total_inference_cnt += 1
+                if self.total_inference_cnt % 250 == 0:
+                    gc.freeze()  # O(1): moves objects that survived the last 5 s out of later collections
 
                 if self.total_inference_cnt % 100 == 0:
                     print(f"total_inference_cnt: {self.total_inference_cnt}")

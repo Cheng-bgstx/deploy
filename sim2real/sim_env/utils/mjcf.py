@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import xml.etree.ElementTree as ET
 import re
 import shutil
 import tempfile
@@ -49,7 +50,10 @@ def _inject_floor_scene_xml(xml_text: str) -> str:
     worldbody_close = xml_text.find("</worldbody>")
     if worldbody_close < 0:
         raise ValueError("Expected </worldbody> block in MJCF")
-    return xml_text[:worldbody_close] + VIEWER_WORLDBODY_XML + xml_text[worldbody_close:]
+    # Vendor models (X2) may already contain a floor; a second plane duplicates its name.
+    has_floor = any(g.get("type") == "plane" for g in ET.fromstring(xml_text).findall("worldbody/geom"))
+    worldbody_xml = "" if has_floor else VIEWER_WORLDBODY_XML
+    return xml_text[:worldbody_close] + worldbody_xml + xml_text[worldbody_close:]
 
 
 @contextmanager
@@ -173,6 +177,16 @@ def load_sim_model(
                     geom.priority = 1 if is_foot else 0
                     if is_foot:
                         geom.friction[0] = 0.6
+        if robot_cfg.name == "x2":
+            # Proteus X2: floor contact only, no robot self-collisions and no passive joint
+            # damping (the controller supplies kd), as in training.
+            for geom in spec.geoms:
+                if geom.type == mujoco.mjtGeom.mjGEOM_PLANE:
+                    geom.contype, geom.conaffinity = 2, 1
+                elif geom.contype or geom.conaffinity:
+                    geom.contype, geom.conaffinity = 1, 2
+            for joint in spec.joints:
+                joint.damping = np.zeros_like(np.atleast_1d(joint.damping))
         added_joint_names = ensure_joint_motor_actuators(spec, robot_cfg)
         if added_joint_names:
             logger.info(
