@@ -23,11 +23,11 @@ Terms follow [`GLOSSARY.md`](../GLOSSARY.md): **Tracker**, **Reference**, **Moti
 | --- | --- | --- | --- |
 | [`g1/`](./g1/README.md) | Unitree G1 | `g1` | Proteus on an external PC or the robot's Orin: SDK2 Bridge, validator, onboard deploy |
 | [`et1/`](./et1/README.md) | Galbot ET1 | `galbot_et1`, `et1` | Onboard HDEP Bridge, keyboard operator, Galbot tracking-policy import |
-| [`pm01/`](./pm01/README.md) | EngineAI PM01 | `pm01`, `pm_v2`, `engineai_pm01` | ROS 2 launchers, read-only check, bounded trial relay tools |
+| [`pm01/`](./pm01/README.md) | EngineAI PM01 | `pm01`, `pm_v2`, `engineai_pm01` | ROS 2 launchers (PC and onboard), read-only check, sway monitor, bounded trial relay tools |
 | [`q1/`](./q1/README.md) | Primebot Q1 | `q1`, `primebot_q1` | Overlay builder, offline validator, joint commissioning, IMU inspection |
 | [`a3/`](./a3/README.md) | AgiBot A3 | `a3`, `agibot_a3` | Asset preparation, File Playback and PICO launchers |
 | [`t800/`](./t800/README.md) | EngineAI T800 | `t800`, `engineai_t800` | Asset preparation, File Playback and PICO launchers |
-| [`x2/`](./x2/README.md) | AgiBot Lingxi X2 | `x2`, `lingxi_x2`, `agibot_x2` | Assets, export, feedback check, system-mode tool, first-Hold launcher |
+| [`x2/`](./x2/README.md) | AgiBot Lingxi X2 | `x2`, `lingxi_x2`, `agibot_x2` | Onboard AimDK Bridge (the route run on hardware), damped overlay, probes; PC/ROS 2 launchers |
 | [`oli/`](./oli/README.md) | LimX OLI | `oli`, `limx_oli_edu`, `hu_d04_01` | Assets, motion conversion and retargeting, sim2sim rendering |
 
 The names come from `sim2real/config/robots/__init__.py`. The Unitree H2 (`h2`, `unitree_h2`) has a
@@ -84,8 +84,9 @@ robot config and a PICO retargeting profile but no robot I/O backend and no fold
   publish loop and command watchdog and fall back to damping when feedback or commands go stale.
 - **ZMQ robot I/O** (`--robot-io zmq`). The Tracker exchanges LowState/LowCmd over local ZMQ
   (`robot_io/zmq.py`) with a separate Bridge process. The G1 uses `scripts/g1/real_bridge.py` (SDK2),
-  the ET1 uses `scripts/et1/hdep_bridge.py` (HDEP; the ET1 has no inline mode). Both arbitrate commands
-  with `robot_io/bridge_safety.py` (BridgeSafety): startup emits no motor command, takeover needs a ready
+  the ET1 uses `scripts/et1/hdep_bridge.py` (HDEP; the ET1 has no inline mode), and the X2 onboard route
+  uses `scripts/x2/aimdk_bridge.py` (AimDK HAL). All three arbitrate commands with
+  `robot_io/bridge_safety.py` (BridgeSafety): startup emits no motor command, takeover needs a ready
   Tracker plus a fresh physical A press, Select and faults latch a stop independently of the Tracker.
   Sim2sim with `sim2real/sim_env/base_sim.py` also uses `--robot-io zmq`.
 - **Where it runs.** The Tracker runs on whichever machine reaches the robot's SDK: an external PC
@@ -188,7 +189,7 @@ For live PICO, each robot's `start_pico.sh sim` + `start_pico.sh policy-sim` run
 - [ ] Exactly one motor writer: the vendor locomotion or motion-control stack is stopped or has released
       ownership. The G1 and ET1 launchers refuse to start next to a running controller.
 - [ ] Read-only feedback probe passed: G1 and ET1 `PROTEUS_READ_ONLY=1`, PM01 `scripts/pm01/check_robot.py`,
-      X2 `scripts/x2/check_feedback.py`, Q1 `scripts/q1/inspect_imu.py`. Check joint order and signs and
+      X2 `scripts/x2/probe.sh` (onboard) or `scripts/x2/check_feedback.py` (PC), Q1 `scripts/q1/inspect_imu.py`. Check joint order and signs and
       that the IMU reports gravity along the expected axis.
 - [ ] Robot hangs on the gantry or hoist with the feet clear; the operator knows when to lower it.
 - [ ] Hardware emergency stop tested and in a second person's hand.
@@ -215,10 +216,11 @@ Controller mapping (from `sim2real/rl_policy/control_mode.py`, `controllers/` an
 | `--controller` | Shaping | Hold | Go | E-stop |
 | --- | --- | --- | --- | --- |
 | `keyboard` (Tracker terminal) | `i` | `]` | `space` | `o` |
+| `keyboard` with `--keyboard-layout et1` (PM01 launchers) | `a` | `a` again | `s` | `space` or `x` |
 | `joystick`, Unitree HG family (G1) | `A` | `A` again, after Shaping completes | `Start` | `Select` |
 | `bridge_joystick` (handset via the Bridge: G1 onboard, ET1) | `A` | `A` again, after Shaping completes | `Start` | `Select` (ET1 Bridge also: `L1` + `Down`) |
 | `pico` (right controller) | `A` alone | `A` + `B` together (release first) | `X` on the publisher (pause/resume stream) | `B` alone |
-| ET1 `scripts/et1/operator.sh` (keys to the Bridge) | `a` | `a` again | `s` | `space` or `x` |
+| ET1 / X2 onboard `scripts/<robot>/operator.sh` (keys to the Bridge) | `a` | `a` again | `s` | `space` or `x` |
 
 Notes:
 
@@ -299,11 +301,11 @@ Notes:
 | --- | --- | --- | --- |
 | Unitree G1 | Hardware-tested from an external PC (`start_proteus_pc.sh`). Onboard Orin: read-only timing runs only, not yet hardware-tested | `checkpoints/proteus/proteus_wamseq_62/unitree_g1` (`policy-pc.yaml`) | [g1](./g1/README.md) |
 | Galbot ET1 | Hardware-tested onboard: runs on 2026-10-29 and 2026-11-11 (proteus_60; WAM-62 stood and started a walk) | `checkpoints/proteus/proteus_60/galbot_et1` (`policy-pc.yaml`); `proteus_wamseq_62/galbot_et1` via `PROTEUS_POLICY_DIR` | [et1](./et1/README.md) |
-| EngineAI PM01 | First gantry-protected hardware walk on 2026-11-05 | `checkpoints/proteus/wsq61/engineai_pm01/policy.yaml` | [pm01](./pm01/README.md) |
+| EngineAI PM01 | First gantry-protected hardware walk on 2026-11-05; onboard gantry run on 2026-11-13 | `checkpoints/proteus/wsq61/engineai_pm01/policy.yaml` | [pm01](./pm01/README.md) |
 | Primebot Q1 | Read-only feedback tested; first Shaping trial crossed the legs; the fix is verified offline only; policy takeover unvalidated | `checkpoints/proteus/wsq61/primebot_q1/policy-pc.yaml` | [q1](./q1/README.md) |
 | AgiBot A3 | Simulation tested; hardware untested | `checkpoints/proteus/proteus_wamseq_62/agibot_a3/policy.yaml` | [a3](./a3/README.md) |
 | EngineAI T800 | Simulation tested; hardware untested | `checkpoints/proteus/wsq61/engineai_t800/policy.yaml` | [t800](./t800/README.md) |
-| AgiBot Lingxi X2 | Simulation tested; hardware untested | `checkpoints/proteus/wsq61/lingxi_x2/policy.yaml` | [x2](./x2/README.md) |
+| AgiBot Lingxi X2 | Onboard gantry trials on 2026-11-12 (Shaping worked; arm/hip oscillation, damped overlay fixed in simulation only) | `checkpoints/proteus/proteus_wamseq_62/lingxi_x2` (`policy-pc-damped.yaml`, `start_proteus_onboard.sh`) | [x2](./x2/README.md) |
 | LimX OLI | Simulation tested; hardware untested | `checkpoints/proteus/proteus_wamseq_62/limx_oli_edu/policy.yaml` | [oli](./oli/README.md) |
 | Unitree H2 | Robot model and PICO retargeting only; no hardware I/O | — | [`docs/h2.md`](../docs/h2.md) |
 

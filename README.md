@@ -110,11 +110,11 @@ and E-stop) and the checklist for bringing up a new robot.
 | --- | --- | --- |
 | Unitree G1 | [`scripts/g1`](./scripts/g1/README.md) | Tested on PC; onboard Orin path not yet hardware-tested |
 | Galbot ET1 | [`scripts/et1`](./scripts/et1/README.md) | Tested onboard |
-| EngineAI PM01 | [`scripts/pm01`](./scripts/pm01/README.md) | First gantry-protected walk |
+| EngineAI PM01 | [`scripts/pm01`](./scripts/pm01/README.md) | Gantry-protected walks (PC and onboard) |
 | Primebot Q1 | [`scripts/q1`](./scripts/q1/README.md) | Feedback only; policy takeover unvalidated |
 | AgiBot A3 | [`scripts/a3`](./scripts/a3/README.md) | Simulation only |
 | EngineAI T800 | [`scripts/t800`](./scripts/t800/README.md) | Simulation only |
-| AgiBot Lingxi X2 | [`scripts/x2`](./scripts/x2/README.md) | Simulation only |
+| AgiBot Lingxi X2 | [`scripts/x2`](./scripts/x2/README.md) | Onboard gantry trials; not yet stable |
 | LimX OLI | [`scripts/oli`](./scripts/oli/README.md) | Simulation only |
 | DH116S hand | [`scripts/dh116s`](./scripts/dh116s/README.md) | PICO grip control |
 

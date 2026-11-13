@@ -112,11 +112,11 @@ root XY 位移为 1.5--3.0 m。
 | --- | --- | --- |
 | Unitree G1 | [`scripts/g1`](./scripts/g1/README_zh.md) | PC 部署已真机测试；机载 Orin 路线尚未真机测试 |
 | Galbot ET1 | [`scripts/et1`](./scripts/et1/README_zh.md) | 已机载真机测试 |
-| EngineAI PM01 | [`scripts/pm01`](./scripts/pm01/README_zh.md) | 首次吊架保护行走 |
+| EngineAI PM01 | [`scripts/pm01`](./scripts/pm01/README_zh.md) | 吊架保护行走（PC 与板载） |
 | Primebot Q1 | [`scripts/q1`](./scripts/q1/README_zh.md) | 仅验证反馈读取；策略接管未验证 |
 | AgiBot A3 | [`scripts/a3`](./scripts/a3/README_zh.md) | 仅仿真 |
 | EngineAI T800 | [`scripts/t800`](./scripts/t800/README_zh.md) | 仅仿真 |
-| 智元灵犀 X2 | [`scripts/x2`](./scripts/x2/README_zh.md) | 仅仿真 |
+| 智元灵犀 X2 | [`scripts/x2`](./scripts/x2/README_zh.md) | 板载吊架试验，尚未稳定 |
 | LimX OLI | [`scripts/oli`](./scripts/oli/README_zh.md) | 仅仿真 |
 | DH116S 灵巧手 | [`scripts/dh116s`](./scripts/dh116s/README_zh.md) | PICO 抓握控制 |
 

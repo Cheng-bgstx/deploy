@@ -23,11 +23,11 @@
 | --- | --- | --- | --- |
 | [`g1/`](./g1/README_zh.md) | Unitree G1 | `g1` | 外置 PC 或机载 Orin 上运行 Proteus：SDK2 Bridge、验证脚本、机载部署 |
 | [`et1/`](./et1/README_zh.md) | Galbot ET1 | `galbot_et1`、`et1` | 机载 HDEP Bridge、键盘操作端、Galbot 跟踪策略导入 |
-| [`pm01/`](./pm01/README_zh.md) | EngineAI PM01 | `pm01`、`pm_v2`、`engineai_pm01` | ROS 2 启动脚本、只读检查、受限试验中继工具 |
+| [`pm01/`](./pm01/README_zh.md) | EngineAI PM01 | `pm01`、`pm_v2`、`engineai_pm01` | ROS 2 启动脚本（PC 与板载）、只读检查、晃动监视、受限试验中继工具 |
 | [`q1/`](./q1/README_zh.md) | Primebot Q1 | `q1`、`primebot_q1` | 覆盖配置生成、离线验证、关节调试、IMU 检查 |
 | [`a3/`](./a3/README_zh.md) | AgiBot A3 | `a3`、`agibot_a3` | 资产准备、文件回放与 PICO 启动脚本 |
 | [`t800/`](./t800/README_zh.md) | EngineAI T800 | `t800`、`engineai_t800` | 资产准备、文件回放与 PICO 启动脚本 |
-| [`x2/`](./x2/README_zh.md) | AgiBot 灵犀 X2 | `x2`、`lingxi_x2`、`agibot_x2` | 资产、导出、反馈检查、系统模式工具、首次 Hold 启动脚本 |
+| [`x2/`](./x2/README_zh.md) | AgiBot 灵犀 X2 | `x2`、`lingxi_x2`、`agibot_x2` | 板载 AimDK Bridge（真机实际使用的路线）、加阻尼 overlay、探测工具；PC/ROS 2 启动脚本 |
 | [`oli/`](./oli/README_zh.md) | LimX OLI | `oli`、`limx_oli_edu`、`hu_d04_01` | 资产、动作转换与重定向、sim2sim 渲染 |
 
 名称来自 `sim2real/config/robots/__init__.py`。Unitree H2（`h2`、`unitree_h2`）有机器人配置和 PICO
@@ -83,7 +83,7 @@
   过期时退回阻尼。
 - **ZMQ 机器人 I/O**（`--robot-io zmq`）。Tracker 通过本地 ZMQ（`robot_io/zmq.py`）与独立的 Bridge 进程
   交换 LowState/LowCmd。G1 用 `scripts/g1/real_bridge.py`（SDK2），ET1 用 `scripts/et1/hdep_bridge.py`
-  （HDEP；ET1 没有 inline 模式）。两者都用 `robot_io/bridge_safety.py`（BridgeSafety）仲裁指令：启动时不发
+  （HDEP；ET1 没有 inline 模式）。X2 的板载路线同样如此，使用 `scripts/x2/aimdk_bridge.py`。它们都用 `robot_io/bridge_safety.py`（BridgeSafety）仲裁指令：启动时不发
   任何电机指令；接管需要 Tracker 就绪并有一次新的实体 A 键按下；Select 和故障在 Bridge 内独立锁存停止，
   不依赖 Tracker。用 `sim2real/sim_env/base_sim.py` 做 sim2sim 时同样使用 `--robot-io zmq`。
 - **运行位置。** Tracker 跑在能访问机器人 SDK 的那台机器上：机器人局域网中的外置主机（Host），或机器人
@@ -180,7 +180,7 @@ Final Hold 中的漂移。Q1 有单独的离线演练 `scripts/q1/validate_deplo
 - [ ] 只有一个电机指令写入方：厂商的运动控制栈已停止或已交出控制权。G1 和 ET1 的启动脚本检测到正在运行的
       控制器时会拒绝启动。
 - [ ] 只读反馈检查已通过：G1 和 ET1 用 `PROTEUS_READ_ONLY=1`，PM01 用 `scripts/pm01/check_robot.py`，
-      X2 用 `scripts/x2/check_feedback.py`，Q1 用 `scripts/q1/inspect_imu.py`。核对关节顺序和正负方向，
+      X2 用 `scripts/x2/probe.sh`（板载）或 `scripts/x2/check_feedback.py`（PC），Q1 用 `scripts/q1/inspect_imu.py`。核对关节顺序和正负方向，
       确认 IMU 测得的重力方向正确。
 - [ ] 机器人挂在龙门架或吊架上，双脚离地；操作者清楚何时放下。
 - [ ] 硬件急停已测试，由第二个人拿在手里。
@@ -207,10 +207,11 @@ Controller 按键映射（来自 `sim2real/rl_policy/control_mode.py`、`control
 | `--controller` | Shaping | Hold | Go | E-stop |
 | --- | --- | --- | --- | --- |
 | `keyboard`（Tracker 所在终端） | `i` | `]` | `space` | `o` |
+| `keyboard` 加 `--keyboard-layout et1`（PM01 启动脚本） | `a` | 再按 `a` | `s` | 空格或 `x` |
 | `joystick`，Unitree HG 系（G1） | `A` | Shaping 完成后再按 `A` | `Start` | `Select` |
 | `bridge_joystick`（手柄经 Bridge 转发：G1 机载、ET1） | `A` | Shaping 完成后再按 `A` | `Start` | `Select`（ET1 Bridge 另支持 `L1` + `Down`） |
 | `pico`（右手柄） | 单按 `A` | `A` + `B` 同时按（先松开） | 发布端按 `X`（暂停/继续实时流） | 单按 `B` |
-| ET1 `scripts/et1/operator.sh`（按键发给 Bridge） | `a` | 再按 `a` | `s` | `space` 或 `x` |
+| ET1 / X2 板载 `scripts/<robot>/operator.sh`（按键发给 Bridge） | `a` | 再按 `a` | `s` | `space` 或 `x` |
 
 说明：
 
@@ -286,11 +287,11 @@ Controller 按键映射（来自 `sim2real/rl_policy/control_mode.py`、`control
 | --- | --- | --- | --- |
 | Unitree G1 | 外置 PC 部署（`start_proteus_pc.sh`）已真机测试。机载 Orin：只做过只读计时运行，尚未真机测试 | `checkpoints/proteus/proteus_wamseq_62/unitree_g1`（`policy-pc.yaml`） | [g1](./g1/README_zh.md) |
 | Galbot ET1 | 机载真机测试：2026-10-29 和 2026-11-11 的运行（proteus_60；WAM-62 已能站立并开始行走） | `checkpoints/proteus/proteus_60/galbot_et1`（`policy-pc.yaml`）；可用 `PROTEUS_POLICY_DIR` 选 `proteus_wamseq_62/galbot_et1` | [et1](./et1/README_zh.md) |
-| EngineAI PM01 | 2026-11-05 完成首次龙门架保护下的真机行走 | `checkpoints/proteus/wsq61/engineai_pm01/policy.yaml` | [pm01](./pm01/README_zh.md) |
+| EngineAI PM01 | 2026-11-05 完成首次龙门架保护下的真机行走；2026-11-13 板载吊架运行 | `checkpoints/proteus/wsq61/engineai_pm01/policy.yaml` | [pm01](./pm01/README_zh.md) |
 | Primebot Q1 | 只读反馈已测试；首次 Shaping 试验双腿交叉；修复仅离线验证；策略接管未验证 | `checkpoints/proteus/wsq61/primebot_q1/policy-pc.yaml` | [q1](./q1/README_zh.md) |
 | AgiBot A3 | 仿真已测试；真机未测试 | `checkpoints/proteus/proteus_wamseq_62/agibot_a3/policy.yaml` | [a3](./a3/README_zh.md) |
 | EngineAI T800 | 仿真已测试；真机未测试 | `checkpoints/proteus/wsq61/engineai_t800/policy.yaml` | [t800](./t800/README_zh.md) |
-| AgiBot 灵犀 X2 | 仿真已测试；真机未测试 | `checkpoints/proteus/wsq61/lingxi_x2/policy.yaml` | [x2](./x2/README_zh.md) |
+| AgiBot 灵犀 X2 | 2026-11-12 板载吊架试验（Shaping 正常；手臂/髋部振荡，加阻尼 overlay 仅在仿真中验证） | `checkpoints/proteus/proteus_wamseq_62/lingxi_x2`（`policy-pc-damped.yaml`，`start_proteus_onboard.sh`） | [x2](./x2/README_zh.md) |
 | LimX OLI | 仿真已测试；真机未测试 | `checkpoints/proteus/proteus_wamseq_62/limx_oli_edu/policy.yaml` | [oli](./oli/README_zh.md) |
 | Unitree H2 | 仅有机器人模型和 PICO 重定向；无硬件 I/O | — | [`docs/h2.md`](../docs/h2.md) |
 

@@ -111,6 +111,7 @@ MANIFEST
 !/tests/test_proteus_sim_resolution.py
 
 !/tests/test_pm01.py
+!/tests/test_pm01_wave.py
 !/tests/test_pm01_launch.py
 !/tests/test_pm01_bench.py
 !/tests/test_pm01_policy_bridge.py

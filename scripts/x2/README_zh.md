@@ -1,161 +1,233 @@
 # 智元灵犀 X2 启动脚本
 
-`scripts/x2/` 通过 AimDK ROS 2 HAL，在智元灵犀 X2 Ultra（Proteus 契约 `lingxi_x2`，公开
-v1.3 模型）上运行 Proteus WAMSeq Tracker；同时负责准备模型、导出策略、转换 / 重定向参考
-动作、录制 sim2sim 视频，并提供只读的反馈与系统模式预检工具。通用流程（Shaping → Hold →
-Go → Final Hold、急停、新机器人检查清单）见 [`../README_zh.md`](../README_zh.md)，本页只介绍
-X2 特有内容。[English](README.md)
+[English](README.md) · 通用流程（Shaping → Hold → Go → Final Hold、急停、新机器人检查清单）：[../README_zh.md](../README_zh.md)
+
+X2 在自身的运控主板（RK3588，aarch64，CPython 3.10）上运行 Proteus Tracker，由电脑通过 SSH 操作，布局与
+Galbot ET1 相同：`aimdk_bridge.py` 独占 AimDK ROS 2 HAL，并在本地提供 ZMQ LowState/LowCmd 协议，指令由
+`BridgeSafety` 仲裁；共用的 Tracker（`sim2real/rl_policy/tracking.py`）在旁边以 50 Hz 做 CPU ONNX 推理；
+第二个 SSH 会话中的 ET1 操作键盘发送 `a`、`a`、`s` 和空格。这条机载路线是真机上实际运行过的路线，也是推荐路线。
+旧的电脑路线（Tracker 跑在电脑上，`--robot-io inline`）保留在下文，但从未在真机上运行过。
 
 ## 状态
 
 | 项目 | 内容 |
 | --- | --- |
-| 真机 | **控制未测试。** 在一台 Ultra 上（2026-11-04）有线只读反馈和只读系统状态查询正常；该机 `Develop_MC` 迁移因未配置被拒绝，因此没有接管控制 |
+| 真机 | **2026-11-12 在龙门架上试验**，机器人为 X2 Basic（固件 v0.8.2.16），使用 `proteus_wamseq_62` 和 `policy-pc-damped.yaml`：接管、整形和 Hold（分别站立 23 秒和 42 秒），`21_wave_right` 手臂和腰部无振荡，`15_walk_short` 完整播放并站立停下。每次运行中绳子都承担了大部分重量：**尚未完成经验证的独立站立运行。** 详见[机载教程](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-x2-onboard.md) |
 | `--robot` 别名 | `x2`、`lingxi_x2`、`agibot_x2`（`sim2real/config/robots/__init__.py`） |
-| 关节数 | 31（腿 12、腰 3、臂 14、头 2） |
-| Robot I/O | `--robot-io inline` → `X2RobotIO`：ROS 2 Humble + AimDK 消息，`/aima/hal/joint/{leg,waist,arm,head}/{state,command}` 与 `/aima/hal/imu/torso/state` |
-| DDS | HAL 启动脚本：CycloneDDS 绑定 `10.0.1.2`。系统状态工具：通过 `fastdds_host.xml` 使用 Fast DDS |
-| Tracker 运行位置 | 接入机器人有线网络、装有 ROS 2 Humble 与 AimDK 的上位机 |
-| 默认 checkpoint | `checkpoints/proteus/wsq61/lingxi_x2/`（所有启动脚本、`check_feedback.py`、`render_sim2sim.py`；`export_policy.py --release` 默认 `wsq61`） |
-| 策略 YAML | `policy.yaml`：真机，`reference_forcing: true`，含 `robot_io_options` 和 `soft_joint_pos_limits`。`policy-sim.yaml`：使用测得根位置的仿真，`reference_forcing: false`，不含 soft 限位 |
-| 早期结果 | sim2sim 表格和 2026-11-03 运行时对照用的是 `proteus_wamseq_62`，不能证明 wsq61 可用 |
+| 关节数 | 31（腿 12、腰 3、手臂 14、头 2）；头部由 overlay 锁定 |
+| Robot I/O | `--robot-io zmq`（127.0.0.1）⇄ `aimdk_bridge.py`（500 Hz）⇄ `/aima/hal/joint/{leg,waist,arm,head}/{state,command}`、`/aima/hal/imu/torso/state`（即骨盆 IMU） |
+| 控制器 | `--controller bridge_joystick`（bridge 以 Unitree 键位转发操作按键） |
+| Tracker 运行位置 | X2 主板：bridge 绑定核 5，Tracking 绑定核 7（`isolcpus=5-7`） |
+| 默认策略 | `checkpoints/proteus/proteus_wamseq_62/lingxi_x2/policy-pc-damped.yaml`（45 次扰动仿真 0 次摔倒） |
+| 其他策略 | `proteus_60`、`proteus_60_bigdata`（目录结构相同）；`wsq61` 可通过 `export_policy.py --release wsq61` 或显式路径选用 |
+| 默认动作 | `outputs/x2/wave/21_wave_right`（站立挥右臂） |
 
 ## 文件
 
+机载路线（`scripts/x2/`）：
+
 | 文件 | 用途 |
 | --- | --- |
-| `start_proteus.sh` | 用键盘控制器在真机上播放一个 any4hdmi 数据集（inline AimDK I/O） |
-| `start_first_hold.sh` | 首次真机 Hold：要求已处于 `Develop_MC`，运行带控制权 / 限位检查的 `check_feedback.py`，然后跟踪静态参考 `outputs/x2/pico_hold` 并录制 |
-| `start_pico.sh` | PICO 遥操：`publisher`、`sim`、`policy-sim` 或 `robot` 模式 |
-| `check_feedback.py` | 只订阅的 HAL 反馈检查（频率、名称、新鲜度、IMU、关节位置）；可选 `--require-exclusive-control`、`--require-joint-limits` |
-| `system_state.sh` / `system_state.py` | 只读查询系统状态；`--target Develop_MC` / `--target Ready` 发起迁移；`--require-develop-mc` 为只读门控 |
-| `fastdds_host.xml` | Fast DDS 配置，只允许上位机接口 `10.0.1.2` |
-| `prepare_assets.py` | 将厂商 `X2_URDF-v1.3.0/x2_ultra.xml` 准备为 `third_party/lingxi_x2/model/scene_tracking.xml`，套用训练限位 / armature，写出 `validation.json` |
-| `export_policy.py` | 导出 actor 及 `policy-sim.yaml`（`--release`，默认 `wsq61`） |
-| `convert_reference.py` | sonic-x2 PKL（`relaxed_walk`、`gangam_dance`、`idle_stand`）→ any4hdmi |
-| `retarget_lafan.py` | 用内置标定和 `X2Retargeter` 将 LAFAN BVH 重定向到 X2 |
-| `render_sim2sim.py` | `scripts/oli/render_sim2sim.py` 的 X2 封装（默认 wsq61 的 `policy-sim.yaml`） |
-| `summarize_sim2sim.py` | 根据渲染视频旁的 `.trajectory.npz` / `.root.npz` 计算指标 |
-| `build_pico_profile.py` | 基于 TaiE64/AgibotX2-Retargeter 重新生成 `sim2real/teleop/configs/xrobot_to_x2.json` |
+| `deploy_onboard.sh` | 电脑 → 主板：rsync 代码、带 overlay 的 X2 actor、模型、动作、HF 资源和 aarch64 site-packages。不会停止 mc，也不会启动控制器。 |
+| `env.sh` | 主板脚本共用：主板 ROS 2 环境、`aimdk_msgs`、`PYTHONPATH`、HF 离线、ORT/BLAS 单线程。 |
+| `start_proteus_onboard.sh` | 主板启动脚本：拒绝第二个 supervisor 或控制器，按 CPU 绑定启动 bridge + Tracker，日志写入 `logs/run-<UTC>/`。 |
+| `aimdk_bridge.py` | AimDK HAL ⇄ ZMQ bridge，`BridgeSafety`（`max_kd=25`）；就绪后的操作员 A 触发接管。 |
+| `release_mc.sh` | 接管命令：`aima em stop-app mc`，然后等待 `mc_main` 退出。 |
+| `operator.sh` | 在主板上运行 `scripts/et1/operator_keyboard.py`（`ssh -t`）。 |
+| `probe.sh` / `state_probe.py` | 只读：关节/IMU 反馈频率和数值，以及核 7 上的 ONNX 计时。 |
+| `watch.sh` / `state_now.py` | 只读实时行（骨盆倾角、腿部误差、膝关节力矩），读取 bridge 的 LowState，运行在核 0-3。 |
+| `imu_compare.py` | 只读：结合腰部关节比较 torso 和 chest 两个 IMU 话题。 |
+| `make_damped_config.py` | 生成 `policy-pc-damped.yaml`（手臂 kd ×5，腿/腰 kd ×2，kp 不变）。 |
+| `make_wave_motion.py` / `make_short_walk.py` | 合成挥臂动作；把 11 号片段截成约 1.4 米、以站立结束的短走。 |
+| `eval_sim2sim.py` | 无界面 sim2sim，支持扰动和指令延迟（`--cmd-delay-ms`、`--sim-dt`）。 |
+| `bridge_sim_test.py` | 演练：真实的 bridge 和 Tracking 进程对接 MuJoCo，带虚拟龙门架。 |
+| `render_delay_compare.py` | 在指令延迟下并排渲染多个 overlay 的 sim2sim 视频。 |
 
-其他相关文件：
+共用及电脑路线文件：`prepare_assets.py`（生成 `third_party/lingxi_x2/model/scene_tracking.xml`）、
+`export_policy.py`（`--release`，默认 `proteus_wamseq_62`；同时写出 `policy-sim.yaml`）、`retarget_lafan.py`、
+`convert_reference.py`、`render_sim2sim.py`、`summarize_sim2sim.py`、`build_pico_profile.py`、
+`start_proteus.sh`、`start_first_hold.sh`、`start_pico.sh`、`check_feedback.py`、
+`system_state.sh` / `system_state.py`、`fastdds_host.xml`。
 
-- 机器人配置：`sim2real/config/robots/x2.py`（`X2_CFG`、`X2_AIMDK_GROUPS`、`X2_VENDOR_LIMITS`、`x2_deploy_joint_limits`）。
-- Robot I/O：`sim2real/rl_policy/robot_io/x2.py`（`X2StateCommand` 编解码、`X2RobotIO`）；分发在 `robot_io/factory.py`。
-- 策略 YAML 生成：`scripts/export_proteus_onnx.py`（X2 的 `robot_io_options`、`soft_joint_pos_limits`）。
-- 仿真模型调整：`sim2real/sim_env/utils/mjcf.py`。
-- 遥操：`sim2real/teleop/x2_retarget.py`、`sim2real/teleop/pico_retarget_pub.py`、
-  `sim2real/teleop/configs/{xrobot_to_x2.json,bvh_lafan1_to_x2.json,X2-RETARGET-LICENSE}`。
-- 共享工具：`scripts/make_hold_motion.py`、`scripts/lafan_tracking_suite.py`、`scripts/summarize_proteus_sim2sim.py`。
-- 测试：`tests/test_x2.py`、`tests/test_pico_retarget_profiles.py`。
-- 记录：`docs/experiments/proteus-x2-runtime-audit.json`、`docs/experiments/proteus-wsq61.json`。
+其他位置的相关文件：
+
+- `sim2real/config/robots/x2.py`：关节、限位、增益、`X2_AIMDK_GROUPS`、`X2_VENDOR_LIMITS`、`x2_deploy_joint_limits`。
+- `sim2real/rl_policy/robot_io/x2.py`：`X2StateCommand` 编解码（`head_present`）、`X2RobotIO`（电脑路线）。
+- `sim2real/rl_policy/robot_io/bridge_safety.py`：与 G1/ET1 bridge 共用的指令仲裁。
+- `scripts/export_proteus_onnx.py`、`scripts/g1/prepare_proteus_deployment.py`（`--robot x2`）、`scripts/make_hold_motion.py`。
+- 测试：`tests/test_x2.py`、`tests/test_x2_bridge.py`、`tests/test_pico_retarget_profiles.py`。
 
 ## 准备
 
-在仓库根目录执行。Tracker、仿真器和工具使用根目录 `uv` 项目（`uv run --no-sync`）；PICO
-发布端使用 `venv/pico`。
+电脑上一次性完成（根 `uv` 项目）：
 
-1. 外部仓库：Proteus `wamseq` worktree（`../Proteus-wamseq`）、`AgibotTech/agibot_x2_urdf`
-   （`../agibot_x2_urdf`）；参考动作需要 `meetsitaram/sonic-x2`（`../sonic-x2-reference`）；
-   LAFAN 需要 `limxdynamics/GMR`（`../GMR-limx`）。
-2. 准备模型并导出默认（wsq61）策略，二者都被 Git 忽略：
+1. 网络：机器人的 `10.0.1.0/24` 是**带标签的 VLAN 200**（不带标签的 IP 收不到回复）。在 VLAN 接口上给电脑配置
+   `10.0.1.2/24`（`nmcli` 命令见教程），然后执行 `ssh-copy-id agi@10.0.1.40`（运控主板 soc0，用户 `agi`）。
+2. 模型和 actor（需要 `../agibot_x2_urdf` 和 Proteus `wamseq` 检出）：
 
    ```bash
-   uv run --no-sync python scripts/x2/prepare_assets.py \
-     --description-root ../agibot_x2_urdf --proteus-root ../Proteus-wamseq
-   uv run --no-sync python scripts/x2/export_policy.py --proteus-root ../Proteus-wamseq
+   uv run --no-sync python scripts/x2/prepare_assets.py --description-root ../agibot_x2_urdf --proteus-root ../Proteus-wamseq
+   uv run --no-sync python scripts/export_proteus_onnx.py --contract lingxi_x2 --robot x2 \
+     --checkpoint-dir ../Proteus-wamseq/ScaleTrack/checkpoints/proteus_wamseq_62 \
+     --output-root checkpoints/proteus/proteus_wamseq_62
+   uv run --no-sync python scripts/g1/prepare_proteus_deployment.py \
+     --policy-config checkpoints/proteus/proteus_wamseq_62/lingxi_x2/policy.yaml --robot x2   # -> policy-pc.yaml
+   uv run --no-sync python scripts/x2/make_damped_config.py checkpoints/proteus/proteus_wamseq_62/lingxi_x2
    ```
 
-   使用 `--release proteus_wamseq_62` 时输出到 `checkpoints/proteus/proteus_wamseq_62/lingxi_x2/`。
-3. 上位机：ROS 2 Humble 及与机器人固件匹配的 AimDK 消息包。自行 source 的启动脚本默认使用
-   `third_party/aimdk_x2_ros_v082/install/setup.bash`（可用 `X2_AIMDK_SETUP` 覆盖）；
-   `start_proteus.sh` 和 `start_pico.sh robot` 需要先在当前 shell 中 source ROS 2 + AimDK。
-4. 网络（仅为一台 Ultra 上的实测，不是通用要求）：带 VLAN 200 标签，上位机 `eno1.200`
-   上配置 `10.0.1.2/24`，机器人 `10.0.1.40`。上位机地址写死在 `fastdds_host.xml` 和
-   `start_first_hold.sh` 的 `CYCLONEDDS_URI` 中，地址不同时两处都要改。`ROS_DOMAIN_ID=0`。
-5. 将 `checkpoints/proteus/wsq61/lingxi_x2/`（ONNX、YAML、契约 JSON）、
-   `third_party/lingxi_x2/` 和动作数据集复制到上位机。
-6. 所有启动脚本都会导出 `HF_HUB_OFFLINE=1` 与 `HF_HUB_DISABLE_TELEMETRY=1`；手动执行命令时
-   也请在 shell 中设置。
-7. PICO / 首次 Hold：在策略电脑上生成中立参考：
-   `uv run --no-sync python scripts/make_hold_motion.py --robot x2 --output outputs/x2/pico_hold`。
-   PICO 发布端按 `docs/getting-started/teleop-x86-64.md` 配置。
+3. 参考动作：`scripts/make_hold_motion.py --robot x2 --output outputs/x2/pico_hold`、
+   `scripts/x2/make_wave_motion.py --output outputs/x2/wave/21_wave_right`，可选 LAFAN 片段
+   （`retarget_lafan.py`，见教程）以及 `make_short_walk.py --output outputs/x2/lafan/15_walk_short`。
+4. 按 `deploy_onboard.sh` 文件头的命令，从 `uv.lock` 一次性生成 aarch64 / CPython 3.10 site-packages 到
+   `outputs/x2-onboard-env/site`（`X2_ENV_CACHE`；也可复用由同一 `uv.lock` 解析的 ET1 包）。目录中必须有
+   `.lock-<sha256(uv.lock) 前 16 位>`。
+5. `~/.cache/huggingface/hub` 中需有 HF 缓存 `models--elijahgalahad--h2_model` 和 `models--elijahgalahad--g1_xmls`。
+
+`deploy_onboard.sh` 要求 `X2_RELEASES`（默认 `proteus_wamseq_62 proteus_60_bigdata proteus_60`）中每个 release
+都有 `policy.onnx`、`policy-pc.yaml` 和 `policy-pc-damped.yaml`，且模型、`pico_hold` 和 `21_wave_right` 都存在，
+否则拒绝运行。设置 `X2_RELEASES=proteus_wamseq_62` 可只部署默认 actor。
+
+主板上：`agi` 用户主目录下为 `proteus_x2/{repo,site-packages,hf,logs}`。`env.sh` 加载
+`/agibot/software/entry/cfg/basic_env.sh` 和 `/agibot/software/hal_ethercat` 中的 `aimdk_msgs`
+（`X2_AIMDK_PKG`），并导出 `HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 HF_HOME=<root>/hf`。
 
 ## 可调项
 
-| 可调项 | 当前值 | 设置位置 |
+| 项目 | 当前值 | 设置位置 |
 | --- | --- | --- |
-| 训练关节限位、kp/kd、armature、默认姿态 | Proteus `lingxi_x2` spec，根高 `0.6735` m | `sim2real/config/robots/x2.py` 的 `_JOINTS` |
-| 厂商（物理 v1.3）限位 | 比训练限位更窄的有：`waist_yaw`（上限 2.2078）、腕 pitch（±0.5236）、腕 roll 外侧限位（1.5097，训练为 1.571）、`head_yaw`（±0.349） | `X2_VENDOR_LIMITS` |
-| 真机目标截断 | 训练限位与厂商限位的交集，绝不放宽 | `x2_deploy_joint_limits`，在 `X2StateCommand.write_command` 中应用 |
-| Soft 限位（Shaping 截断） | `soft_joint_pos_limits` 取同一交集，仅在 `policy.yaml` 中 | `scripts/export_proteus_onnx.py` |
-| `robot_io_options` | `publish_hz: 500`、`timeout_s: 0.25`、`head_pitch_enabled: false`、`imu_topic: /aima/hal/imu/torso/state`、`imu_to_pelvis_wxyz: [1,0,0,0]` | `policy.yaml`（由 `scripts/export_proteus_onnx.py` 生成） |
-| IMU 外参 | 单位旋转对应模型；真机必须使用出厂标定 | `imu_to_pelvis_wxyz` |
-| 头部 pitch | 禁用：`head_pitch_joint` 的所有命令字段均发送 0 | `head_pitch_enabled` |
-| Shaping 目标 | `motion_first_frame` | `policy.yaml` / `policy-sim.yaml` |
-| 预检限位余量 | 超出部署限位 0.01 rad 即报错 | `check_feedback.py --require-joint-limits` |
-| 仿真 | 只保留地面接触、被动阻尼为零，`sim_dt` 0.005 s，策略 50 Hz | `sim2real/sim_env/utils/mjcf.py`、`IntegratedSim2SimArgs` |
-| 遥操关节速度上限 | 相邻目标之间 12 rad/s | `X2Retargeter.max_joint_speed` |
+| Overlay | `policy-pc.yaml`：整形到站姿，2 秒进入参考，目标限制在训练 ∩ 厂商范围内缩 5%，目标速度上限 15 rad/s，锁定头部 | `scripts/g1/prepare_proteus_deployment.py` |
+| 真机增益 | `policy-pc-damped.yaml`：手臂 kd ×5（1.1 → 5.5），腿/腰 kd ×2（膝 7.7 → 15.3），kp 不变 | `make_damped_config.py`（`--kd-scale`、`--leg-kd-scale`） |
+| Bridge kd 上限 | `max_kd=25.0`（`BridgeSafety` 默认 10） | `aimdk_bridge.py` |
+| Bridge 频率 / 裁剪 | 500 Hz；目标裁剪到训练 ∩ 厂商范围 | `aimdk_bridge.py`、`x2_deploy_joint_limits` |
+| CPU 绑定 | `PROTEUS_BRIDGE_CPU=5`、`PROTEUS_TRACKER_CPU=7`；核 4 运行 EtherCAT HAL，核 6 运行智元 DDS 线程 | `start_proteus_onboard.sh` |
+| I/O 超时 | `PROTEUS_IO_TIMEOUT_S=0.2` → `SIM2REAL_IO_TIMEOUT_S` 和 bridge `--timeout-s` | `start_proteus_onboard.sh` |
+| 操作按键有效期 | 0.3 秒（`OPERATOR_FRESH_S`） | `aimdk_bridge.py` |
+| 接管 | `--takeover-cmd`（`bash release_mc.sh`）、`--takeover-timeout-s 70` | `aimdk_bridge.py` |
+| 头部关节组 | `X2_NO_HEAD=1` → `--no-head`：不订阅、不下发头部话题 | `start_proteus_onboard.sh` |
+| 主板地址 / 目录 | `X2_HOST=agi@10.0.1.40`、`X2_TARGET=proteus_x2` | `deploy_onboard.sh` |
+
+主板启动脚本的选择项：
+
+- `PROTEUS_POLICY_DIR`（默认 `checkpoints/proteus/proteus_wamseq_62/lingxi_x2`）和 `PROTEUS_POLICY_FILE`
+  （默认 `policy-pc-damped.yaml`；`policy-pc.yaml` 为训练增益）。YAML 必须设置 `proteus.reference_forcing: true`。
+- `PROTEUS_MOTION`：`outputs/x2/wave/21_wave_right`（默认）、`outputs/x2/pico_hold`（仅站立）、
+  `outputs/x2/lafan/15_walk_short`（向前短走）、`outputs/x2/lafan/1x_*`（较长的 LAFAN 片段）。
+- `PROTEUS_PLAYBACK_LIMIT_S`：参考时钟停在该时刻并保持。
+- `PROTEUS_READ_ONLY=1`（可加 `PROTEUS_MAX_RUNTIME_S`）：空跑，不创建指令发布器，不接管。
+- `PROTEUS_RUN_DIR`、`PROTEUS_ROOT`：日志目录 / 安装根目录。
 
 ## 使用
 
-### Sim2sim 预演
+1. 在电脑上用真实的 bridge 和 Tracking 进程演练。`--lower-before-hold` 对应真机按键顺序；
+   `--gantry-gravity 0.22,0.10,-0.97` 复现机器人倾斜悬挂的情况：
+
+   ```bash
+   uv run --no-sync python scripts/x2/bridge_sim_test.py --lower-before-hold \
+     --motion outputs/x2/wave/21_wave_right --play-s 12
+   uv run --no-sync python scripts/x2/eval_sim2sim.py --sim-dt 0.001 --cmd-delay-ms 40 \
+     --policy-config checkpoints/proteus/proteus_wamseq_62/lingxi_x2/policy-pc-damped.yaml \
+     --motion-path outputs/x2/lafan/15_walk_short --perturbation push60 --out outputs/x2/eval/walk_push.json
+   ```
+
+2. 部署（只改动主板上的 `X2_TARGET`）：`bash scripts/x2/deploy_onboard.sh`
+3. 只读探测，mc 仍在运行。**把关节读数和机器人实际姿态对照**；接管前先用手把四肢摆到接近站姿：
+
+   ```bash
+   ssh agi@10.0.1.40 HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 proteus_x2/repo/scripts/x2/probe.sh
+   ```
+
+4. mc 运行时空跑（bridge 不创建指令发布器）：
+
+   ```bash
+   ssh -t agi@10.0.1.40 HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 PROTEUS_READ_ONLY=1 \
+     proteus_x2/repo/scripts/x2/start_proteus_onboard.sh
+   ```
+
+5. 龙门架上运行。终端 1（启动脚本）、终端 2（操作员）、终端 3（可选监视）：
+
+   ```bash
+   ssh -t agi@10.0.1.40 HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 proteus_x2/repo/scripts/x2/start_proteus_onboard.sh
+   ssh -t agi@10.0.1.40 proteus_x2/repo/scripts/x2/operator.sh
+   ssh -t agi@10.0.1.40 proteus_x2/repo/scripts/x2/watch.sh
+   ```
+
+   | 步骤 | 按键 | 作用 |
+   | --- | --- | --- |
+   | 等待 | — | `bridge.log` 出现 `Tracker and LowState ready` |
+   | 1 | `a` | 接管（`release_mc.sh`）并整形到站姿 |
+   | — | — | 放下龙门架，直到双脚平放、机器人直立，绳子仍收紧（`watch.sh` 显示 `UPRIGHT`） |
+   | 2 | `a` | 2 秒过渡到参考；策略接管（Hold） |
+   | — | — | 松绳，直到两侧膝关节读数约 +10 到 +20 Nm |
+   | 3 | `s` | 播放 |
+   | 停止 | 空格或 `x` | 锁存停止（阻尼） |
+
+   如果 `mc_main` 正在运行（例如主板重启后），第一次 `a` 会释放 mc，随后 bridge 锁存阻尼并提示
+   "takeover took … s; mc is released, restart the launcher and press a again"。Ctrl-C 后重新启动并按 `a`：
+   mc 已停止时接管立即完成。`mc_main` 运行时启动脚本会给出提示。
+
+6. 关机：保持机器人吊在龙门架上，在启动脚本终端按 Ctrl-C；bridge 锁存并发送 0.2 秒阻尼。用
+   `aima em start-app mc` 重启原厂控制器。`proteus_x2/logs/run-<UTC>/` 中有 `bridge.log`、`tracker.log`、
+   `bridge-state.json` 和 `tracking.npz`。
+
+### 电脑路线（未在真机上运行）
+
+Tracker 跑在装有 ROS 2 Humble + AimDK 的电脑上，`--robot-io inline`（`X2RobotIO`），使用 `policy.yaml`。先加载
+ROS 2 + AimDK（`start_first_hold.sh` 和 `system_state.sh` 会自行加载 `third_party/aimdk_x2_ros_v082/install/setup.bash`，
+可用 `X2_AIMDK_SETUP` 覆盖）。`start_first_hold.sh` 把 CycloneDDS 绑定到 `10.0.1.2`；`system_state.sh` 通过
+`fastdds_host.xml` 使用 Fast DDS。两者都不会停止 mc。
 
 ```bash
-uv run --no-sync python scripts/x2/convert_reference.py --clip gangam_dance --output outputs/x2/gangam_dance
-uv run --no-sync python scripts/x2/render_sim2sim.py --motion-path outputs/x2/gangam_dance \
-  --duration 11.2 --output outputs/x2/x2_wamseq_gangam_dance.mp4
-uv run --no-sync python scripts/x2/summarize_sim2sim.py outputs/x2/x2_wamseq_gangam_dance.mp4
-uv run --no-sync python scripts/lafan_tracking_suite.py --robot x2 \
-  --lafan-data ../ubisoft-laforge-animation-dataset/lafan1/data --gmr-root ../GMR-limx --render
-```
-
-### 真机预检与接管
-
-```bash
-# 按 start_first_hold.sh 设置 ROS 环境（CycloneDDS 绑定 10.0.1.2），然后：
 uv run --no-sync python scripts/x2/check_feedback.py --duration 10 --output outputs/x2/feedback.json
-bash scripts/x2/system_state.sh                       # 只读查询
-bash scripts/x2/system_state.sh --target Develop_MC  # 仅当机器人已配置该模式
-bash scripts/x2/start_first_hold.sh                  # 静态 Hold，记录到 outputs/x2/first_hold_<time>.npz
+bash scripts/x2/system_state.sh                       # 只读查询系统状态
+bash scripts/x2/system_state.sh --target Develop_MC  # 仅当机器人配置了该模式
+bash scripts/x2/start_first_hold.sh                  # 需要 Develop_MC；静态 Hold 并录制
 bash scripts/x2/start_proteus.sh /path/to/x2/any4hdmi_dataset [policy.yaml]
+bash scripts/x2/system_state.sh --target Ready       # 恢复原厂控制
 ```
 
-键盘：`i` 用 10 秒 Shaping 到第 0 帧，`]` 进入策略 Hold，空格播放 / 暂停，`o` 阻尼，
-Ctrl+C 退出。Tracking 一启动就发送阻尼命令，不必等按键。
+键盘：`i` 整形，`]` Hold，空格播放 / 暂停，`o` 阻尼。`X2RobotIO` 还支持 `read_only`
+（`SIM2REAL_X2_READ_ONLY=1`：不创建指令发布器和定时器）以及 `SIM2REAL_X2_IO_CPUS` /
+`SIM2REAL_X2_POLICY_CPUS`（ROS I/O 线程与推理分核）。在一台 X2 Ultra 上（2026-11-04）`Develop_MC` 因未配置被拒绝，
+因此这条路线从未取得控制权。
 
-### PICO 遥操
+### PICO 遥操作
 
 ```bash
 bash scripts/x2/start_pico.sh publisher --actual-human-height 1.70   # venv/pico
 bash scripts/x2/start_pico.sh sim
 bash scripts/x2/start_pico.sh policy-sim 127.0.0.1
-bash scripts/x2/start_pico.sh robot PUBLISHER_IP                      # 真机，替换后两条
+bash scripts/x2/start_pico.sh robot PUBLISHER_IP                      # 电脑路线，替代后两条
 ```
 
-按键：**A** Shaping 到中立姿态（10 秒），**A+B** 进入策略 Hold，**X** 开始 / 暂停实时参考，
-**单独按 B** 阻尼。放通 TCP 28701 和 5592；OLI 与 X2 的 PICO 默认端口相同，同一主机上一次
-只能运行一个。
+按键：**A** 整形到中立姿态，**A+B** 策略 Hold，**X** 开始 / 暂停实时参考，**B** 单独按下进入阻尼。
+需开放 TCP 28701 和 5592；OLI 与 X2 的 PICO 共用这些端口，每台主机只运行一个。需要 `outputs/x2/pico_hold`。
 
-### 关停
+## 安全注意事项与已知问题
 
-停止 Tracking（先 `o`，再 Ctrl+C）；正常退出时后端连续发送 5 次阻尼命令。保持支撑，然后用
-`bash scripts/x2/system_state.sh --target Ready` 恢复原生控制（可能自动进入 Business）。
+- **HAL 没有看门狗。** bridge 被 SIGKILL 或断电后，最后一条指令持续生效。龙门架和物理急停要随时可及；
+  仅靠键盘无法让机器人停下。
+- **机器人悬空时绝不要按第二次 `a`。** 2026-11-12 机器人倾斜悬挂（前倾 13°、侧倾 7°），双脚离地，策略猛烈迈步，
+  在绳上乱摆并旋转，直到按下空格。请按上面的顺序操作。
+- **接管较慢。** 在 X2 Basic 上 `aima em stop-app mc` 用时超过 20 秒；`release_mc.sh` 以 `mc_main` 退出判定成功
+  （最多等待 60 秒）。
+- **按 `a` 前检查读数。** 在龙门架上处于被动状态时，腿部曾读到髋 yaw ±1.7 rad。整形不会把关节指令推到比按 `a`
+  以来到过的位置更远；被拒绝的指令会锁存，并在 `bridge.log` 中记录关节信息。
+- **阻尼。** 使用训练增益时手臂以 4.4 Hz 振荡（→ 手臂 kd ×5）；之后髋部以 3.7 Hz 摆动（→ 腿/腰 kd ×2，在 50 ms
+  指令延迟的 sim2sim 中找到；真机上随后 23 秒 Hold 中腿部关节速度为 0.01–0.03 rad/s）。真机延迟估计为 40–50 ms，
+  可能出现一次恢复性迈步。
+- **脚上的承重。** 绳子承担了重量（膝关节约 0 Nm）；`15_walk_short` 走了约 0.7 米（参考为 1.33 米）。
+  双脚完全承重的行走尚未测试。
+- **GC 卡顿。** 一次垃圾回收曾让 RK3588 上的循环卡住约 600 ms；Tracker 现在调用 `gc.freeze()`。
+- **运行中不要订阅 1000 Hz 的 ROS 话题**（关节状态 1000 Hz，IMU 500 Hz）：用 `watch.sh`，它读取 bridge 的
+  LowState。不要把任何进程绑到核 4（EtherCAT HAL）。
+- **头部。** `X2_NO_HEAD` 默认为 0；如果 `probe.sh` 输出 `head : no messages`，请设置 `X2_NO_HEAD=1`。
+- **仿真负载。** 31 GB 内存的电脑上最多并行运行 4 个仿真。
+- 停止、超过 0.2 秒的指令或状态超时、无效指令都会锁存阻尼；Ctrl-C 会发送阻尼。
 
-## 安全须知与已知问题
+## 延伸阅读
 
-- **真机控制未测试。** v0.8.2 反馈格式匹配并不能确认固件版本，也不提供电机故障监测（该
-  格式没有 `error_code` 字段）。
-- 已测试的机器人未配置 `Develop_MC`；不要猜测其他模式名，也不要在原生 MC 占有 HAL 时启动 Tracking。
-- 预检只是启动检查，不是控制权互斥锁。
-- HAL 没有命令超时保护：进程被强杀或断电时会保留最后一条命令。请保持吊装支撑和独立停止手段。
-- 先核对 IMU 轴向与骨盆实际倾斜、编码器零位；不要为绕过拒绝而放宽限位。本适配不覆盖其他
-  X2 修订版本（如 v1.4 模型）。
-- `policy-sim.yaml` 需要世界系定位，不要在真机上使用。
-- PICO 身体数据流中断时保持最后一帧参考，不会切到阻尼。
-
-## 详细文档
-
-- English：[`docs/tutorials/proteus-x2.md`](../../docs/tutorials/proteus-x2.md)
-- 中文：[`docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-x2.md`](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-x2.md)
-- 通用流程：[`../README_zh.md`](../README_zh.md)
+- 机载教程：[proteus-x2-onboard.md](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-x2-onboard.md) ·
+  [English](../../docs/tutorials/proteus-x2-onboard.md)
+- 电脑路线：[proteus-x2.md](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-x2.md) ·
+  [English](../../docs/tutorials/proteus-x2.md)
+- 通用流程：[../README_zh.md](../README_zh.md)

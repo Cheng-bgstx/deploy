@@ -1,132 +1,200 @@
 # AgiBot Lingxi X2 launchers
 
-`scripts/x2/` runs the Proteus WAMSeq Tracker on the AgiBot Lingxi X2 Ultra (Proteus
-contract `lingxi_x2`, public v1.3 model) through the AimDK ROS 2 HAL. It also stages the
-model, exports the policy, converts / retargets references, records sim2sim videos, and
-provides read-only feedback and system-mode preflight tools. The generic workflow
-(Shaping → Hold → Go → Final Hold, E-stop, new-robot checklist) is in
-[`../README.md`](../README.md); this page covers only what is specific to X2.
-[中文](README_zh.md)
+[中文](README_zh.md) · Generic workflow (Shaping → Hold → Go → Final Hold, E-stop, new-robot checklist): [../README.md](../README.md)
+
+The X2 runs the Proteus Tracker on its own motion-control board (RK3588, aarch64, CPython 3.10), operated
+from a PC over SSH, in the same layout as the Galbot ET1: `aimdk_bridge.py` owns the AimDK ROS 2 HAL and
+serves the local ZMQ LowState/LowCmd contract, arbitrated by `BridgeSafety`; the shared Tracker
+(`sim2real/rl_policy/tracking.py`) runs CPU ONNX inference at 50 Hz next to it; the ET1 keyboard operator
+in a second SSH session sends `a`, `a`, `s` and space. This onboard route is the one run on hardware and the
+recommended one. The older PC route (Tracker on a PC with `--robot-io inline`) is kept below but was never
+run on hardware.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| Hardware | **Control untested.** Wired read-only feedback and a read-only system-state query worked on one Ultra (2026-11-04); its `Develop_MC` migration was rejected as not configured, so no takeover was done |
+| Hardware | **Gantry trials on 2026-11-12** on an X2 Basic (firmware v0.8.2.16) with `proteus_wamseq_62` and `policy-pc-damped.yaml`: takeover, shaping and Hold (stood 23 s and 42 s), `21_wave_right` without arm or waist oscillation, `15_walk_short` played in full and stopped standing. The rope carried most of the weight in every run: **not yet a validated free-standing run.** Details: [onboard tutorial](../../docs/tutorials/proteus-x2-onboard.md) |
 | `--robot` aliases | `x2`, `lingxi_x2`, `agibot_x2` (`sim2real/config/robots/__init__.py`) |
-| Joints | 31 (12 leg, 3 waist, 14 arm, 2 head) |
-| Robot I/O | `--robot-io inline` → `X2RobotIO`: ROS 2 Humble + AimDK messages, `/aima/hal/joint/{leg,waist,arm,head}/{state,command}` and `/aima/hal/imu/torso/state` |
-| DDS | HAL launcher: CycloneDDS bound to `10.0.1.2`. System-state helper: Fast DDS via `fastdds_host.xml` |
-| Where the Tracker runs | Host PC on the robot's wired network (ROS 2 Humble + AimDK installed) |
-| Default checkpoint | `checkpoints/proteus/wsq61/lingxi_x2/` (all launchers, `check_feedback.py`, `render_sim2sim.py`; `export_policy.py --release` defaults to `wsq61`) |
-| Policy YAMLs | `policy.yaml`: hardware, `reference_forcing: true`, with `robot_io_options` and `soft_joint_pos_limits`. `policy-sim.yaml`: measured-root simulation, `reference_forcing: false`, no soft limits |
-| Earlier results | Sim2sim tables and the 2026-11-03 runtime audit used `proteus_wamseq_62`; they do not validate wsq61 |
+| Joints | 31 (12 leg, 3 waist, 14 arm, 2 head); head locked by the overlay |
+| Robot I/O | `--robot-io zmq` on 127.0.0.1 ⇄ `aimdk_bridge.py` (500 Hz) ⇄ `/aima/hal/joint/{leg,waist,arm,head}/{state,command}`, `/aima/hal/imu/torso/state` (the pelvis IMU) |
+| Controller | `--controller bridge_joystick` (operator keys republished by the bridge in the Unitree key layout) |
+| Tracker runs on | The X2 board: bridge on core 5, Tracking on core 7 (`isolcpus=5-7`) |
+| Default policy | `checkpoints/proteus/proteus_wamseq_62/lingxi_x2/policy-pc-damped.yaml` (0 falls in 45 perturbed sims) |
+| Other policies | `proteus_60`, `proteus_60_bigdata` (same layout); `wsq61` via `export_policy.py --release wsq61` or explicit paths |
+| Default motion | `outputs/x2/wave/21_wave_right` (standing right-arm wave) |
 
 ## Files
 
+Onboard route (`scripts/x2/`):
+
 | File | Purpose |
 | --- | --- |
-| `start_proteus.sh` | Hardware run of one any4hdmi dataset with the keyboard controller (inline AimDK I/O) |
-| `start_first_hold.sh` | First hardware Hold: requires `Develop_MC`, runs `check_feedback.py` with ownership / limit checks, then tracks the static `outputs/x2/pico_hold` with recording |
-| `start_pico.sh` | PICO teleop: `publisher`, `sim`, `policy-sim` or `robot` mode |
-| `check_feedback.py` | Subscribe-only HAL feedback check (rates, names, freshness, IMU, positions); optional `--require-exclusive-control`, `--require-joint-limits` |
-| `system_state.sh` / `system_state.py` | Read-only system-state query; `--target Develop_MC` / `--target Ready` migrate; `--require-develop-mc` read-only gate |
-| `fastdds_host.xml` | Fast DDS profile whitelisting host interface `10.0.1.2` |
-| `prepare_assets.py` | Stages vendor `X2_URDF-v1.3.0/x2_ultra.xml` as `third_party/lingxi_x2/model/scene_tracking.xml` with training limits / armature, writes `validation.json` |
-| `export_policy.py` | Exports the actor plus `policy-sim.yaml` (`--release`, default `wsq61`) |
-| `convert_reference.py` | sonic-x2 PKL (`relaxed_walk`, `gangam_dance`, `idle_stand`) → any4hdmi |
-| `retarget_lafan.py` | LAFAN BVH → X2 with the bundled calibration and `X2Retargeter` |
-| `render_sim2sim.py` | X2 wrapper around `scripts/oli/render_sim2sim.py` (defaults to wsq61 `policy-sim.yaml`) |
-| `summarize_sim2sim.py` | Metrics from a rendered video's `.trajectory.npz` / `.root.npz` |
-| `build_pico_profile.py` | Regenerates `sim2real/teleop/configs/xrobot_to_x2.json` from TaiE64/AgibotX2-Retargeter |
+| `deploy_onboard.sh` | PC → board: rsyncs code, the X2 actors with their overlays, the model, motions, HF assets and the aarch64 site-packages. Never stops mc or starts the controller. |
+| `env.sh` | Sourced by the board scripts: board ROS 2 env, `aimdk_msgs`, `PYTHONPATH`, HF offline, one ORT/BLAS thread. |
+| `start_proteus_onboard.sh` | Board launcher: refuses a second supervisor or controller, starts bridge + Tracker pinned to CPUs, logs under `logs/run-<UTC>/`. |
+| `aimdk_bridge.py` | AimDK HAL ⇄ ZMQ bridge, `BridgeSafety` (`max_kd=25`); the ready operator A runs the takeover. |
+| `release_mc.sh` | Takeover command: `aima em stop-app mc`, then waits until `mc_main` has exited. |
+| `operator.sh` | Runs `scripts/et1/operator_keyboard.py` on the board (`ssh -t`). |
+| `probe.sh` / `state_probe.py` | Read-only joint/IMU feedback rates and values plus ONNX timing on core 7. |
+| `watch.sh` / `state_now.py` | Read-only live line (pelvis tilt, leg error, knee torque) from the bridge's LowState, on cores 0-3. |
+| `imu_compare.py` | Read-only: compares the torso and chest IMU topics with the waist joints. |
+| `make_damped_config.py` | Writes `policy-pc-damped.yaml` (arm kd ×5, leg/waist kd ×2, kp unchanged). |
+| `make_wave_motion.py` / `make_short_walk.py` | Synthetic arm wave; clip 11 cut to a 1.4 m walk that ends standing. |
+| `eval_sim2sim.py` | Headless sim2sim under perturbations and command delay (`--cmd-delay-ms`, `--sim-dt`). |
+| `bridge_sim_test.py` | Rehearsal: the real bridge and Tracking processes against MuJoCo with a virtual gantry. |
+| `render_delay_compare.py` | Side-by-side sim2sim videos of several overlays under command delay. |
+
+Shared and PC-route files: `prepare_assets.py` (stages `third_party/lingxi_x2/model/scene_tracking.xml`),
+`export_policy.py` (`--release`, default `proteus_wamseq_62`; also writes `policy-sim.yaml`), `retarget_lafan.py`,
+`convert_reference.py`, `render_sim2sim.py`, `summarize_sim2sim.py`, `build_pico_profile.py`,
+`start_proteus.sh`, `start_first_hold.sh`, `start_pico.sh`, `check_feedback.py`,
+`system_state.sh` / `system_state.py`, `fastdds_host.xml`.
 
 Related files elsewhere:
 
-- Robot config: `sim2real/config/robots/x2.py` (`X2_CFG`, `X2_AIMDK_GROUPS`, `X2_VENDOR_LIMITS`, `x2_deploy_joint_limits`).
-- Robot I/O: `sim2real/rl_policy/robot_io/x2.py` (`X2StateCommand` codec, `X2RobotIO`); dispatch in `robot_io/factory.py`.
-- Policy YAML generation: `scripts/export_proteus_onnx.py` (`robot_io_options`, `soft_joint_pos_limits` for X2).
-- Simulation model tweaks: `sim2real/sim_env/utils/mjcf.py`.
-- Teleop: `sim2real/teleop/x2_retarget.py`, `sim2real/teleop/pico_retarget_pub.py`,
-  `sim2real/teleop/configs/{xrobot_to_x2.json,bvh_lafan1_to_x2.json,X2-RETARGET-LICENSE}`.
-- Shared helpers: `scripts/make_hold_motion.py`, `scripts/lafan_tracking_suite.py`, `scripts/summarize_proteus_sim2sim.py`.
-- Tests: `tests/test_x2.py`, `tests/test_pico_retarget_profiles.py`.
-- Records: `docs/experiments/proteus-x2-runtime-audit.json`, `docs/experiments/proteus-wsq61.json`.
+- `sim2real/config/robots/x2.py` — joints, limits, gains, `X2_AIMDK_GROUPS`, `X2_VENDOR_LIMITS`, `x2_deploy_joint_limits`.
+- `sim2real/rl_policy/robot_io/x2.py` — `X2StateCommand` codec (`head_present`), `X2RobotIO` (PC route).
+- `sim2real/rl_policy/robot_io/bridge_safety.py` — command arbitration shared with the G1/ET1 bridges.
+- `scripts/export_proteus_onnx.py`, `scripts/g1/prepare_proteus_deployment.py` (`--robot x2`), `scripts/make_hold_motion.py`.
+- Tests: `tests/test_x2.py`, `tests/test_x2_bridge.py`, `tests/test_pico_retarget_profiles.py`.
 
 ## Setup
 
-Run from the repository root. Tracker, simulator and tools use the root `uv` project
-(`uv run --no-sync`); the PICO publisher uses `venv/pico`.
+One-time, on the PC (root `uv` project):
 
-1. External checkouts: Proteus `wamseq` worktree (`../Proteus-wamseq`),
-   `AgibotTech/agibot_x2_urdf` (`../agibot_x2_urdf`); for references `meetsitaram/sonic-x2`
-   (`../sonic-x2-reference`); for LAFAN `limxdynamics/GMR` (`../GMR-limx`).
-2. Stage the model and export the default (wsq61) policy; both are Git-ignored:
+1. Network: the robot's `10.0.1.0/24` is **tagged VLAN 200** (untagged IP gets no reply). Give the PC
+   `10.0.1.2/24` on a VLAN interface (the `nmcli` commands are in the tutorial), then
+   `ssh-copy-id agi@10.0.1.40` (motion-control board soc0, user `agi`).
+2. Model and actor (`../agibot_x2_urdf`, a Proteus `wamseq` checkout):
 
    ```bash
-   uv run --no-sync python scripts/x2/prepare_assets.py \
-     --description-root ../agibot_x2_urdf --proteus-root ../Proteus-wamseq
-   uv run --no-sync python scripts/x2/export_policy.py --proteus-root ../Proteus-wamseq
+   uv run --no-sync python scripts/x2/prepare_assets.py --description-root ../agibot_x2_urdf --proteus-root ../Proteus-wamseq
+   uv run --no-sync python scripts/export_proteus_onnx.py --contract lingxi_x2 --robot x2 \
+     --checkpoint-dir ../Proteus-wamseq/ScaleTrack/checkpoints/proteus_wamseq_62 \
+     --output-root checkpoints/proteus/proteus_wamseq_62
+   uv run --no-sync python scripts/g1/prepare_proteus_deployment.py \
+     --policy-config checkpoints/proteus/proteus_wamseq_62/lingxi_x2/policy.yaml --robot x2   # -> policy-pc.yaml
+   uv run --no-sync python scripts/x2/make_damped_config.py checkpoints/proteus/proteus_wamseq_62/lingxi_x2
    ```
 
-   `--release proteus_wamseq_62` writes `checkpoints/proteus/proteus_wamseq_62/lingxi_x2/` instead.
-3. Host: ROS 2 Humble and the AimDK message package that matches the robot firmware. The
-   launchers that source it themselves default to `third_party/aimdk_x2_ros_v082/install/setup.bash`
-   (override with `X2_AIMDK_SETUP`); `start_proteus.sh` and `start_pico.sh robot` expect
-   you to source ROS 2 + AimDK in the shell first.
-4. Network (observed on one Ultra, not a general requirement): tagged VLAN 200, host
-   `10.0.1.2/24` on `eno1.200`, robot `10.0.1.40`. The host address is hard-coded in
-   `fastdds_host.xml` and the `CYCLONEDDS_URI` of `start_first_hold.sh`; edit both for a
-   different address. `ROS_DOMAIN_ID=0`.
-5. Copy `checkpoints/proteus/wsq61/lingxi_x2/` (ONNX, YAMLs, contract JSON),
-   `third_party/lingxi_x2/` and motion datasets to the host.
-6. All launchers export `HF_HUB_OFFLINE=1` and `HF_HUB_DISABLE_TELEMETRY=1`; set them in
-   your shell for manual commands.
-7. PICO / first Hold: create the neutral reference on the policy computer:
-   `uv run --no-sync python scripts/make_hold_motion.py --robot x2 --output outputs/x2/pico_hold`.
-   PICO publisher setup follows `docs/getting-started/teleop-x86-64.md`.
+3. References: `scripts/make_hold_motion.py --robot x2 --output outputs/x2/pico_hold`,
+   `scripts/x2/make_wave_motion.py --output outputs/x2/wave/21_wave_right`, and optionally the LAFAN windows
+   (`retarget_lafan.py`, see the tutorial) and `make_short_walk.py --output outputs/x2/lafan/15_walk_short`.
+4. aarch64 / CPython 3.10 site-packages from `uv.lock`, built once with the commands in the header of
+   `deploy_onboard.sh` into `outputs/x2-onboard-env/site` (`X2_ENV_CACHE`; the ET1 set from the same `uv.lock`
+   can be reused). It must hold `.lock-<first 16 hex of sha256(uv.lock)>`.
+5. HF caches `models--elijahgalahad--h2_model` and `models--elijahgalahad--g1_xmls` in `~/.cache/huggingface/hub`.
+
+`deploy_onboard.sh` refuses to run unless every release in `X2_RELEASES` (default
+`proteus_wamseq_62 proteus_60_bigdata proteus_60`) has `policy.onnx`, `policy-pc.yaml` and
+`policy-pc-damped.yaml`, and the model, `pico_hold` and `21_wave_right` exist. Set
+`X2_RELEASES=proteus_wamseq_62` to ship only the default actor.
+
+On the board: layout `proteus_x2/{repo,site-packages,hf,logs}` in `agi`'s home. `env.sh` sources
+`/agibot/software/entry/cfg/basic_env.sh` and `aimdk_msgs` from `/agibot/software/hal_ethercat`
+(`X2_AIMDK_PKG`), and exports `HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 HF_HOME=<root>/hf`.
 
 ## Adjustments
 
-| Tunable | Current value | Set in |
+| What | Current value | Set in |
 | --- | --- | --- |
-| Training joint limits, kp/kd, armature, default pose | Proteus `lingxi_x2` spec, root height `0.6735` m | `sim2real/config/robots/x2.py` `_JOINTS` |
-| Vendor (physical v1.3) limits | Narrower than training on `waist_yaw` (upper 2.2078), wrist pitch (±0.5236), wrist roll outer limit (1.5097 vs 1.571), `head_yaw` (±0.349) | `X2_VENDOR_LIMITS` |
-| Hardware target clip | Intersection of training and vendor limits; never widened | `x2_deploy_joint_limits`, applied in `X2StateCommand.write_command` |
-| Soft limits (Shaping clip) | `soft_joint_pos_limits` = same intersection, in `policy.yaml` only | `scripts/export_proteus_onnx.py` |
-| `robot_io_options` | `publish_hz: 500`, `timeout_s: 0.25`, `head_pitch_enabled: false`, `imu_topic: /aima/hal/imu/torso/state`, `imu_to_pelvis_wxyz: [1,0,0,0]` | `policy.yaml` (generated by `scripts/export_proteus_onnx.py`) |
-| IMU extrinsics | Identity matches the model; hardware must use the factory calibration | `imu_to_pelvis_wxyz` |
-| Head pitch | Disabled: all command fields for `head_pitch_joint` sent as zero | `head_pitch_enabled` |
-| Shaping target | `motion_first_frame` | `policy.yaml` / `policy-sim.yaml` |
-| Preflight limit margin | 0.01 rad beyond the deploy limits | `check_feedback.py --require-joint-limits` |
-| Simulation | Floor contacts only, zero passive damping, `sim_dt` 0.005 s, policy 50 Hz | `sim2real/sim_env/utils/mjcf.py`, `IntegratedSim2SimArgs` |
-| Teleop joint speed bound | 12 rad/s between consecutive targets | `X2Retargeter.max_joint_speed` |
+| Overlay | `policy-pc.yaml`: shapes to the standing pose, 2 s reference entry, targets inside training ∩ vendor range minus 5%, 15 rad/s target slew, head locked | `scripts/g1/prepare_proteus_deployment.py` |
+| Robot gains | `policy-pc-damped.yaml`: arm kd ×5 (1.1 → 5.5), leg/waist kd ×2 (knee 7.7 → 15.3), kp unchanged | `make_damped_config.py` (`--kd-scale`, `--leg-kd-scale`) |
+| Bridge kd ceiling | `max_kd=25.0` (`BridgeSafety` default 10) | `aimdk_bridge.py` |
+| Bridge rate / clamp | 500 Hz; targets clipped to training ∩ vendor range | `aimdk_bridge.py`, `x2_deploy_joint_limits` |
+| CPU pinning | `PROTEUS_BRIDGE_CPU=5`, `PROTEUS_TRACKER_CPU=7`; core 4 runs the EtherCAT HAL, core 6 AgiBot DDS threads | `start_proteus_onboard.sh` |
+| I/O timeout | `PROTEUS_IO_TIMEOUT_S=0.2` → `SIM2REAL_IO_TIMEOUT_S` and bridge `--timeout-s` | `start_proteus_onboard.sh` |
+| Operator key freshness | 0.3 s (`OPERATOR_FRESH_S`) | `aimdk_bridge.py` |
+| Takeover | `--takeover-cmd` (`bash release_mc.sh`), `--takeover-timeout-s 70` | `aimdk_bridge.py` |
+| Head group | `X2_NO_HEAD=1` → `--no-head`: no head topics subscribed or commanded | `start_proteus_onboard.sh` |
+| Board host / target | `X2_HOST=agi@10.0.1.40`, `X2_TARGET=proteus_x2` | `deploy_onboard.sh` |
+
+Board launcher selection:
+
+- `PROTEUS_POLICY_DIR` (default `checkpoints/proteus/proteus_wamseq_62/lingxi_x2`) and `PROTEUS_POLICY_FILE`
+  (default `policy-pc-damped.yaml`; `policy-pc.yaml` has the training gains). The YAML must set
+  `proteus.reference_forcing: true`.
+- `PROTEUS_MOTION` — `outputs/x2/wave/21_wave_right` (default), `outputs/x2/pico_hold` (standing only),
+  `outputs/x2/lafan/15_walk_short` (short forward walk), `outputs/x2/lafan/1x_*` (longer LAFAN windows).
+- `PROTEUS_PLAYBACK_LIMIT_S` — stop the reference clock there and hold.
+- `PROTEUS_READ_ONLY=1` (+ optional `PROTEUS_MAX_RUNTIME_S`) — dry run: no command publisher, no takeover.
+- `PROTEUS_RUN_DIR`, `PROTEUS_ROOT` — log directory / install root.
 
 ## Usage
 
-### Sim2sim rehearsal
+1. Rehearse on the PC with the real bridge and Tracking processes. `--lower-before-hold` follows the
+   hardware key order; `--gantry-gravity 0.22,0.10,-0.97` reproduces the robot hanging tilted:
+
+   ```bash
+   uv run --no-sync python scripts/x2/bridge_sim_test.py --lower-before-hold \
+     --motion outputs/x2/wave/21_wave_right --play-s 12
+   uv run --no-sync python scripts/x2/eval_sim2sim.py --sim-dt 0.001 --cmd-delay-ms 40 \
+     --policy-config checkpoints/proteus/proteus_wamseq_62/lingxi_x2/policy-pc-damped.yaml \
+     --motion-path outputs/x2/lafan/15_walk_short --perturbation push60 --out outputs/x2/eval/walk_push.json
+   ```
+
+2. Deploy (touches only `X2_TARGET` on the board): `bash scripts/x2/deploy_onboard.sh`
+3. Read-only probe, with mc still running. **Compare the joint readings with the robot**; bring the limbs
+   close to standing by hand before a takeover:
+
+   ```bash
+   ssh agi@10.0.1.40 HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 proteus_x2/repo/scripts/x2/probe.sh
+   ```
+
+4. Dry run with mc running (the bridge creates no command publisher):
+
+   ```bash
+   ssh -t agi@10.0.1.40 HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 PROTEUS_READ_ONLY=1 \
+     proteus_x2/repo/scripts/x2/start_proteus_onboard.sh
+   ```
+
+5. Gantry run. Terminal 1 (launcher), terminal 2 (operator), terminal 3 (optional monitor):
+
+   ```bash
+   ssh -t agi@10.0.1.40 HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 proteus_x2/repo/scripts/x2/start_proteus_onboard.sh
+   ssh -t agi@10.0.1.40 proteus_x2/repo/scripts/x2/operator.sh
+   ssh -t agi@10.0.1.40 proteus_x2/repo/scripts/x2/watch.sh
+   ```
+
+   | Step | Key | Effect |
+   | --- | --- | --- |
+   | Wait | — | `bridge.log`: `Tracker and LowState ready` |
+   | 1 | `a` | Takeover (`release_mc.sh`) and shaping to the standing pose |
+   | — | — | Lower the gantry until both feet are flat and the robot stands upright, rope still taut (`watch.sh`: `UPRIGHT`) |
+   | 2 | `a` | 2 s transition to the reference; the policy takes over (Hold) |
+   | — | — | Slacken the rope until both knees read about +10 to +20 Nm |
+   | 3 | `s` | Play |
+   | Stop | space or `x` | Latched stop (damping) |
+
+   If `mc_main` was running (e.g. after a board reboot), the first `a` releases mc, the bridge latches damping
+   with "takeover took … s; mc is released, restart the launcher and press a again". Ctrl-C, relaunch and press
+   `a`: with mc stopped the takeover is immediate. The launcher warns when `mc_main` is running.
+
+6. Shutdown: keep the robot on the gantry, Ctrl-C the launcher; the bridge latches and sends damping for 0.2 s.
+   Restart the native controller with `aima em start-app mc`. `proteus_x2/logs/run-<UTC>/` holds `bridge.log`,
+   `tracker.log`, `bridge-state.json` and `tracking.npz`.
+
+### PC route (not run on hardware)
+
+The Tracker on a PC with ROS 2 Humble + AimDK, `--robot-io inline` (`X2RobotIO`), `policy.yaml`. Source ROS 2 +
+AimDK first (`start_first_hold.sh` and `system_state.sh` source `third_party/aimdk_x2_ros_v082/install/setup.bash`,
+override with `X2_AIMDK_SETUP`). `start_first_hold.sh` binds CycloneDDS to `10.0.1.2`; `system_state.sh` uses
+Fast DDS via `fastdds_host.xml`. Neither stops mc.
 
 ```bash
-uv run --no-sync python scripts/x2/convert_reference.py --clip gangam_dance --output outputs/x2/gangam_dance
-uv run --no-sync python scripts/x2/render_sim2sim.py --motion-path outputs/x2/gangam_dance \
-  --duration 11.2 --output outputs/x2/x2_wamseq_gangam_dance.mp4
-uv run --no-sync python scripts/x2/summarize_sim2sim.py outputs/x2/x2_wamseq_gangam_dance.mp4
-uv run --no-sync python scripts/lafan_tracking_suite.py --robot x2 \
-  --lafan-data ../ubisoft-laforge-animation-dataset/lafan1/data --gmr-root ../GMR-limx --render
-```
-
-### Hardware preflight and takeover
-
-```bash
-# ROS env as in start_first_hold.sh (CycloneDDS on 10.0.1.2), then:
 uv run --no-sync python scripts/x2/check_feedback.py --duration 10 --output outputs/x2/feedback.json
-bash scripts/x2/system_state.sh                       # read-only query
+bash scripts/x2/system_state.sh                       # read-only system-state query
 bash scripts/x2/system_state.sh --target Develop_MC  # only if the robot configures this mode
-bash scripts/x2/start_first_hold.sh                  # static Hold, records outputs/x2/first_hold_<time>.npz
+bash scripts/x2/start_first_hold.sh                  # requires Develop_MC; static Hold with recording
 bash scripts/x2/start_proteus.sh /path/to/x2/any4hdmi_dataset [policy.yaml]
+bash scripts/x2/system_state.sh --target Ready       # restore native control
 ```
 
-Keyboard: `i` Shaping to frame 0 over 10 s, `]` policy Hold, Space play / pause,
-`o` damping, Ctrl+C exit. Tracking sends damping from start-up, before any key.
+Keyboard: `i` Shaping, `]` Hold, Space play / pause, `o` damping. `X2RobotIO` also takes `read_only`
+(`SIM2REAL_X2_READ_ONLY=1`: no command publisher or timer) and `SIM2REAL_X2_IO_CPUS` /
+`SIM2REAL_X2_POLICY_CPUS` (ROS I/O threads vs inference). On one X2 Ultra (2026-11-04) `Develop_MC` was
+rejected as not configured, so this route never took control.
 
 ### PICO teleop
 
@@ -134,35 +202,38 @@ Keyboard: `i` Shaping to frame 0 over 10 s, `]` policy Hold, Space play / pause,
 bash scripts/x2/start_pico.sh publisher --actual-human-height 1.70   # venv/pico
 bash scripts/x2/start_pico.sh sim
 bash scripts/x2/start_pico.sh policy-sim 127.0.0.1
-bash scripts/x2/start_pico.sh robot PUBLISHER_IP                      # hardware, replaces the last two
+bash scripts/x2/start_pico.sh robot PUBLISHER_IP                      # PC route, replaces the last two
 ```
 
-Buttons: **A** Shaping to neutral (10 s), **A+B** policy Hold, **X** start / pause live
-reference, **B** alone damping. Open TCP 28701 and 5592; OLI and X2 PICO defaults use the
-same ports, so run only one at a time per host.
-
-### Shutdown
-
-Stop Tracking (`o`, then Ctrl+C); the backend publishes damping five times on orderly
-exit. Keep support, then restore native control with
-`bash scripts/x2/system_state.sh --target Ready` (may continue to Business).
+Buttons: **A** Shaping to neutral, **A+B** policy Hold, **X** start / pause live reference, **B** alone damping.
+Open TCP 28701 and 5592; OLI and X2 PICO share these ports, so run one per host. Needs `outputs/x2/pico_hold`.
 
 ## Safety notes & known issues
 
-- **Hardware control is untested.** Matching v0.8.2 feedback does not confirm firmware
-  version or provide motor-fault monitoring (no `error_code` field in that layout).
-- On the tested robot `Develop_MC` is not configured; do not guess mode names or start
-  Tracking while native MC owns the HAL.
-- The preflight checks are start-up checks, not an ownership lock.
-- The HAL has no command watchdog: process kill or power loss leaves the last command.
-  Keep gantry support and an independent stop.
-- Verify IMU axes against physical pelvis tilt and encoder zeros; do not widen limits to
-  bypass refusal. Other X2 revisions (e.g. v1.4 model) are not covered.
-- `policy-sim.yaml` needs world localization; do not use it on hardware.
-- PICO body-stream loss holds the last reference; it does not select damping.
+- **No HAL watchdog.** After a SIGKILL of the bridge or a power loss the last command stays in force. Keep the
+  gantry and the physical stop within reach; the keyboard alone cannot stop the robot.
+- **Never press the second `a` while the robot hangs.** On 2026-11-12 it hung tilted (13° forward, 7° sideways)
+  with its feet off the floor; the policy stepped hard, flailed and spun on the rope until space. Use the order above.
+- **Slow takeover.** `aima em stop-app mc` took more than 20 s on the X2 Basic; `release_mc.sh` judges success by
+  `mc_main` exiting (waits up to 60 s).
+- **Check the readings before `a`.** Passive on the gantry, the legs once read hip yaw ±1.7 rad. Shaping never
+  commands a joint further out than it has been since `a`; a rejected command latches with the joint in `bridge.log`.
+- **Damping.** With the training gains the arms oscillated at 4.4 Hz (→ arm kd ×5); then the hips rocked at 3.7 Hz
+  (→ leg/waist kd ×2, found in sim2sim with 50 ms command delay; on the robot the legs then held 0.01–0.03 rad/s
+  over 23 s of Hold). The robot's delay is estimated at 40–50 ms, so expect a possible recovery step.
+- **Load on the feet.** The rope carried the weight (knees about 0 Nm); `15_walk_short` covered about 0.7 m of
+  1.33 m. Walking with full weight on the feet is untested.
+- **GC stall.** A garbage collection stalled the RK3588 loop for about 600 ms; the Tracker now calls `gc.freeze()`.
+- **No 1000 Hz ROS subscribers during a run** (joint state 1000 Hz, IMU 500 Hz): use `watch.sh`, which reads
+  the bridge's LowState. Never pin anything to core 4 (EtherCAT HAL).
+- **Head.** `X2_NO_HEAD` defaults to 0; if `probe.sh` prints `head : no messages`, set `X2_NO_HEAD=1`.
+- **Simulation load.** Run at most 4 sims in parallel on a 31 GB PC.
+- A stop, a command or state timeout over 0.2 s, or an invalid command latches damping; Ctrl-C sends damping.
 
-## Detailed docs
+## Further reading
 
-- English: [`docs/tutorials/proteus-x2.md`](../../docs/tutorials/proteus-x2.md)
-- 中文: [`docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-x2.md`](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-x2.md)
-- Generic workflow: [`../README.md`](../README.md)
+- Onboard tutorial: [docs/tutorials/proteus-x2-onboard.md](../../docs/tutorials/proteus-x2-onboard.md) ·
+  [中文](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-x2-onboard.md)
+- PC route: [docs/tutorials/proteus-x2.md](../../docs/tutorials/proteus-x2.md) ·
+  [中文](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-x2.md)
+- Generic workflow: [../README.md](../README.md)
