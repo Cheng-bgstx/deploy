@@ -12,7 +12,7 @@ _ROBOT_CFGS: Dict[str, RobotCfg] = {
     H2_CFG.name: H2_CFG,
     "unitree_h2": H2_CFG,
     ET1_CFG.name: ET1_CFG,
-    "galbot_et1": ET1_CFG,
+    "et1": ET1_CFG,
     "oli": OLI_CFG,
     "limx_oli_edu": OLI_CFG,
     "hu_d04_01": OLI_CFG,

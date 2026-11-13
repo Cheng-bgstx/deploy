@@ -145,7 +145,7 @@ def wrap_actor(source: onnx.ModelProto, contract: dict[str, Any], far_offset: in
     expected = {old: shapes[new] for old, new in bindings.items()} | {SOURCE_MORPH: morph.shape[1:]}
     for name, shape in expected.items():
         if name not in inputs or tuple(_shape(inputs[name])[1:]) != tuple(shape):
-            raise ValueError(f"Proteus actor input {name} != [batch, {shape}]: {[(i.name, _shape(i)) for i in graph.input]}")
+            raise ValueError(f"Proteus actor inputs: {name} != [batch, {shape}]: {[(i.name, _shape(i)) for i in graph.input]}")
     if [o.name for o in graph.output] != [SOURCE_OUTPUT] or _shape(graph.output[0])[1:] != [S]:
         raise ValueError(f"Proteus actor output != {SOURCE_OUTPUT}[batch, {S}]")
     tensor_names = {t for n in graph.node for t in (*n.input, *n.output)} | {i.name for i in graph.initializer}
@@ -225,7 +225,7 @@ def compare_with_source(
         source_feeds = {old: feeds[new][None] for old, new in bindings.items()} | {SOURCE_MORPH: morph}
         (actions,) = source.run([SOURCE_OUTPUT], source_feeds)
         if not all(np.isfinite(x).all() for x in (action, next_slot_action, actions)):
-            raise RuntimeError("Non-finite actor output during numerical comparison")
+            raise RuntimeError("Proteus export comparison produced non-finite actor output")
         max_err = max(max_err, float(np.abs(next_slot_action - actions[0]).max()),
                       float(np.abs(action - actions[0, slots]).max()))  # fmt: skip
     return max_err
