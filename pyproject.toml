@@ -47,6 +47,8 @@ include = ["sim2real*"]
 
 [tool.setuptools.package-data]
 sim2real = [
+    "config/robots/specs/*.yaml",
+    "teleop/configs/*.json",
     "teleop/configs/xrobot_to_h2.json",
     "planner/camera_config.json",
     "planner/profiles/g1_leg_kinematics.json",

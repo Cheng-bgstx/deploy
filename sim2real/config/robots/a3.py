@@ -1,0 +1,4 @@
+"""Proteus agibot_a3: exact contract joint order and signed training parameters."""
+from sim2real.config.robots.proteus_spec import from_proteus_spec
+
+A3_CFG = from_proteus_spec("a3", "agibot_a3", ('pelvis_link', 'waist_yaw_Link', 'waist_roll_Link', 'torso_Link', 'head_yaw_Link', 'head_pitch_Link', 'left_shoulder_pitch_Link', 'left_shoulder_roll_Link', 'left_shoulder_yaw_Link', 'left_elbow_Link', 'left_wrist_roll_Link', 'left_wrist_pitch_Link', 'left_wrist_yaw_Link', 'right_shoulder_pitch_Link', 'right_shoulder_roll_Link', 'right_shoulder_yaw_Link', 'right_elbow_Link', 'right_wrist_roll_Link', 'right_wrist_pitch_Link', 'right_wrist_yaw_Link', 'left_hip_pitch_Link', 'left_hip_roll_Link', 'left_hip_yaw_Link', 'left_knee_Link', 'left_ankle_pitch_Link', 'left_ankle_roll_Link', 'right_hip_pitch_Link', 'right_hip_roll_Link', 'right_hip_yaw_Link', 'right_knee_Link', 'right_ankle_pitch_Link', 'right_ankle_roll_Link'))

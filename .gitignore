@@ -50,8 +50,8 @@ stubs
 .omx
 prebuilt
 .cache
-external/
-.venv/
+external
+.venv
 docs/node_modules/
 docs/.cache/
 docs/.docusaurus/
@@ -101,3 +101,5 @@ MANIFEST
 !/tests/test_oli.py
 
 !/tests/test_x2.py
+
+!/tests/test_proteus_transport.py
