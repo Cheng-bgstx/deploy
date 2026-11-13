@@ -67,7 +67,7 @@ uv sync --project venv/dh116s
 `third_party/dh116s_sdk/python`。然后使用根项目环境启动：
 
 ```bash
-uv run --project venv/dh116s --no-sync scripts/dh116s_control.py \
+uv run --project venv/dh116s --no-sync scripts/dh116s/control.py \
   --hand-dir double \
   --connect tcp://<pico-publisher-ip>:5593
 ```
@@ -82,7 +82,7 @@ ZMQ 和最大 40% 的安全闭合映射，而不 import SDK 或移动硬件，�
 
 ```bash
 uv run --project venv/dh116s --no-sync \
-  scripts/dh116s_control.py --dry-run --hand-dir double
+  scripts/dh116s/control.py --dry-run --hand-dir double
 ```
 
 grip stream 断流后，进程会保持最后一次下发的手部姿态。停止进程时只断开 SDK，

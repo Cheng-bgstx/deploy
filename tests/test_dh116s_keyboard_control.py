@@ -1,7 +1,7 @@
 import math
 import unittest
 
-from scripts.dh116s_keyboard_control import next_grip
+from scripts.dh116s.keyboard_control import next_grip
 
 
 class KeyboardGripTest(unittest.TestCase):

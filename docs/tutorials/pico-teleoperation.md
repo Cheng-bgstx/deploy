@@ -73,7 +73,7 @@ The installer detects `aarch64` or `x86_64` and writes the runtime under
 project environment:
 
 ```bash
-uv run --project venv/dh116s --no-sync scripts/dh116s_control.py \
+uv run --project venv/dh116s --no-sync scripts/dh116s/control.py \
   --hand-dir double \
   --connect tcp://<pico-publisher-ip>:5593
 ```
@@ -90,7 +90,7 @@ mapping without importing the SDK or moving hardware, run:
 
 ```bash
 uv run --project venv/dh116s --no-sync \
-  scripts/dh116s_control.py --dry-run --hand-dir double
+  scripts/dh116s/control.py --dry-run --hand-dir double
 ```
 
 When the grip stream becomes stale, the process keeps the last commanded hand

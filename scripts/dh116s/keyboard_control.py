@@ -13,7 +13,7 @@ import tty
 import numpy as np
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from sim2real.utils.dh116s import (
     DEFAULT_ANGULAR_VELOCITY,

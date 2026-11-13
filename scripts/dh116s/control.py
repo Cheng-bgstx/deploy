@@ -11,7 +11,7 @@ import time
 import zmq
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from sim2real.utils.common import PORTS
 from sim2real.utils.dh116s import (

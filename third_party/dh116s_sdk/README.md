@@ -91,14 +91,14 @@ PYTHONPATH=third_party/dh116s_sdk/python uv run python -c \
 The sim2real transport can be tested without importing the SDK or touching CAN:
 
 ```bash
-uv run scripts/dh116s_control.py --dry-run --hand-dir double
+uv run scripts/dh116s/control.py --dry-run --hand-dir double
 ```
 
 After staged hardware bring-up, the direct keyboard controller is available as:
 
 ```bash
 uv run --project venv/dh116s --no-sync \
-  scripts/dh116s_keyboard_control.py --hand-dir double
+  scripts/dh116s/keyboard_control.py --hand-dir double
 ```
 
 It homes and enters normalized grip `0.0` at startup. Press `,` to open one

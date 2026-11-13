@@ -251,7 +251,7 @@ Install DH116S separately:
 bash third_party/dh116s_sdk/install.sh
 uv sync --project venv/dh116s
 uv run --project venv/dh116s --no-sync \
-  scripts/dh116s_control.py --dry-run
+  scripts/dh116s/control.py --dry-run
 ```
 
 Verify the expected `libLHandProLib.so` path before a hardware run. Do not home
