@@ -1,3 +1,4 @@
+import gc
 import time
 import numpy as np
 from dataclasses import dataclass, replace
@@ -581,6 +582,11 @@ class BasePolicy:
         }
         self.total_inference_cnt = total_inference_cnt
         self.perf_dict = {}
+        # Setup leaves hundreds of thousands of long-lived objects (motion datasets, FK caches, the
+        # inference runtime). A full collection that scans them took 442 ms on the ET1 board and stalled
+        # a control step past the bridge timeout; freezing them keeps later collections to new objects.
+        gc.collect()
+        gc.freeze()
 
         try:
             scheduler = sched.scheduler(time.perf_counter, time.sleep)

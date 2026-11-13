@@ -42,6 +42,8 @@ UNITREE_SELECT = 1 << 3
 GAMEPAD_FORMAT = "<QIffff"
 # Operator keys (sim2real/utils/operator_keys.py) are tracked per sender and expire after this.
 OPERATOR_FRESH_S = 0.3
+# After enter_debug_mode, how long to wait for the Tracker to resume sending commands.
+TAKEOVER_RESUME_S = 0.5
 
 
 def unitree_keys(hdep_buttons: int) -> int:
@@ -210,11 +212,38 @@ class ET1Bridge:
             success = False
         self.debug_mode_s = time.monotonic() - begin
         logger.info("enter_debug_mode returned after {:.2f} s", self.debug_mode_s)
-        # The call blocks the loop (0.86 s on the first hardware run). Refresh the state and take the
-        # Tracker's latest command so freshness is judged now; a Tracker that stopped still fails it.
-        self._observe()
-        self._receive_command()
+        # A command the Tracker sent just before the block waited in the queue through it and is now
+        # as old as the block: drop it rather than latch on it as expired. The Tracker sends nothing
+        # during the block (no LowState), so everything queued is from before it.
+        self._discard_queued_commands()
+        # The call blocks the loop (0.13-0.86 s on hardware). Without fresh LowState the Tracker skips its
+        # steps, so its last command is as old as the block: keep publishing state until it sends again.
+        # A Tracker that stopped stays stale and fails the takeover. No motor command is written here.
+        deadline = time.monotonic() + TAKEOVER_RESUME_S
+        while True:
+            self._observe()
+            self._publish_state()
+            self._receive_command()
+            if self.guard.ready(time.monotonic_ns()) or time.monotonic() >= deadline:
+                break
+            time.sleep(self.dt)
         self.guard.takeover_finished(success, time.monotonic_ns())
+
+    def _publish_state(self) -> None:
+        if self.guard.state is None:
+            return
+        self.guard.state.stop_epoch = self.guard.stop_epoch
+        try:
+            self.state_pub.send(self.guard.state.to_bytes(), flags=zmq.DONTWAIT)
+        except zmq.Again:
+            pass
+
+    def _discard_queued_commands(self) -> None:
+        while True:
+            try:
+                self.cmd_sub.recv(flags=zmq.DONTWAIT)
+            except zmq.Again:
+                return
 
     def _receive_command(self) -> None:
         try:
@@ -240,12 +269,7 @@ class ET1Bridge:
         cmd = self.guard.output(time.monotonic_ns())
         if cmd is not None:
             self._write(cmd)
-        if self.guard.state is not None:
-            self.guard.state.stop_epoch = self.guard.stop_epoch
-            try:
-                self.state_pub.send(self.guard.state.to_bytes(), flags=zmq.DONTWAIT)
-            except zmq.Again:
-                pass
+        self._publish_state()
         if self.guard.reason != self._last_reason:
             logger.info("Bridge state: {} (stop epoch {})", self.guard.reason, self.guard.stop_epoch)
             self._last_reason = self.guard.reason

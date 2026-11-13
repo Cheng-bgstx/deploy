@@ -39,7 +39,8 @@ files="$cache/files.txt"
 {
   git ls-files sim2real scripts/et1 pyproject.toml
   git ls-files --others --exclude-standard sim2real scripts/et1
-  find checkpoints/proteus/proteus_60/galbot_et1 -type f
+  find checkpoints/proteus/proteus_60/galbot_et1 checkpoints/proteus/proteus_wamseq_62/galbot_et1 -type f
+  [[ ! -d checkpoints/galbot_track/galbot_et1 ]] || find checkpoints/galbot_track/galbot_et1 -type f
 } | sort -u > "$files"
 ssh "$host" "mkdir -p '$target/repo' '$target/et1-dep/storage' '$target/hf/hub' '$target/logs'"
 rsync -a --delete "$cache/site/" "$host:$target/site-packages/"

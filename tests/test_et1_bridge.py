@@ -179,27 +179,65 @@ def test_operator_keys_merge_per_sender_and_expire(bridge_factory):
 
 
 @pytest.mark.parametrize("tracker_alive", [True, False])
-def test_blocking_debug_mode_entry_judges_freshness_after_the_call(bridge_factory, tracker_alive):
-    # enter_debug_mode blocked 0.86 s on hardware, longer than the command timeout. The Tracker keeps
-    # publishing meanwhile; its latest command must count, while a Tracker that stopped must not.
+def test_takeover_waits_for_the_tracker_to_resume_after_a_blocking_debug_mode_entry(bridge_factory, tracker_alive):
+    # enter_debug_mode blocked 0.84 s on hardware. The Tracker sends a command only after a fresh
+    # LowState, so it is silent during the block: the bridge must publish state again and wait for
+    # its next command. A Tracker that has stopped must still fail the takeover.
+    import threading
+
     bridge, fake, cmd_pub, _ = bridge_factory(False)
-    bridge.step()
-    _send(cmd_pub, "zero", 1)
-    bridge.step()
-    fake.buttons.value = A
-    bridge.step()
-    fake.buttons.value = 0
-    _send(cmd_pub, "init", 2, generation=2)
+    state_port = int(bridge.state_pub.getsockopt(zmq.LAST_ENDPOINT).decode().rsplit(":", 1)[1])
+    mode = {"name": "zero", "generation": 1, "alive": True, "sequence": 0}
+    stop = threading.Event()
 
-    def block():
-        time.sleep(0.7)  # > timeout_s = 0.5
+    def tracker():
+        sub = zmq.Context.instance().socket(zmq.SUB)
+        sub.setsockopt(zmq.SUBSCRIBE, b"")
+        sub.setsockopt(zmq.RCVTIMEO, 50)
+        sub.connect(f"tcp://127.0.0.1:{state_port}")
+        while not stop.is_set():
+            try:
+                sub.recv()
+            except zmq.Again:
+                continue  # no fresh state: like ZMQRobotIO, skip the step
+            if mode["alive"]:
+                mode["sequence"] += 1
+                _send(cmd_pub, mode["name"], mode["sequence"], generation=mode["generation"])
+        sub.close(linger=0)
+
+    thread = threading.Thread(target=tracker, daemon=True)
+    thread.start()
+    try:
+        for _ in range(30):
+            bridge.step()
+            time.sleep(0.01)
+            if bridge.guard.ready(time.monotonic_ns()):
+                break
+        assert bridge.guard.ready(time.monotonic_ns())
+        mode.update(name="init", generation=2)
+        time.sleep(0.05)
+
+        def block():
+            # The Tracker's reply to the last state before the block lands in the queue and expires there
+            # (hardware 2026-11-11: it latched the takeover as an expired command).
+            mode["sequence"] += 1
+            _send(cmd_pub, mode["name"], mode["sequence"], generation=mode["generation"])
+            time.sleep(0.8)  # > timeout_s = 0.5
+            mode["alive"] = tracker_alive
+
+        fake.on_debug = block
+        fake.buttons.value = A
+        for _ in range(20):
+            bridge.step()
+            fake.buttons.value = 0
+            if fake.debug_calls:
+                break
+            time.sleep(0.01)
+        assert fake.debug_calls == 1
+        assert bridge.guard.active
+        assert bridge.guard.latched is not tracker_alive
         if tracker_alive:
-            _send(cmd_pub, "init", 3, generation=2)
-
-    fake.on_debug = block
-    bridge.step()
-    assert fake.debug_calls == 1
-    assert bridge.guard.active
-    assert bridge.guard.latched is not tracker_alive
-    if tracker_alive:
-        assert fake.writes and np.all(fake.writes[-1][1][:26] == 20.0)
+            assert fake.writes and np.all(fake.writes[-1][1][:26] == 20.0)
+    finally:
+        stop.set()
+        thread.join(timeout=1)
