@@ -5,8 +5,8 @@
 X2 在自身的运控主板（RK3588，aarch64，CPython 3.10）上运行 Proteus Tracker，由电脑通过 SSH 操作，布局与
 Galbot ET1 相同：`aimdk_bridge.py` 独占 AimDK ROS 2 HAL，并在本地提供 ZMQ LowState/LowCmd 协议，指令由
 `BridgeSafety` 仲裁；共用的 Tracker（`sim2real/rl_policy/tracking.py`）在旁边以 50 Hz 做 CPU ONNX 推理；
-第二个 SSH 会话中的 ET1 操作键盘发送 `a`、`a`、`s` 和空格。这条机载路线是真机上实际运行过的路线，也是推荐路线。
-旧的电脑路线（Tracker 跑在电脑上，`--robot-io inline`）保留在下文，但从未在真机上运行过。
+第二个 SSH 会话中的 ET1 操作键盘发送 `a`、`a`、`s` 和空格。这条机载路线是真机上实际运行过的路线，也是本文档
+唯一介绍的真机路线。
 
 ## 状态
 
@@ -43,16 +43,15 @@ Galbot ET1 相同：`aimdk_bridge.py` 独占 AimDK ROS 2 HAL，并在本地提�
 | `bridge_sim_test.py` | 演练：真实的 bridge 和 Tracking 进程对接 MuJoCo，带虚拟龙门架。 |
 | `render_delay_compare.py` | 在指令延迟下并排渲染多个 overlay 的 sim2sim 视频。 |
 
-共用及电脑路线文件：`prepare_assets.py`（生成 `third_party/lingxi_x2/model/scene_tracking.xml`）、
+模型、仿真和遥操文件：`prepare_assets.py`（生成 `third_party/lingxi_x2/model/scene_tracking.xml`）、
 `export_policy.py`（`--release`，默认 `proteus_wamseq_62`；同时写出 `policy-sim.yaml`）、`retarget_lafan.py`、
-`convert_reference.py`、`render_sim2sim.py`、`summarize_sim2sim.py`、`build_pico_profile.py`、
-`start_proteus.sh`、`start_first_hold.sh`、`start_pico.sh`、`check_feedback.py`、
-`system_state.sh` / `system_state.py`、`fastdds_host.xml`。
+`convert_reference.py`、`render_sim2sim.py`、`summarize_sim2sim.py`、`build_pico_profile.py`、`start_pico.sh`
+（PICO 遥操作，见下文）。
 
 其他位置的相关文件：
 
 - `sim2real/config/robots/x2.py`：关节、限位、增益、`X2_AIMDK_GROUPS`、`X2_VENDOR_LIMITS`、`x2_deploy_joint_limits`。
-- `sim2real/rl_policy/robot_io/x2.py`：`X2StateCommand` 编解码（`head_present`）、`X2RobotIO`（电脑路线）。
+- `sim2real/rl_policy/robot_io/x2.py`：`X2StateCommand` 编解码（`head_present`，与 bridge 共用）、`X2RobotIO`（inline 电脑路径，仅 `start_pico.sh robot` 使用；从未在真机上运行）。
 - `sim2real/rl_policy/robot_io/bridge_safety.py`：与 G1/ET1 bridge 共用的指令仲裁。
 - `scripts/export_proteus_onnx.py`、`scripts/g1/prepare_proteus_deployment.py`（`--robot x2`）、`scripts/make_hold_motion.py`。
 - 测试：`tests/test_x2.py`、`tests/test_x2_bridge.py`、`tests/test_pico_retarget_profiles.py`。
@@ -103,7 +102,7 @@ Galbot ET1 相同：`aimdk_bridge.py` 独占 AimDK ROS 2 HAL，并在本地提�
 | I/O 超时 | `PROTEUS_IO_TIMEOUT_S=0.2` → `SIM2REAL_IO_TIMEOUT_S` 和 bridge `--timeout-s` | `start_proteus_onboard.sh` |
 | 操作按键有效期 | 0.3 秒（`OPERATOR_FRESH_S`） | `aimdk_bridge.py` |
 | 接管 | `--takeover-cmd`（`bash release_mc.sh`）、`--takeover-timeout-s 70` | `aimdk_bridge.py` |
-| 头部关节组 | `X2_NO_HEAD=1` → `--no-head`：不订阅、不下发头部话题 | `start_proteus_onboard.sh` |
+| 头部关节组 | `X2_NO_HEAD=0`（默认）：bridge 订阅并下发头部关节组。这台 X2 Basic 的 HAL 会发布头部关节组，读数恒为 0，因此默认值可用。仅当 `probe.sh` 输出 `head : no messages` 时才设置 `X2_NO_HEAD=1` → `--no-head`（不订阅、不下发头部话题） | `start_proteus_onboard.sh` |
 | 主板地址 / 目录 | `X2_HOST=agi@10.0.1.40`、`X2_TARGET=proteus_x2` | `deploy_onboard.sh` |
 
 主板启动脚本的选择项：
@@ -169,35 +168,16 @@ Galbot ET1 相同：`aimdk_bridge.py` 独占 AimDK ROS 2 HAL，并在本地提�
    `aima em start-app mc` 重启原厂控制器。`proteus_x2/logs/run-<UTC>/` 中有 `bridge.log`、`tracker.log`、
    `bridge-state.json` 和 `tracking.npz`。
 
-### 电脑路线（未在真机上运行）
-
-Tracker 跑在装有 ROS 2 Humble + AimDK 的电脑上，`--robot-io inline`（`X2RobotIO`），使用 `policy.yaml`。先加载
-ROS 2 + AimDK（`start_first_hold.sh` 和 `system_state.sh` 会自行加载 `third_party/aimdk_x2_ros_v082/install/setup.bash`，
-可用 `X2_AIMDK_SETUP` 覆盖）。`start_first_hold.sh` 把 CycloneDDS 绑定到 `10.0.1.2`；`system_state.sh` 通过
-`fastdds_host.xml` 使用 Fast DDS。两者都不会停止 mc。
-
-```bash
-uv run --no-sync python scripts/x2/check_feedback.py --duration 10 --output outputs/x2/feedback.json
-bash scripts/x2/system_state.sh                       # 只读查询系统状态
-bash scripts/x2/system_state.sh --target Develop_MC  # 仅当机器人配置了该模式
-bash scripts/x2/start_first_hold.sh                  # 需要 Develop_MC；静态 Hold 并录制
-bash scripts/x2/start_proteus.sh /path/to/x2/any4hdmi_dataset [policy.yaml]
-bash scripts/x2/system_state.sh --target Ready       # 恢复原厂控制
-```
-
-键盘：`i` 整形，`]` Hold，空格播放 / 暂停，`o` 阻尼。`X2RobotIO` 还支持 `read_only`
-（`SIM2REAL_X2_READ_ONLY=1`：不创建指令发布器和定时器）以及 `SIM2REAL_X2_IO_CPUS` /
-`SIM2REAL_X2_POLICY_CPUS`（ROS I/O 线程与推理分核）。在一台 X2 Ultra 上（2026-11-04）`Develop_MC` 因未配置被拒绝，
-因此这条路线从未取得控制权。
-
 ### PICO 遥操作
 
 ```bash
 bash scripts/x2/start_pico.sh publisher --actual-human-height 1.70   # venv/pico
 bash scripts/x2/start_pico.sh sim
 bash scripts/x2/start_pico.sh policy-sim 127.0.0.1
-bash scripts/x2/start_pico.sh robot PUBLISHER_IP                      # 电脑路线，替代后两条
 ```
+
+`start_pico.sh robot PUBLISHER_IP` 用 inline 电脑路径替代后两条（`--robot-io inline`、`X2RobotIO`、`policy.yaml`，
+需已加载 ROS 2 + AimDK 并释放 mc）。**该模式未在真机上测试。**
 
 按键：**A** 整形到中立姿态，**A+B** 策略 Hold，**X** 开始 / 暂停实时参考，**B** 单独按下进入阻尼。
 需开放 TCP 28701 和 5592；OLI 与 X2 的 PICO 共用这些端口，每台主机只运行一个。需要 `outputs/x2/pico_hold`。
@@ -220,7 +200,8 @@ bash scripts/x2/start_pico.sh robot PUBLISHER_IP                      # 电脑�
 - **GC 卡顿。** 一次垃圾回收曾让 RK3588 上的循环卡住约 600 ms；Tracker 现在调用 `gc.freeze()`。
 - **运行中不要订阅 1000 Hz 的 ROS 话题**（关节状态 1000 Hz，IMU 500 Hz）：用 `watch.sh`，它读取 bridge 的
   LowState。不要把任何进程绑到核 4（EtherCAT HAL）。
-- **头部。** `X2_NO_HEAD` 默认为 0；如果 `probe.sh` 输出 `head : no messages`，请设置 `X2_NO_HEAD=1`。
+- **头部。** `start_proteus_onboard.sh` 默认 `X2_NO_HEAD=0`。这台 X2 Basic 的 HAL 会发布头部关节组，读数恒为 0，
+  因此默认值可用。仅当 `probe.sh` 输出 `head : no messages` 时才设置 `X2_NO_HEAD=1`。
 - **仿真负载。** 31 GB 内存的电脑上最多并行运行 4 个仿真。
 - 停止、超过 0.2 秒的指令或状态超时、无效指令都会锁存阻尼；Ctrl-C 会发送阻尼。
 
@@ -228,6 +209,6 @@ bash scripts/x2/start_pico.sh robot PUBLISHER_IP                      # 电脑�
 
 - 机载教程：[proteus-x2-onboard.md](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-x2-onboard.md) ·
   [English](../../docs/tutorials/proteus-x2-onboard.md)
-- 电脑路线：[proteus-x2.md](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-x2.md) ·
+- 模型、sim2sim 与 PICO 遥操作：[proteus-x2.md](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-x2.md) ·
   [English](../../docs/tutorials/proteus-x2.md)
 - 通用流程：[../README_zh.md](../README_zh.md)

@@ -7,7 +7,7 @@ slug: /tutorials/proteus-pm01
 
 ## 在运控计算机上机载运行：wamseq_62_full、挥手与行走（2026-11-13）
 
-策略也可以像 Galbot ET1 一样，直接在 PM01 自带的运控计算机上运行。运控计算机是 Nezha（`user@192.168.0.163`），配置为 Ubuntu 22.04、x86_64、CPython 3.10、ROS Humble。机载运行使用机器人自己的 ROS 和已安装的 `interface_protocol`，因此 PC 上不需要装 ROS。Tracking 进程、通信传输、看门狗和按键都与下文 PC 方案相同，变化的只是运行位置。**以下内容只完成了准备和仿真，还没有在真机上运行过。**
+策略也可以像 Galbot ET1 一样，直接在 PM01 自带的运控计算机上运行。运控计算机是 Nezha（`user@192.168.0.163`），配置为 Ubuntu 22.04、x86_64、CPython 3.10、ROS Humble。机载运行使用机器人自己的 ROS 和已安装的 `interface_protocol`，因此 PC 上不需要装 ROS。Tracking 进程、通信传输、看门狗和按键都与下文 PC 方案相同，变化的只是运行位置。**目前只做过一次吊架测试（2026-11-13，见下文）：在 `joint_bridge` 下运行了 Hold 和挥手，当时吊绳承担了大部分体重。此后加入的踝关节 kd 放大、双脚承重时的 Hold 以及行走都只在仿真中验证过。**
 
 ### 资产（在 PC 上）
 

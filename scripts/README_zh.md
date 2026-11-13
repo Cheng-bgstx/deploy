@@ -179,7 +179,7 @@ Final Hold 中的漂移。Q1 有单独的离线演练 `scripts/q1/validate_deplo
 - [ ] 只有一个电机指令写入方：厂商的运动控制栈已停止或已交出控制权。G1 和 ET1 的启动脚本检测到正在运行的
       控制器时会拒绝启动。
 - [ ] 只读反馈检查已通过：G1 和 ET1 用 `PROTEUS_READ_ONLY=1`，PM01 用 `scripts/pm01/check_robot.py`，
-      X2 用 `scripts/x2/probe.sh`（板载）或 `scripts/x2/check_feedback.py`（PC），Q1 用 `scripts/q1/inspect_imu.py`。核对关节顺序和正负方向，
+      X2 用 `scripts/x2/probe.sh`，Q1 用 `scripts/q1/inspect_imu.py`。核对关节顺序和正负方向，
       确认 IMU 测得的重力方向正确。
 - [ ] 机器人挂在龙门架或吊架上，双脚离地；操作者清楚何时放下。
 - [ ] 硬件急停已测试，由第二个人拿在手里。

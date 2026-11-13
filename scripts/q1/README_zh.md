@@ -16,7 +16,7 @@ Hold、急停、新机器人检查清单）见 [`../README_zh.md`](../README_zh.
 | Robot I/O | `--robot-io inline` → `Q1RobotIO`（`robot_io/q1.py`），基于 `NamedRosRobotIO`（`robot_io/ros2_named.py`）；`aimdk_msgs` 的 `JointStateArray` / `JointCommandArray`，话题 `/aima/hal/joint/state` / `/aima/hal/joint/command`；`sensor_msgs/Imu` 话题 `/aima/hal/imu/state` |
 | Tracker 运行位置 | 机器人 ROS 2 网络上的主机 PC（教程中的“已检查 PC”，有线 DDS）。文档中没有板载部署方案。 |
 | 默认 checkpoint | `wsq61`（`wsq61_wam_61robots_30000.pt`）：`checkpoints/proteus/wsq61/primebot_q1/` |
-| 策略 YAML | `policy-sim.yaml`（sim2sim、PICO 仿真）、`policy.yaml`（实机基础配置、PICO `robot` 模式）、`policy-pc.yaml`（由 `prepare_deployment.py` 生成的实机覆盖配置，`start_proteus.sh` 使用） |
+| 策略 YAML | `policy-sim.yaml`（sim2sim、PICO 仿真）、`policy.yaml`（实机基础配置）、`policy-pc.yaml`（由 `prepare_deployment.py` 生成的实机覆盖配置，`start_proteus.sh` 和 `start_pico.sh robot` 使用） |
 
 ## 文件
 
@@ -164,15 +164,14 @@ bash scripts/q1/start_proteus.sh checkpoints/primebot_q1/motions/motions/walk1_s
 bash scripts/q1/start_pico.sh publisher --actual-human-height 1.8   # 终端 1
 bash scripts/q1/start_pico.sh sim                                   # 终端 2
 bash scripts/q1/start_pico.sh policy-sim 127.0.0.1                  # 终端 3
-# 实机替代终端 3：
-PROTEUS_POLICY_CONFIG=checkpoints/proteus/wsq61/primebot_q1/policy-pc.yaml \
-  bash scripts/q1/start_pico.sh robot PUBLISHER_IP
+# 实机替代终端 3（使用 policy-pc.yaml；PROTEUS_POLICY_CONFIG=<yaml> 可覆盖）：
+bash scripts/q1/start_pico.sh robot PUBLISHER_IP
 ```
 
 动作走 TCP 28701，按键走 TCP 5592。**A** Shaping 到中立位；**A+B** 进入策略 Hold；
 **X** 暂停/恢复实时参考；单按 **B** 进入阻尼。数据流中断时保持最后一帧参考，不会
-自动阻尼。`robot` 模式默认使用 `policy.yaml`，其中 `imu_topic` 未设置；请按上面方式
-使用覆盖配置，或设置 `SIM2REAL_Q1_IMU_TOPIC`。
+自动阻尼。`robot` 模式使用实机覆盖配置 `policy-pc.yaml`（其中包含 IMU 话题和外参），
+若尚未生成该文件，会提示后退出。
 
 **关闭。** `o`（或 PICO **B**）进入阻尼；Ctrl+C 退出。上电后正常退出会连续发送几次
 阻尼指令。这些只是进程层面的检查，进程被杀或断电时并非固件级保护；请确保厂商急停

@@ -46,8 +46,10 @@ Then rerun your environment setup.
 
 ### Test ankle swing
 
+This drives the real G1 over SDK2 DDS: it releases high-level mode, moves every joint to zero over 3 seconds, then swings the ankles until Ctrl+C. Keep the robot suspended. The optional argument is the robot-LAN network interface (for example `enp5s0`).
+
 ```bash
-uv run scripts/g1/test_ankle_swing.py
+uv run scripts/ankle_swing.py <network-interface>
 ```
 
 ### Test inference time

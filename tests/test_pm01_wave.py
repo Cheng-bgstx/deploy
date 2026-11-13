@@ -4,8 +4,14 @@ import pytest
 
 from sim2real.config.robots import PM01_CFG
 
-pytestmark = pytest.mark.skipif(not PM01_CFG.resolve_mjcf_path().is_file(),
-                                reason='prepared PM01 model missing (scripts/pm01/prepare.py)')
+def _model_ready() -> bool:
+    try:
+        return PM01_CFG.resolve_mjcf_path().is_file()
+    except FileNotFoundError:
+        return False
+
+
+pytestmark = pytest.mark.skipif(not _model_ready(), reason='prepared PM01 model missing (scripts/pm01/prepare.py)')
 
 
 @pytest.mark.parametrize('arm', ['right', 'left'])

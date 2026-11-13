@@ -35,10 +35,24 @@ TRACKERS_DIR = DEFAULT_MODELSCOPE_ROOT / "trackers" / "d1146_dpsd_ft"
 VARIANTS = ("ft500ema", "ft1000ema")
 TOLERANCE = 5e-6
 
-pytestmark = pytest.mark.skipif(
-    not TRACKERS_DIR.is_dir(),
-    reason=f"ModelScope Scalecar trackers not downloaded: {TRACKERS_DIR}",
-)
+def _torch_version() -> str:
+    try:
+        import torch
+    except ImportError:
+        return "missing"
+    return torch.__version__
+
+
+pytestmark = [
+    pytest.mark.skipif(
+        not TRACKERS_DIR.is_dir(),
+        reason=f"ModelScope Scalecar trackers not downloaded: {TRACKERS_DIR}",
+    ),
+    pytest.mark.skipif(
+        not _torch_version().startswith("2.7.0"),
+        reason=f"the exporter needs torch 2.7.0 (found {_torch_version()}); see the module docstring",
+    ),
+]
 
 
 @pytest.fixture(scope="module", params=VARIANTS)

@@ -5,22 +5,24 @@ slug: /tutorials/proteus-x2
 
 # 在智元灵犀 X2 上部署 Proteus WAMSeq
 
-## 默认 checkpoint（2026-11-04）
+## 默认 checkpoint
 
-准备与启动脚本现默认使用 **wsq61**（`wsq61_wam_61robots_30000.pt`），
-策略目录为 `checkpoints/proteus/wsq61/lingxi_x2/`。
-使用 `policy.yaml` 进行真机部署、`policy-sim.yaml` 进行测量根位置的仿真；
-G1/ET1 PC 与 ET1 板载部署使用本分支生成的 `policy-pc.yaml`。
-actor 使用十步 WAMSeq 历史窗口与有效位掩码，关节/形态合约保持原样。
-将完整策略目录（ONNX、YAML、合约 JSON）随代码一起复制到部署机器；原动作库路径保持不变。
-checkpoint SHA256：`1d1c65ddf5706b940744d87e2f86f7cea453c9240bcccc12d31923211f694bba`。
-来源记录在 `checkpoints/proteus/wsq61/source/export.json`，已有数值比较及短时仿真记录在
-`docs/experiments/proteus-wsq61.json`。下文旧版本的性能和真机记录不能作为 wsq61 的验收数据。
+准备、仿真和 PICO 脚本默认使用 **`proteus_wamseq_62`**，策略目录为
+`checkpoints/proteus/proteus_wamseq_62/lingxi_x2/`。`policy-sim.yaml` 用于测量根位置的仿真；
+`policy.yaml` 是真机 overlay 的基础。actor 使用十步 WAMSeq 历史窗口与有效位掩码，
+关节/形态合约保持原样。将完整策略目录（ONNX、YAML、合约 JSON）随代码一起复制到部署
+机器；原动作库路径保持不变。每次导出都在 `comparison.json` 中记录源文件和产物的
+SHA256。其他 release（例如 `wsq61`）仍可通过 `export_policy.py --release` 导出。
 
 本适配针对 Proteus **`lingxi_x2` 31 关节合约**，使用公开的 X2 Ultra v1.3 模型，
 接入本仓库的 Tracking 和集成 sim2sim。机器人别名为 `x2`、`lingxi_x2`、`agibot_x2`。
 策略是原始共享 WAMSeq actor，使用合约中的形态描述和带符号动作映射固定为 X2，无需
-微调。已检查两个完整动态动作的 sim2sim，真机尚未验证。
+微调。
+
+本页介绍模型和策略准备、sim2sim 与 PICO 遥操。真机上实际运行的是机载路线，策略跑在
+X2 运控主板上，见[在智元灵犀 X2 上运行 Proteus（机载）](./proteus-x2-onboard.md)。下文的
+sim2sim、LAFAN 和运行时对照结果记录于 2026-11-02/03，使用的是更早的 WAMSeq actor，
+不能作为 `proteus_wamseq_62` 的验收数据；它的仿真检查和龙门架试验见机载教程。
 
 ## 准备模型和策略
 
@@ -53,7 +55,7 @@ uv run --no-sync python scripts/x2/export_policy.py --release proteus_wamseq_62 
 | 配置 | 根部平移来源 | 用途 |
 | --- | --- | --- |
 | `policy-sim.yaml` | 仿真测得的世界系根部位置，`reference_forcing: false` | 与原仓库 MuJoCo 观测语义一致的 sim2sim |
-| `policy.yaml` | 参考锚点，`reference_forcing: true` | 没有世界系定位反馈的 SDK 局部跟踪 |
+| `policy.yaml` | 参考锚点，`reference_forcing: true` | 没有世界系定位反馈的真机；机载 overlay `policy-pc.yaml` / `policy-pc-damped.yaml` 的基础 |
 
 两者绑定 `proprioception[10,68]`、`action_history[10,31]`、`history_valid[10]` 和
 `task[6,253]`，输出 `action[31]`、`next_slot_action[31]`。历史、有效掩码、关节符号、
@@ -104,127 +106,29 @@ seed=0，策略 50 Hz，物理步长 0.005 秒。初始暂停 1 秒和结束保�
 2.46 厘米，行走 45.54 厘米），因初始骨盆朝向不同，与世界系末端误差不是同一指标。
 指标 JSON 对这两类量作了明确命名。
 
-## AimDK 部署
+## 真机部署
 
-### 有线只读反馈检查
+真机运行使用机载路线：`scripts/x2/aimdk_bridge.py` 在 X2 运控主板上独占 AimDK ROS 2 HAL，
+Tracker 在旁边运行，使用 `policy.yaml` 的 overlay `policy-pc.yaml` / `policy-pc-damped.yaml`。
+网络设置（带标签的 VLAN 200）、部署、只读探测、接管、按键顺序和安全注意事项见
+[在智元灵犀 X2 上运行 Proteus（机载）](./proteus-x2-onboard.md) 和 `scripts/x2/README_zh.md`。
 
-在上位机使用 ROS 2 Humble 和与机器人固件匹配的 AimDK 消息包运行 Proteus。
-当前 `wsq61/lingxi_x2/policy.yaml` 使用参考根位置锚定，适用于真机；
-`policy-sim.yaml` 需要世界坐标定位反馈。
+inline ROS 2 后端 `X2RobotIO`（`sim2real/rl_policy/robot_io/x2.py`，通过 `--robot-io inline`
+选用）只由下文的 `start_pico.sh robot` 使用，从未在真机上运行过。它订阅四组关节状态和
+`/aima/hal/imu/torso/state`（虽然叫 torso，实际为骨盆 IMU），以 500 Hz 复发最新命令；
+反馈或命令超时（>250 ms）、异常反馈以及 `zero` 模式下只保留阻尼。HAL 本身没有发布者
+死亡超时保护。
 
-换线之前先检查实际以太网帧。2026-11-04 连接的 Ultra 网口带有 **VLAN 200 标签**。
-仅在 `eno1` 上配置普通 IP 可以收到广播，但无法完成 ARP 回程。以下临时配置打通了
-双向通信（接口已存在时跳过创建）：
+`policy.yaml` 中的 `robot_io_options` 配置频率、IMU 话题、四元数 `imu_to_pelvis_wxyz` 和
+`head_pitch_enabled`（默认禁用；原 X2 Ultra 仅头部 yaw 有效）。默认单位 IMU 旋转对应模型；
+真机必须使用出厂标定外参，不能只依赖话题 `frame_id`。`policy.yaml` 另设
+`soft_joint_pos_limits`，取值即 AimDK 目标截断范围（训练限位与厂商限位的交集），供
+`motion_first_frame` 初始插值目标使用；`policy-sim.yaml` 不含此项。没有世界系定位时，
+不能在真机使用 `policy-sim.yaml`。
 
-```bash
-sudo ip link add link eno1 name eno1.200 type vlan id 200
-sudo ip addr add 10.0.1.2/24 dev eno1.200
-sudo ip link set eno1.200 up
-ping -c 2 10.0.1.40
-```
-
-`10.0.1.2/24` 只配置在一个接口上；如果此前加在父接口，先从父接口删除该地址。
-上述配置重启后不保留。VLAN 200 是这台机器的实测结果，并非所有 X2 的统一要求。
-当时 `10.0.1.40` 和 `.42` 均可访问，文档中的默认开发机地址 `.41` 未响应；
-尚未登录确认 `.42` 的角色。
-
-```bash
-source /opt/ros/humble/setup.bash
-source /path/to/matching/aimdk/install/setup.bash
-export ROS_DOMAIN_ID=0 ROS_LOCALHOST_ONLY=0 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-export CYCLONEDDS_URI='<CycloneDDS><Domain><General><Interfaces><NetworkInterface address="10.0.1.2" multicast="true"/></Interfaces><AllowMulticast>true</AllowMulticast></General></Domain></CycloneDDS>'
-HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --no-sync python \
-  scripts/x2/check_feedback.py --duration 10 --output outputs/x2/feedback.json
-```
-
-检查脚本只创建订阅者，不实例化 `X2RobotIO`，不发布控制指令，也不停止原生运控。
-它使用运行时相同的 codec 检查四组关节和骨盆 IMU，报告消息包路径、字段布局、
-关节名称、频率、反馈时效与关节角度。
-
-这台机器使用官方 v0.8.2 消息定义可正确解码全部 **31 个具名关节**：腿、腰、臂约
-**1000 Hz**，头约 **333 Hz**，IMU 约 **500 Hz**。最新 v1.1 RL 扩展包的消息定义
-会解出错误的数组长度，已被检查拒绝。v0.8.2 布局含温度字段，没有 `error_code`
-和数组 `state`；反馈解码成功**不能**确认实际固件版本，也不代表已具备电机故障监控。
-接管前仍需在 Agibot Go 中确认固件版本并使用匹配 SDK。本机已编译的只读消息包位于
-`third_party/aimdk_x2_ros_v082/install/setup.bash`，其 `source.json` 记录官方来源和
-源码哈希。目前尚未验证真机控制。
-
-### 接管控制
-
-**这台机器的实测能力限制：**2026-11-04 的迁移请求返回
-`code=0, status=2: State Develop_MC not configured, it will be skipped`。
-通信链路正常，但机器人配置没有定义 Develop_MC，仍处于 Business。本机辅助脚本
-不能给机器人新增模式配置。不要猜其他模式名称重试，也不要在原生 MC 仍占有 HAL
-时启动 Tracking。官方更新记录在 v1.0 才列出开发者模式，实际安装固件版本仍未确认；
-旧 HAL 布局不能证明全部固件能力。这台机器人接管前，仍需支持该模式的固件/配置，
-或通过已认证的机器人端管理入口执行旧版停止 MC 的操作。
-
-对于已配置该模式的机器人，可从上位机使用官方[系统模式接口](https://x2-aimdk.agibot.com/zh-cn/dev/Interface/system_state/)：
-`MigrateSystemState(state="Develop_MC")` 会停用原生运控，**不需要 SSH**。
-SUCCESS 仅表示请求已接受；必须轮询 GetSystemState，直到
-`cur_state == "Develop_MC"` 且 `curr_status.value == 1`（`IN_READY`）。迁移可能
-耗时数秒至数十秒。MC 的零力矩动作模式与系统的 Develop_MC 模式不同。
-
-辅助入口默认只读；显式传入 `--target` 才会切换系统模式。操作时保持吊装和独立停止手段：
-
-```bash
-bash scripts/x2/system_state.sh                       # 只读查询
-bash scripts/x2/system_state.sh --target Develop_MC  # 仅适用于机器人已配置该模式的情况
-bash scripts/x2/start_first_hold.sh                 # 单独启动控制进程
-```
-
-2026-11-04 本机只读服务调用成功，返回 Business / IN_READY。Fast DDS 绑定
-10.0.1.2 时服务响应正常；CycloneDDS 能发现服务，但查询未收到响应。辅助入口使用
-`scripts/x2/fastdds_host.xml`。本地消息包补充了官方 v1.1 的四个系统状态定义，保留
-已验证的全部 v0.8.2 HAL 定义，源码哈希记录于 `source.json`。只读查询成功不代表
-目标模式可用；后续迁移被拒绝的实测结果见上文。
-
-首次 Hold 启动器只检查控制权，不主动请求迁移。它要求 Develop_MC 已完成迁移、
-反馈新鲜、没有其他 HAL 控制发布者，且实测关节位于官方/训练限位交集内（允许
-0.01 rad 测量余量）；失败会在创建控制传输前退出。这些是启动检查，不是控制权
-互斥锁。先核对 IMU 轴向与骨盆实际倾斜、编码器零位；不要放宽限位来绕过拒绝。
-
-启动器使用 wsq61、静态参考 `outputs/x2/pico_hold` 和 CPU 推理，记录至
-`outputs/x2/first_hold_<time>.npz`。Tracking 启动后即发送阻尼命令，不必等到按键。
-按 `i` 等待 10 秒完成初始姿态整形，再按 `]` 进入策略 Hold；首次测试继续保留支撑。
-`o` 切换阻尼，正常 Ctrl+C 退出也发送阻尼；这些软件操作不替代独立停止手段。
-
-停止 Tracking 后继续保留支撑，执行 `bash scripts/x2/system_state.sh --target Ready`
-恢复原生功能；Ready 可能自动进入 Business。其他控制器还在发送 HAL 指令时不要
-恢复原生运控。旧文档中的机器人终端 `aima em stop-app mc` 可作为手动替代方案，
-在机器人确实支持上述全程上位机系统模式路径时，它不是前置条件。
-
-inline 后端遵循 [AimDK 关节接口](https://x2-aimdk.agibot.com/zh-cn/latest/Interface/control_mod/joint_control.html)
-和[骨盆 IMU 说明](https://x2-aimdk.agibot.com/zh-cn/latest/Interface/hal/sensor.html)。
-订阅四组关节状态及 `/aima/hal/imu/torso/state`（虽然叫 torso，实际为胯部 IMU），
-按组/名称映射数组，将 ROS XYZW 四元数转为 WXYZ。独立 ROS 定时器以 500 Hz 复发
-最新命令，策略推理为 50 Hz。反馈或命令超过 250 ms、异常反馈以及 `zero` 模式均将
-位置刚度、速度和前馈力矩清零，保留阻尼。正常退出时发送 5 次阻尼命令。HAL 本身
-没有发布者死亡超时保护，因此此线程不能覆盖进程被强杀或电脑断电的情况。
-
-```bash
-source /opt/ros/humble/setup.bash
-source /path/to/aimdk/install/setup.bash
-# 先通过 MigrateSystemState 进入 Develop_MC，并等待 IN_READY。
-bash scripts/x2/start_proteus.sh /path/to/x2/any4hdmi_dataset
-```
-
-接管前设置正确的 ROS domain/网络并确认反馈正常。脚本设置离线环境、CPU 推理、
-`robot=x2`、`robot_io=inline` 和键盘控制：`i` 用 10 秒插值到第 0 帧，`]` 启用策略
-Hold，空格播放/暂停，`o` 阻尼，Ctrl+C 退出。首次真机测试需支撑机器人。
-
-`policy.yaml` 中的 `robot_io_options` 配置频率、超时、IMU 话题、四元数
-`imu_to_pelvis_wxyz` 和 `head_pitch_enabled`。默认单位 IMU 旋转对应模型；真机必须
-使用出厂标定外参，不能只依赖话题 `frame_id`。旧版 X2 Ultra 仅头部 yaw 有效，因此
-默认不驱动 head pitch。本适配没有验证其他 X2 修订版本。没有世界系定位时，不能在
-真机使用 `policy-sim.yaml`。
-`policy.yaml` 另设 `soft_joint_pos_limits`，取值即 AimDK 后端自身的目标截断范围（训练限位与
-厂商限位的交集），供 `motion_first_frame` 初始插值目标使用，下发硬件的命令不变；`policy-sim.yaml` 不含此项。
-
-回归检查：`uv run --no-sync python -m pytest tests/test_x2.py tests/test_oli.py
-tests/test_proteus_observations.py tests/test_et1_proteus.py tests/test_robot_io.py
-tests/test_command_sender.py -q`，并通过 Python 语法和 shell 参数检查。
-`third_party/`、`checkpoints/`、`outputs/` 下的运行资源不纳入 Git。
+回归检查：`uv run --no-sync python -m pytest tests/test_x2.py tests/test_x2_bridge.py
+tests/test_oli.py tests/test_proteus_observations.py tests/test_robot_io.py
+tests/test_command_sender.py -q`。`third_party/`、`checkpoints/`、`outputs/` 下的运行资源不纳入 Git。
 
 
 ## PICO 全身遥操
@@ -276,24 +180,23 @@ bash scripts/x2/start_pico.sh policy-sim 127.0.0.1
 自由平衡测试前在仿真 GUI 关闭弹力带。X 暂停参考时策略继续运行。头部目标保持中立，
 真机 head pitch 仍按默认设置禁用。
 
-真机测试时，在 X2 策略计算机上将终端 3 替换为：
+脚本还有 `robot` 模式，在已加载 ROS 2 + AimDK 的电脑上替代终端 3。它使用上文的 inline
+`X2RobotIO` 路径，**从未在真机上运行过**，并要求原厂 mc 已释放。真机运行请改用机载路线。
 
 ```bash
-source /opt/ros/humble/setup.bash
-source /path/to/aimdk/install/setup.bash
-# 先通过 MigrateSystemState 进入 Develop_MC，并等待 IN_READY。
+# 未在真机上测试：inline 电脑路线。
 bash scripts/x2/start_pico.sh robot PUBLISHER_IP
 ```
 
-脚本设置 HF 离线参数、CPU 推理、50 Hz 策略、`robot=x2`、`robot_io=inline` 和真机
-`policy.yaml`；`policy-sim` 使用 ZMQ RobotIO 与 `policy-sim.yaml`。两者均连接发布 PC 的
+脚本设置 HF 离线参数、CPU 推理、50 Hz 策略和 `robot=x2`。`policy-sim` 使用 ZMQ RobotIO 与
+`policy-sim.yaml`；`robot` 使用 `robot_io=inline` 与 `policy.yaml`。两者均连接发布 PC 的
 动作 **TCP 28701** 和手柄 **TCP 5592**，两端需放通。位置参数后可追加 tracking 参数，
 覆盖策略或中立 `--motion-path`。同一组端口只运行一个发布器/仿真，OLI 与 X2 默认端口
 不能在同一主机并行占用。扳机流仍在 5593，此适配未加入 X2 灵巧手驱动。
 
 body 断流时接收端保持最后参考，**不会自动切换阻尼**；重连时重新对齐动作段。
-手柄链路正常时可按 B，网络/进程失败则使用机器人独立停止路径。AimDK 控制权、IMU
-标定和 HAL watchdog 限制仍按上文处理。实时 PICO 没有未来动作样本，现有 buffer 使用
+手柄链路正常时可按 B，网络/进程失败则使用机器人独立停止路径。上文 `X2RobotIO` 的
+限制（无 HAL watchdog、IMU 标定）同样适用。实时 PICO 没有未来动作样本，现有 buffer 使用
 已收到的姿态填充不可用的未来参考，因此下文文件 tracking 结果不代表实时遥操性能。
 
 本地离线 XR 测试已覆盖 OLI/X2、1.6/1.8/2.0 米操作者身高：源坐标变换、IK/FK 关节顺序、
@@ -319,8 +222,6 @@ HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 uv run --project venv/pico --no-sync
 gh repo clone limxdynamics/GMR ../GMR-limx -- --depth 1
 uv run --no-sync python scripts/lafan_tracking_suite.py --robot x2 \
   --lafan-data ../ubisoft-laforge-animation-dataset/lafan1/data --gmr-root ../GMR-limx --render
-# 原键盘启动器可播放生成的真机参考：
-# bash scripts/x2/start_proteus.sh outputs/x2/lafan_suite/walk
 ```
 
 已有 GMR 仓库可直接复用。脚本使用内置社区 LAFAN 标定和准备好的 X2 模型、中立姿态

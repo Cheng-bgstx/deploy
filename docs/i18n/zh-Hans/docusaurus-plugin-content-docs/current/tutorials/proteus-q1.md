@@ -29,10 +29,12 @@ git -C "$sources_root/Proteus" worktree add --detach "$sources_root/Proteus-wams
 gh repo clone PrimebotTech/primebot-q1-urdf "$sources_root/primebot-q1-urdf" -- --depth 1
 gh repo clone YanjieZe/GMR "$sources_root/GMR" -- --depth 1
 gh repo clone ubisoft/ubisoft-laforge-animation-dataset "$sources_root/ubisoft-laforge-animation-dataset" -- --depth 1
-uv run --no-sync python -m scripts.q1.prepare --release proteus_wamseq_62 --sources-root "$sources_root"
+uv run --no-sync python -m scripts.q1.prepare --sources-root "$sources_root"
 ```
 
 可用 `--sources-root /path/to/projects` 指定源仓库父目录（兼容 git worktree），`--proteus-root` 指定已有 `wamseq` 检出。`--skip-motions` 只准备模型、策略和 PICO 静态参考。推理用根环境，遥操用 `venv/pico`；准备脚本会在 `venv/pico` 子进程中生成 IK 数据，不负责安装真机 SDK。先按已有 Getting Started 页面配置两个环境；`--no-sync` 复用本机环境。
+
+默认 `--release wsq61` 写入启动脚本读取的 `checkpoints/proteus/wsq61/primebot_q1/`。下文的产物说明和评测表基于 `proteus_wamseq_62` 测得；如需使用该版本，用 `--release proteus_wamseq_62` 准备，并通过 `PROTEUS_POLICY_CONFIG`（启动脚本）或 `--policy-config`（评测）选择。
 
 核对的源版本：[Proteus wamseq](https://github.com/Hxxxz0/Proteus/tree/1e0e0381bdec73652f8aa90b871f2980586bb52a) `1e0e038`、[厂商模型](https://github.com/PrimebotTech/primebot-q1-urdf) `9657817`（`xml/q1_v3.xml`）、GMR `bb1bbe4`、LAFAN1 `9408460`。准备过程检查训练默认姿态下所有关节轴，把质量/限位差异写入 `third_party/primebot_q1/validation.json`，展开 MJCF include，并改为可迁移的相对资源路径。关节参数来自 `sim2real/config/robots/specs/` 中冻结的训练 spec。仿真只与地面碰撞，摩擦系数 1.0，采用 implicitfast，去除关节被动阻尼/摩擦，保留 contract 的增益、力矩限制和 armature。
 
@@ -46,7 +48,7 @@ uv run --no-sync python -m scripts.q1.prepare --release proteus_wamseq_62 --sour
 
 ```bash
 uv run --no-sync python -m scripts.proteus.evaluate --robot q1 \
-  --policy-config checkpoints/proteus/proteus_wamseq_62/primebot_q1/policy-sim.yaml \
+  --policy-config checkpoints/proteus/wsq61/primebot_q1/policy-sim.yaml \
   --dataset checkpoints/primebot_q1/motions --output outputs/q1/eval-new
 ```
 
@@ -103,7 +105,7 @@ uv run --no-sync python -m scripts.q1.prepare_deployment \
 bash scripts/q1/start_proteus.sh checkpoints/primebot_q1/motions/motions/walk1_subject1.npz
 ```
 
-`start_proteus.sh` 选择 `checkpoints/proteus/wsq61/primebot_q1/policy-pc.yaml`，可用 `PROTEUS_POLICY_CONFIG` 覆盖。该配置提供 `shaping_target: motion_first_frame` 所需的关节限位（`soft_joint_pos_limits`；使用 `--policy-limit-mode pass|feedforward` 时为 `shaping_joint_pos_limits`）及 15 rad/s 策略目标速度限制。上方命令按本机操作者要求明确选择**手动策略接管**：按 `]` 直接进入暂停回放的 policy Hold，不要求塑形完成、关节误差小于 0.10 rad 或速度小于 0.5 rad/s。`i` 仍可选择执行十秒塑形。启动仍未使能，反馈检查、超时阻尼、目标限位及 `o` 停止仍保留。这是操作者手动试机，不代表实机验收通过。
+`start_proteus.sh` 和 `start_pico.sh robot` 选择 `checkpoints/proteus/wsq61/primebot_q1/policy-pc.yaml`，若尚未生成会提示后退出；可用 `PROTEUS_POLICY_CONFIG` 覆盖。该配置提供 `shaping_target: motion_first_frame` 所需的关节限位（`soft_joint_pos_limits`；使用 `--policy-limit-mode pass|feedforward` 时为 `shaping_joint_pos_limits`）及 15 rad/s 策略目标速度限制。上方命令按本机操作者要求明确选择**手动策略接管**：按 `]` 直接进入暂停回放的 policy Hold，不要求塑形完成、关节误差小于 0.10 rad 或速度小于 0.5 rad/s。`i` 仍可选择执行十秒塑形。启动仍未使能，反馈检查、超时阻尼、目标限位及 `o` 停止仍保留。这是操作者手动试机，不代表实机验收通过。
 
 **超出关节范围的策略目标（实验性）。** 默认情况下，overlay 会把每个策略目标裁剪到模型关节范围，共两层：Tracker 中的 `soft_joint_pos_limits`，以及 `NamedJointCodec` 的位置钳位。Proteus 训练时没有这种裁剪。低增益关节（踝 kp 8.4 N·m/rad）上，策略靠把目标打到限位之外来获得力矩。在 2026-11-05 的 walk1 实机记录中，裁剪在行走时削掉了约 35% 的踝 pitch PD 力矩，在 7.0–7.5 s 踉跄时削掉 60–73%。`--policy-limit-mode` 选择 policy 模式下 codec 如何处理这类目标，塑形目标始终会被裁剪。
 - `clip`（默认）：发送范围边界。

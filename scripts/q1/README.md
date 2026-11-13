@@ -17,7 +17,7 @@ E-stop, new-robot checklist) see [`../README.md`](../README.md).
 | Robot I/O | `--robot-io inline` → `Q1RobotIO` (`robot_io/q1.py`) on `NamedRosRobotIO` (`robot_io/ros2_named.py`); `aimdk_msgs` `JointStateArray` / `JointCommandArray` on `/aima/hal/joint/state` / `/aima/hal/joint/command`, `sensor_msgs/Imu` on `/aima/hal/imu/state` |
 | Where the Tracker runs | A host PC on the robot's ROS 2 network (the tutorial's "inspected PC", wired DDS). No onboard deployment is documented. |
 | Default checkpoint | `wsq61` (`wsq61_wam_61robots_30000.pt`): `checkpoints/proteus/wsq61/primebot_q1/` |
-| Policy YAMLs | `policy-sim.yaml` (sim2sim, PICO sim), `policy.yaml` (hardware base, PICO `robot`), `policy-pc.yaml` (hardware overlay from `prepare_deployment.py`, used by `start_proteus.sh`) |
+| Policy YAMLs | `policy-sim.yaml` (sim2sim, PICO sim), `policy.yaml` (hardware base), `policy-pc.yaml` (hardware overlay from `prepare_deployment.py`, used by `start_proteus.sh` and `start_pico.sh robot`) |
 
 ## Files
 
@@ -173,16 +173,15 @@ Hold is active policy control: limbs can move while playback is paused.
 bash scripts/q1/start_pico.sh publisher --actual-human-height 1.8   # terminal 1
 bash scripts/q1/start_pico.sh sim                                   # terminal 2
 bash scripts/q1/start_pico.sh policy-sim 127.0.0.1                  # terminal 3
-# Hardware instead of terminal 3:
-PROTEUS_POLICY_CONFIG=checkpoints/proteus/wsq61/primebot_q1/policy-pc.yaml \
-  bash scripts/q1/start_pico.sh robot PUBLISHER_IP
+# Hardware instead of terminal 3 (uses policy-pc.yaml; PROTEUS_POLICY_CONFIG=<yaml> overrides):
+bash scripts/q1/start_pico.sh robot PUBLISHER_IP
 ```
 
 Motion on TCP 28701, buttons on TCP 5592. **A** Shaping to neutral; **A+B**
 policy Hold; **X** pauses/resumes the live reference; **B** alone damps. Stream
-loss holds the last reference; it does not damp. The `robot` mode defaults to
-`policy.yaml`, whose `imu_topic` is unset; use the overlay as above or set
-`SIM2REAL_Q1_IMU_TOPIC`.
+loss holds the last reference; it does not damp. The `robot` mode uses the hardware
+overlay `policy-pc.yaml` (it carries the IMU topic and extrinsic) and exits with a
+hint if that file has not been prepared.
 
 **Shutdown.** `o` (or PICO **B**) damps; Ctrl+C exits. Once armed, a normal exit
 sends damping several times. These are process-level checks, not firmware

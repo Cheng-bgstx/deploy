@@ -134,7 +134,8 @@ def test_tracking_npz_update_clamps_and_holds_last_frame() -> None:
 
     np.testing.assert_array_equal(tracking.motion_t, [1])
     assert tracking.state_dict["paused"] is True
-    np.testing.assert_array_equal(tracking.motion_data.joint_vel, [[[1, 2, 99]]])
+    # The step that reaches the end already holds the last frame: a frozen Reference has zero velocity.
+    np.testing.assert_array_equal(tracking.motion_data.joint_vel, 0.0)
 
     tracking.update()
     np.testing.assert_array_equal(tracking.motion_t, [1])

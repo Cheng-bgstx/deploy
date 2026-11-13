@@ -1,8 +1,11 @@
 import copy
 import numpy as np
 import mujoco
+import pytest
 from scipy.spatial.transform import Rotation
-from general_motion_retargeting import GeneralMotionRetargeting
+
+# GMR lives in the teleop project (venv/pico), not the root project.
+GeneralMotionRetargeting = pytest.importorskip("general_motion_retargeting").GeneralMotionRetargeting
 from sim2real.config.robots import get_robot_cfg
 from sim2real.config.robots.base import resolve_mjcf_joint_names
 from sim2real.teleop.pico_retarget_pub import _register_gmr_robot, _resolve_gmr_target_robot

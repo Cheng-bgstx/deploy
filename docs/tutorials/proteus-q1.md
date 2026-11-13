@@ -29,10 +29,12 @@ git -C "$sources_root/Proteus" worktree add --detach "$sources_root/Proteus-wams
 gh repo clone PrimebotTech/primebot-q1-urdf "$sources_root/primebot-q1-urdf" -- --depth 1
 gh repo clone YanjieZe/GMR "$sources_root/GMR" -- --depth 1
 gh repo clone ubisoft/ubisoft-laforge-animation-dataset "$sources_root/ubisoft-laforge-animation-dataset" -- --depth 1
-uv run --no-sync python -m scripts.q1.prepare --release proteus_wamseq_62 --sources-root "$sources_root"
+uv run --no-sync python -m scripts.q1.prepare --sources-root "$sources_root"
 ```
 
 `--sources-root /path/to/projects` overrides the common checkout parent (also works from git worktrees). `--proteus-root` selects an existing `wamseq` checkout. `--skip-motions` prepares only model/policy/PICO hold. Use the established root environment for inference and `venv/pico` for teleop. The preparation script launches the offline IK subprocess in `venv/pico`; it does not install robot SDKs. Set up those environments using the existing Getting Started pages before running this recipe. `--no-sync` reuses the local environments.
+
+The default `--release wsq61` writes `checkpoints/proteus/wsq61/primebot_q1/`, which the launchers read. The artifact description and evaluation table below were measured on `proteus_wamseq_62`; prepare it with `--release proteus_wamseq_62` and select it with `PROTEUS_POLICY_CONFIG` (launchers) or `--policy-config` (evaluation).
 
 Pinned sources checked: [Proteus wamseq](https://github.com/Hxxxz0/Proteus/tree/1e0e0381bdec73652f8aa90b871f2980586bb52a) `1e0e038`, [vendor model](https://github.com/PrimebotTech/primebot-q1-urdf) `9657817`, `xml/q1_v3.xml`; GMR `bb1bbe4`; LAFAN1 `9408460`. Preparation verifies all axes at the training default pose, records mass/limit differences in `third_party/primebot_q1/validation.json`, flattens MJCF includes and rewrites resources to portable relative paths. Joint parameters come from the frozen source spec under `sim2real/config/robots/specs/`. Simulation uses floor-only contacts, friction 1.0, implicitfast, zero passive joint damping/friction, contract gains, effort and armature.
 
@@ -46,7 +48,7 @@ Q1 has no public vendor GMR profile in the inspected sources. Its saved BVH and 
 
 ```bash
 uv run --no-sync python -m scripts.proteus.evaluate --robot q1 \
-  --policy-config checkpoints/proteus/proteus_wamseq_62/primebot_q1/policy-sim.yaml \
+  --policy-config checkpoints/proteus/wsq61/primebot_q1/policy-sim.yaml \
   --dataset checkpoints/primebot_q1/motions --output outputs/q1/eval-new
 ```
 
@@ -107,7 +109,7 @@ uv run --no-sync python -m scripts.q1.prepare_deployment \
 bash scripts/q1/start_proteus.sh checkpoints/primebot_q1/motions/motions/walk1_subject1.npz
 ```
 
-`start_proteus.sh` selects `checkpoints/proteus/wsq61/primebot_q1/policy-pc.yaml`. `PROTEUS_POLICY_CONFIG` overrides it. The overlay supplies the joint limits required by `shaping_target: motion_first_frame` (`soft_joint_pos_limits`, or `shaping_joint_pos_limits` with `--policy-limit-mode pass|feedforward`) and a 15 rad/s policy target rate bound. The command above explicitly selects **manual policy entry**, as requested for the local robot: `]` enters paused policy Hold directly, without requiring Shaping completion, joint error below 0.10 rad, or speed below 0.5 rad/s. `i` remains an optional ten-second Shaping command. Startup remains disarmed; feedback checks, timeout damping, target limits and `o` stop remain active. This is operator-controlled commissioning, not hardware validation.
+`start_proteus.sh` and `start_pico.sh robot` select `checkpoints/proteus/wsq61/primebot_q1/policy-pc.yaml` and exit with a hint if it has not been prepared. `PROTEUS_POLICY_CONFIG` overrides it. The overlay supplies the joint limits required by `shaping_target: motion_first_frame` (`soft_joint_pos_limits`, or `shaping_joint_pos_limits` with `--policy-limit-mode pass|feedforward`) and a 15 rad/s policy target rate bound. The command above explicitly selects **manual policy entry**, as requested for the local robot: `]` enters paused policy Hold directly, without requiring Shaping completion, joint error below 0.10 rad, or speed below 0.5 rad/s. `i` remains an optional ten-second Shaping command. Startup remains disarmed; feedback checks, timeout damping, target limits and `o` stop remain active. This is operator-controlled commissioning, not hardware validation.
 
 **Policy targets beyond the joint range (experimental).** By default the overlay clips every policy target to the model joint range twice: `soft_joint_pos_limits` in the Tracker and the position clamp in `NamedJointCodec`. Proteus trains without such a clip. At low gains (ankle kp 8.4 N·m/rad) the actor aims past a limit to obtain torque. In the 2026-11-05 walk1 recordings, the clip removed about 35% of the commanded ankle-pitch PD torque while walking and 60–73% during the stumble at 7.0–7.5 s. `--policy-limit-mode` selects how the codec handles such targets in policy mode. Shaping targets are always clipped.
 - `clip` (default): send the range bound.

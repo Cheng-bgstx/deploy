@@ -10,7 +10,7 @@ slug: /tutorials/proteus-pm01
 The policy can also run on the PM01's own motion computer (Nezha, `user@192.168.0.163`: Ubuntu 22.04, x86_64,
 CPython 3.10, ROS Humble), as on the Galbot ET1. It uses the robot's own ROS and installed `interface_protocol`,
 so the PC needs no ROS. The Tracking process, transport, watchdogs and keys are the ones described below for the
-PC; only where it runs changes. **Prepared and simulated only: nothing below has run on the robot yet.**
+PC; only where it runs changes. **One gantry run so far (2026-11-13, below): Hold and the wave ran in `joint_bridge` with the rope carrying most of the weight. The ankle kd scale added after it, Hold with the feet carrying the weight, and the walk are checked in simulation only.**
 
 ### Assets (on the PC)
 

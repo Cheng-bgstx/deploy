@@ -58,7 +58,7 @@ source /path/to/vendor_workspace/install/setup.bash
 bash scripts/a3/start_proteus.sh checkpoints/agibot_a3/motions/motions/walk1_subject1.npz
 ```
 
-[厂商 SDK/接口来源](https://github.com/AgibotTech/sonic_for_a3)。CPU 策略推理为 50 Hz，独立 ROS 定时器持续发送最新命令。必须有新鲜关节/IMU 反馈、有限数值命令和非负增益。命令/反馈超过 250 ms、错误或 zero 模式时，位置刚度、目标速度和前馈力矩归零，并保留阻尼。Q1 采用阻尼 5，单次发布的位置步进不超过 0.2 rad。正常退出会重复发送阻尼命令。这些属于进程内检查，不代表进程被杀或断电后有固件保护。IMU 姿态和角速度通过显式外参转换为骨盆 WXYZ/body 坐标。控制 generation 变化时丢弃旧命令。键位：`i` 在 10 s 内整形到首帧，`]` 开启策略 Hold，空格播放/暂停，`o` 阻尼，Ctrl+C 退出。可用 `PROTEUS_POLICY_CONFIG=/path/to/custom.yaml` 指定部署配置。
+[厂商 SDK/接口来源](https://github.com/AgibotTech/sonic_for_a3)。CPU 策略推理为 50 Hz，独立 ROS 定时器持续发送最新命令。必须有新鲜关节/IMU 反馈、有限数值命令和非负增益。命令/反馈超过 250 ms、错误或 zero 模式时，位置刚度、目标速度和前馈力矩归零，并保留阻尼。A3 编解码器采用阻尼 2（`NamedJointCodec` 默认值），单次发布的位置步进不超过 0.2 rad。正常退出会重复发送阻尼命令。这些属于进程内检查，不代表进程被杀或断电后有固件保护。IMU 姿态和角速度通过显式外参转换为骨盆 WXYZ/body 坐标。控制 generation 变化时丢弃旧命令。键位：`i` 在 10 s 内整形到首帧，`]` 开启策略 Hold，空格播放/暂停，`o` 阻尼，Ctrl+C 退出。可用 `PROTEUS_POLICY_CONFIG=/path/to/custom.yaml` 指定部署配置。
 
 ## PICO
 

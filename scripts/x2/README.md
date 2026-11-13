@@ -7,8 +7,7 @@ from a PC over SSH, in the same layout as the Galbot ET1: `aimdk_bridge.py` owns
 serves the local ZMQ LowState/LowCmd contract, arbitrated by `BridgeSafety`; the shared Tracker
 (`sim2real/rl_policy/tracking.py`) runs CPU ONNX inference at 50 Hz next to it; the ET1 keyboard operator
 in a second SSH session sends `a`, `a`, `s` and space. This onboard route is the one run on hardware and the
-recommended one. The older PC route (Tracker on a PC with `--robot-io inline`) is kept below but was never
-run on hardware.
+only hardware route documented here.
 
 ## Status
 
@@ -45,16 +44,15 @@ Onboard route (`scripts/x2/`):
 | `bridge_sim_test.py` | Rehearsal: the real bridge and Tracking processes against MuJoCo with a virtual gantry. |
 | `render_delay_compare.py` | Side-by-side sim2sim videos of several overlays under command delay. |
 
-Shared and PC-route files: `prepare_assets.py` (stages `third_party/lingxi_x2/model/scene_tracking.xml`),
+Model, simulation and teleop files: `prepare_assets.py` (stages `third_party/lingxi_x2/model/scene_tracking.xml`),
 `export_policy.py` (`--release`, default `proteus_wamseq_62`; also writes `policy-sim.yaml`), `retarget_lafan.py`,
-`convert_reference.py`, `render_sim2sim.py`, `summarize_sim2sim.py`, `build_pico_profile.py`,
-`start_proteus.sh`, `start_first_hold.sh`, `start_pico.sh`, `check_feedback.py`,
-`system_state.sh` / `system_state.py`, `fastdds_host.xml`.
+`convert_reference.py`, `render_sim2sim.py`, `summarize_sim2sim.py`, `build_pico_profile.py`, `start_pico.sh`
+(PICO teleop, see below).
 
 Related files elsewhere:
 
 - `sim2real/config/robots/x2.py` — joints, limits, gains, `X2_AIMDK_GROUPS`, `X2_VENDOR_LIMITS`, `x2_deploy_joint_limits`.
-- `sim2real/rl_policy/robot_io/x2.py` — `X2StateCommand` codec (`head_present`), `X2RobotIO` (PC route).
+- `sim2real/rl_policy/robot_io/x2.py` — `X2StateCommand` codec (`head_present`, shared with the bridge), `X2RobotIO` (inline PC path, used only by `start_pico.sh robot`; never run on hardware).
 - `sim2real/rl_policy/robot_io/bridge_safety.py` — command arbitration shared with the G1/ET1 bridges.
 - `scripts/export_proteus_onnx.py`, `scripts/g1/prepare_proteus_deployment.py` (`--robot x2`), `scripts/make_hold_motion.py`.
 - Tests: `tests/test_x2.py`, `tests/test_x2_bridge.py`, `tests/test_pico_retarget_profiles.py`.
@@ -107,7 +105,7 @@ On the board: layout `proteus_x2/{repo,site-packages,hf,logs}` in `agi`'s home. 
 | I/O timeout | `PROTEUS_IO_TIMEOUT_S=0.2` → `SIM2REAL_IO_TIMEOUT_S` and bridge `--timeout-s` | `start_proteus_onboard.sh` |
 | Operator key freshness | 0.3 s (`OPERATOR_FRESH_S`) | `aimdk_bridge.py` |
 | Takeover | `--takeover-cmd` (`bash release_mc.sh`), `--takeover-timeout-s 70` | `aimdk_bridge.py` |
-| Head group | `X2_NO_HEAD=1` → `--no-head`: no head topics subscribed or commanded | `start_proteus_onboard.sh` |
+| Head group | `X2_NO_HEAD=0` (default): the bridge subscribes to and commands the head group. This X2 Basic's HAL publishes a head group that reads constant 0, so the default works. `X2_NO_HEAD=1` → `--no-head` (no head topics subscribed or commanded) only if `probe.sh` prints `head : no messages` | `start_proteus_onboard.sh` |
 | Board host / target | `X2_HOST=agi@10.0.1.40`, `X2_TARGET=proteus_x2` | `deploy_onboard.sh` |
 
 Board launcher selection:
@@ -175,35 +173,16 @@ Board launcher selection:
    Restart the native controller with `aima em start-app mc`. `proteus_x2/logs/run-<UTC>/` holds `bridge.log`,
    `tracker.log`, `bridge-state.json` and `tracking.npz`.
 
-### PC route (not run on hardware)
-
-The Tracker on a PC with ROS 2 Humble + AimDK, `--robot-io inline` (`X2RobotIO`), `policy.yaml`. Source ROS 2 +
-AimDK first (`start_first_hold.sh` and `system_state.sh` source `third_party/aimdk_x2_ros_v082/install/setup.bash`,
-override with `X2_AIMDK_SETUP`). `start_first_hold.sh` binds CycloneDDS to `10.0.1.2`; `system_state.sh` uses
-Fast DDS via `fastdds_host.xml`. Neither stops mc.
-
-```bash
-uv run --no-sync python scripts/x2/check_feedback.py --duration 10 --output outputs/x2/feedback.json
-bash scripts/x2/system_state.sh                       # read-only system-state query
-bash scripts/x2/system_state.sh --target Develop_MC  # only if the robot configures this mode
-bash scripts/x2/start_first_hold.sh                  # requires Develop_MC; static Hold with recording
-bash scripts/x2/start_proteus.sh /path/to/x2/any4hdmi_dataset [policy.yaml]
-bash scripts/x2/system_state.sh --target Ready       # restore native control
-```
-
-Keyboard: `i` Shaping, `]` Hold, Space play / pause, `o` damping. `X2RobotIO` also takes `read_only`
-(`SIM2REAL_X2_READ_ONLY=1`: no command publisher or timer) and `SIM2REAL_X2_IO_CPUS` /
-`SIM2REAL_X2_POLICY_CPUS` (ROS I/O threads vs inference). On one X2 Ultra (2026-11-04) `Develop_MC` was
-rejected as not configured, so this route never took control.
-
 ### PICO teleop
 
 ```bash
 bash scripts/x2/start_pico.sh publisher --actual-human-height 1.70   # venv/pico
 bash scripts/x2/start_pico.sh sim
 bash scripts/x2/start_pico.sh policy-sim 127.0.0.1
-bash scripts/x2/start_pico.sh robot PUBLISHER_IP                      # PC route, replaces the last two
 ```
+
+`start_pico.sh robot PUBLISHER_IP` replaces the last two with the inline PC path (`--robot-io inline`,
+`X2RobotIO`, `policy.yaml`, ROS 2 + AimDK sourced, mc released). It is **untested on hardware**.
 
 Buttons: **A** Shaping to neutral, **A+B** policy Hold, **X** start / pause live reference, **B** alone damping.
 Open TCP 28701 and 5592; OLI and X2 PICO share these ports, so run one per host. Needs `outputs/x2/pico_hold`.
@@ -226,7 +205,8 @@ Open TCP 28701 and 5592; OLI and X2 PICO share these ports, so run one per host.
 - **GC stall.** A garbage collection stalled the RK3588 loop for about 600 ms; the Tracker now calls `gc.freeze()`.
 - **No 1000 Hz ROS subscribers during a run** (joint state 1000 Hz, IMU 500 Hz): use `watch.sh`, which reads
   the bridge's LowState. Never pin anything to core 4 (EtherCAT HAL).
-- **Head.** `X2_NO_HEAD` defaults to 0; if `probe.sh` prints `head : no messages`, set `X2_NO_HEAD=1`.
+- **Head.** `start_proteus_onboard.sh` defaults to `X2_NO_HEAD=0`. This X2 Basic's HAL publishes a head group that
+  reads constant 0, so the default works. Set `X2_NO_HEAD=1` only if `probe.sh` prints `head : no messages`.
 - **Simulation load.** Run at most 4 sims in parallel on a 31 GB PC.
 - A stop, a command or state timeout over 0.2 s, or an invalid command latches damping; Ctrl-C sends damping.
 
@@ -234,6 +214,6 @@ Open TCP 28701 and 5592; OLI and X2 PICO share these ports, so run one per host.
 
 - Onboard tutorial: [docs/tutorials/proteus-x2-onboard.md](../../docs/tutorials/proteus-x2-onboard.md) ·
   [中文](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-x2-onboard.md)
-- PC route: [docs/tutorials/proteus-x2.md](../../docs/tutorials/proteus-x2.md) ·
+- Model, sim2sim and PICO teleop: [docs/tutorials/proteus-x2.md](../../docs/tutorials/proteus-x2.md) ·
   [中文](../../docs/i18n/zh-Hans/docusaurus-plugin-content-docs/current/tutorials/proteus-x2.md)
 - Generic workflow: [../README.md](../README.md)

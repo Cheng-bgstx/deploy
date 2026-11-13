@@ -72,6 +72,8 @@ class SonicDictPolicyContractTest(unittest.TestCase):
 
     def test_yaml_groups_match_onnx_inputs(self) -> None:
         checkpoint_root = Path(__file__).resolve().parents[1] / "checkpoints" / "sonic"
+        if not checkpoint_root.is_dir():
+            self.skipTest(f"SONIC checkpoints not downloaded: {checkpoint_root}")
         expected = {
             "release/g1": {"g1_input": [640], "proprioception": [930]},
             "release/smpl": {"smpl_input": [840], "proprioception": [930]},

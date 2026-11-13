@@ -29,10 +29,12 @@ git -C "$sources_root/Proteus" worktree add --detach "$sources_root/Proteus-wams
 gh repo clone engineai-robotics/GMR "$sources_root/GMR-engineai" -- --depth 1
 gh repo clone YanjieZe/GMR "$sources_root/GMR" -- --depth 1
 gh repo clone ubisoft/ubisoft-laforge-animation-dataset "$sources_root/ubisoft-laforge-animation-dataset" -- --depth 1
-uv run --no-sync python -m scripts.t800.prepare --release proteus_wamseq_62 --sources-root "$sources_root"
+uv run --no-sync python -m scripts.t800.prepare --sources-root "$sources_root"
 ```
 
 可用 `--sources-root /path/to/projects` 指定源仓库父目录（兼容 git worktree），`--proteus-root` 指定已有 `wamseq` 检出。`--skip-motions` 只准备模型、策略和 PICO 静态参考。推理用根环境，遥操用 `venv/pico`；准备脚本会在 `venv/pico` 子进程中生成 IK 数据，不负责安装真机 SDK。先按已有 Getting Started 页面配置两个环境；`--no-sync` 复用本机环境。
+
+默认 `--release wsq61` 写入启动脚本读取的 `checkpoints/proteus/wsq61/engineai_t800/`。下文的产物说明和评测表基于 `proteus_wamseq_62` 测得；如需使用该版本，用 `--release proteus_wamseq_62` 准备，并通过 `PROTEUS_POLICY_CONFIG`（启动脚本）或 `--policy-config`（评测）选择。
 
 核对的源版本：[Proteus wamseq](https://github.com/Hxxxz0/Proteus/tree/1e0e0381bdec73652f8aa90b871f2980586bb52a) `1e0e038`、[厂商模型](https://github.com/engineai-robotics/GMR) `71e02c0`（`assets/engineai_t800/t800_mocap.xml`）、GMR `bb1bbe4`、LAFAN1 `9408460`。准备过程检查训练默认姿态下所有关节轴，把质量/限位差异写入 `third_party/engineai_t800/validation.json`，展开 MJCF include，并改为可迁移的相对资源路径。关节参数来自 `sim2real/config/robots/specs/` 中冻结的训练 spec。仿真只与地面碰撞，摩擦系数 1.0，采用 implicitfast，去除关节被动阻尼/摩擦，保留 contract 的增益、力矩限制和 armature。
 
@@ -46,7 +48,7 @@ T800 使用众擎 GMR `71e02c0` 中的 `bvh_lafan1_to_t800.json` 和 `smplx_to_t
 
 ```bash
 uv run --no-sync python -m scripts.proteus.evaluate --robot t800 \
-  --policy-config checkpoints/proteus/proteus_wamseq_62/engineai_t800/policy-sim.yaml \
+  --policy-config checkpoints/proteus/wsq61/engineai_t800/policy-sim.yaml \
   --dataset checkpoints/engineai_t800/motions --output outputs/t800/eval-new
 ```
 
@@ -96,7 +98,7 @@ source /path/to/vendor_workspace/install/setup.bash
 bash scripts/t800/start_proteus.sh checkpoints/engineai_t800/motions/motions/walk1_subject1.npz
 ```
 
-[厂商 SDK/接口来源](https://github.com/engineai-robotics/engineai_ros2_workspace)。CPU 策略推理为 50 Hz，独立 ROS 定时器持续发送最新命令。必须有新鲜关节/IMU 反馈、有限数值命令和非负增益。命令/反馈超过 250 ms、错误或 zero 模式时，位置刚度、目标速度和前馈力矩归零，并保留阻尼。Q1 采用阻尼 5，单次发布的位置步进不超过 0.2 rad。正常退出会重复发送阻尼命令。这些属于进程内检查，不代表进程被杀或断电后有固件保护。IMU 姿态和角速度通过显式外参转换为骨盆 WXYZ/body 坐标。控制 generation 变化时丢弃旧命令。键位：`i` 在 10 s 内整形到首帧，`]` 开启策略 Hold，空格播放/暂停，`o` 阻尼，Ctrl+C 退出。可用 `PROTEUS_POLICY_CONFIG=/path/to/custom.yaml` 指定部署配置。
+[厂商 SDK/接口来源](https://github.com/engineai-robotics/engineai_ros2_workspace)。CPU 策略推理为 50 Hz，独立 ROS 定时器持续发送最新命令。必须有新鲜关节/IMU 反馈、有限数值命令和非负增益。命令/反馈超过 250 ms、错误或 zero 模式时，位置刚度、目标速度和前馈力矩归零，并保留阻尼。T800 编解码器采用阻尼 2（`NamedJointCodec` 默认值），单次发布的位置步进不超过 0.2 rad。正常退出会重复发送阻尼命令。这些属于进程内检查，不代表进程被杀或断电后有固件保护。IMU 姿态和角速度通过显式外参转换为骨盆 WXYZ/body 坐标。控制 generation 变化时丢弃旧命令。键位：`i` 在 10 s 内整形到首帧，`]` 开启策略 Hold，空格播放/暂停，`o` 阻尼，Ctrl+C 退出。可用 `PROTEUS_POLICY_CONFIG=/path/to/custom.yaml` 指定部署配置。
 
 ## PICO
 

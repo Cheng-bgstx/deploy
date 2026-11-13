@@ -208,7 +208,7 @@ PR→AB 转换（[官方映射说明](https://github.com/limxdynamics/humanoid-r
 
 ```bash
 uv run --no-sync python -m pytest tests/test_oli.py tests/test_proteus_observations.py \
-  tests/test_et1_proteus.py tests/test_robot_io.py tests/test_command_sender.py \
+  tests/test_robot_io.py tests/test_command_sender.py \
   -q
 uv run --no-sync python -m py_compile scripts/export_proteus_onnx.py scripts/oli/*.py \
   sim2real/config/robots/oli.py sim2real/rl_policy/robot_io/oli.py

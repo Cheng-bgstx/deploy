@@ -42,8 +42,10 @@ export CYCLONEDDS_HOME="$HOME/cyclonedds/install"
 
 ### Test ankle swing
 
+该脚本通过 SDK2 DDS 直接控制真实 G1：释放高层模式，3 秒内把所有关节移到零位，然后持续摆动脚踝直到 Ctrl+C。机器人需保持吊起。可选参数为连接机器人局域网的网卡（例如 `enp5s0`）。
+
 ```bash
-uv run scripts/g1/test_ankle_swing.py
+uv run scripts/ankle_swing.py <network-interface>
 ```
 
 ### Test inference time

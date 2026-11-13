@@ -29,10 +29,12 @@ git -C "$sources_root/Proteus" worktree add --detach "$sources_root/Proteus-wams
 gh repo clone engineai-robotics/GMR "$sources_root/GMR-engineai" -- --depth 1
 gh repo clone YanjieZe/GMR "$sources_root/GMR" -- --depth 1
 gh repo clone ubisoft/ubisoft-laforge-animation-dataset "$sources_root/ubisoft-laforge-animation-dataset" -- --depth 1
-uv run --no-sync python -m scripts.t800.prepare --release proteus_wamseq_62 --sources-root "$sources_root"
+uv run --no-sync python -m scripts.t800.prepare --sources-root "$sources_root"
 ```
 
 `--sources-root /path/to/projects` overrides the common checkout parent (also works from git worktrees). `--proteus-root` selects an existing `wamseq` checkout. `--skip-motions` prepares only model/policy/PICO hold. Use the established root environment for inference and `venv/pico` for teleop. The preparation script launches the offline IK subprocess in `venv/pico`; it does not install robot SDKs. Set up those environments using the existing Getting Started pages before running this recipe. `--no-sync` reuses the local environments.
+
+The default `--release wsq61` writes `checkpoints/proteus/wsq61/engineai_t800/`, which the launchers read. The artifact description and evaluation table below were measured on `proteus_wamseq_62`; prepare it with `--release proteus_wamseq_62` and select it with `PROTEUS_POLICY_CONFIG` (launchers) or `--policy-config` (evaluation).
 
 Pinned sources checked: [Proteus wamseq](https://github.com/Hxxxz0/Proteus/tree/1e0e0381bdec73652f8aa90b871f2980586bb52a) `1e0e038`, [vendor model](https://github.com/engineai-robotics/GMR) `71e02c0`, `assets/engineai_t800/t800_mocap.xml`; GMR `bb1bbe4`; LAFAN1 `9408460`. Preparation verifies all axes at the training default pose, records mass/limit differences in `third_party/engineai_t800/validation.json`, flattens MJCF includes and rewrites resources to portable relative paths. Joint parameters come from the frozen source spec under `sim2real/config/robots/specs/`. Simulation uses floor-only contacts, friction 1.0, implicitfast, zero passive joint damping/friction, contract gains, effort and armature.
 
@@ -46,7 +48,7 @@ T800 uses EngineAI GMR’s own `bvh_lafan1_to_t800.json` and `smplx_to_t800.json
 
 ```bash
 uv run --no-sync python -m scripts.proteus.evaluate --robot t800 \
-  --policy-config checkpoints/proteus/proteus_wamseq_62/engineai_t800/policy-sim.yaml \
+  --policy-config checkpoints/proteus/wsq61/engineai_t800/policy-sim.yaml \
   --dataset checkpoints/engineai_t800/motions --output outputs/t800/eval-new
 ```
 
@@ -100,7 +102,7 @@ source /path/to/vendor_workspace/install/setup.bash
 bash scripts/t800/start_proteus.sh checkpoints/engineai_t800/motions/motions/walk1_subject1.npz
 ```
 
-[Vendor SDK/interface source](https://github.com/engineai-robotics/engineai_ros2_workspace). Policy inference is 50 Hz on CPU; a separate ROS timer holds the latest command. Fresh joint/IMU feedback, finite commands and nonnegative gains are required. Stale commands/feedback (>250 ms), errors and zero mode replace stiffness, velocity and feedforward torque with zero and retain damping. Q1 uses damping 5 and a 0.2 rad per-publish position step bound. Normal shutdown sends damping repeatedly. These are process-level checks; no claim is made about firmware protection after process kill or power loss. IMU quaternion and angular velocity are converted to pelvis WXYZ/body coordinates with an explicit extrinsic. Changing control generation invalidates old commands. Keys: `i` shapes to frame 0 over 10 s, `]` enables policy Hold, Space plays/pauses, `o` damps, Ctrl+C exits. Use `PROTEUS_POLICY_CONFIG=/path/to/custom.yaml` to select a deployment config.
+[Vendor SDK/interface source](https://github.com/engineai-robotics/engineai_ros2_workspace). Policy inference is 50 Hz on CPU; a separate ROS timer holds the latest command. Fresh joint/IMU feedback, finite commands and nonnegative gains are required. Stale commands/feedback (>250 ms), errors and zero mode replace stiffness, velocity and feedforward torque with zero and retain damping. The T800 codec uses damping 2 (the `NamedJointCodec` default) and a 0.2 rad per-publish position step bound. Normal shutdown sends damping repeatedly. These are process-level checks; no claim is made about firmware protection after process kill or power loss. IMU quaternion and angular velocity are converted to pelvis WXYZ/body coordinates with an explicit extrinsic. Changing control generation invalidates old commands. Keys: `i` shapes to frame 0 over 10 s, `]` enables policy Hold, Space plays/pauses, `o` damps, Ctrl+C exits. Use `PROTEUS_POLICY_CONFIG=/path/to/custom.yaml` to select a deployment config.
 
 ## PICO
 

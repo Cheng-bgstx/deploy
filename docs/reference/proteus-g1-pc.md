@@ -1,33 +1,34 @@
 # Proteus G1 from an external PC
 
-To run the same stack on the G1's own Orin instead, see [Proteus G1 on the robot's Orin](proteus-g1-onboard.md).
+This external-PC route is the hardware-tested one. To run the same stack on the G1's own Orin instead, see [Proteus G1 on the robot's Orin](proteus-g1-onboard.md); that route has only had read-only timing runs and has not yet been tested on hardware.
 
 The launchers default to the hardware-tested `checkpoints/proteus/proteus_wamseq_62/unitree_g1`. The per-robot
 branches also exported the **wsq61** actor (`wsq61_wam_61robots_30000.pt`, SHA256
 `1d1c65ddf5706b940744d87e2f86f7cea453c9240bcccc12d31923211f694bba`, provenance in
 `checkpoints/proteus/wsq61/source/export.json`); select it with
-`PROTEUS_POLICY_DIR=checkpoints/proteus/wsq61/unitree_g1`. The hardware results below do not cover wsq61.
+`PROTEUS_POLICY_DIR=checkpoints/proteus/wsq61/unitree_g1`. wsq61 has only passed a simulation smoke test and has not been tested on hardware.
 
 Run CPU ONNX Tracking at 50 Hz and the Python SDK2 Bridge at 200 Hz on the PC. Tracking reads the cached NPZ reference; the G1 receives joint position/velocity targets, feedforward torque and PD gains over DDS. This route uses the existing Python 3.10 environment, SDK2, CycloneDDS and ZMQ. It does not require the aarch64 inline `unitree_interface` module.
 
 The launcher defaults ONNX, OpenMP and BLAS to one CPU thread. Unbounded ONNX thread pools can consume many cores between 50 Hz inference calls and compete with DDS callbacks. A prior log also recorded a 174 ms command-send delay. The launcher now uses a shared 250 ms I/O timeout instead of the former 100 ms limit, so brief gaps do not latch a stop. Both settings apply when new processes start. Existing processes do not pick up launcher edits. Do not run policy benchmarks or simulation alongside a hardware test.
 
-The exported artifact stays in `checkpoints/proteus/proteus_60/unitree_g1/`. Keep its generated `policy.yaml` unchanged. Generate the separate deployment overlay once:
+The default actor is `checkpoints/proteus/proteus_wamseq_62/unitree_g1/`; the Motion clips stay under `checkpoints/proteus/proteus_60/unitree_g1/motions/`. Keep the exported `policy.yaml` unchanged and generate the separate deployment overlay `policy-pc.yaml` once (the launcher also does this when it is missing):
 
 ```bash
 export HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1
 export PYTHONPATH="$PWD"
 export SIM2REAL_PYTHON=/absolute/path/to/existing/.venv/bin/python
-"$SIM2REAL_PYTHON" scripts/g1/prepare_proteus_deployment.py
+"$SIM2REAL_PYTHON" scripts/g1/prepare_proteus_deployment.py \
+  --policy-config checkpoints/proteus/proteus_wamseq_62/unitree_g1/policy.yaml
 ```
 
-Model and motion artifacts remain outside Git. With the exported actor present and the pinned source motion plus G1 MJCF cached, generate the forward clip once:
+Model and motion artifacts remain outside Git. With the exported actor present and the pinned source motion plus G1 MJCF cached, generate the default clip once:
 
 ```bash
 "$SIM2REAL_PYTHON" scripts/g1/prepare_proteus_motion.py
 ```
 
-The script copies source frames 90–330 inclusively at 30 Hz, without resampling or modifying qpos, and refuses to overwrite existing artifacts. The launcher also prepares it offline if the default clip directory is absent. Cache the source motion and MJCF before deployment; an incomplete existing directory must be inspected rather than silently overwritten.
+The script copies a fixed inclusive frame range of the source motion at 30 Hz (by default `walk_straight_short`, `walk3_subject1` frames 6670–6823; `--clip` selects another clip, for example `walk_forward_to_stand`, `walk1_subject1` frames 90–349), without resampling or modifying qpos, and refuses to overwrite existing artifacts. The launcher also prepares it offline if the default clip directory is absent. Cache the source motion and MJCF before deployment; an incomplete existing directory must be inspected rather than silently overwritten.
 
 `policy-pc.yaml` retains `proteus.reference_forcing: true`, shapes to the arms-down default standing pose, sets waist roll/pitch gains to kp=100, kd=2.5 (yaw remains 100/2), lets targets point up to 1 rad past the joint limits (the Bridge accepts the same range), and limits target changes to 15 rad/s. Proteus trains without clipping targets, and its ankles push them up to about 0.8 rad past the joint range; the former 5% inset clipped the ankles on most walking steps, causing lateral drift and falls during Hold in simulation. The original actor and observation contract are unchanged. The initial arm targets match the previous deployed default pose. A second A interpolates to the reference starting pose over 2 seconds (including settling), then resets histories and enters Hold. Direct policy takeover from the standing pose and lowering before Hold failed rehearsals, so wait for Hold ready before lowering.
 
@@ -35,7 +36,7 @@ Rehearse the actual Tracking controller without DDS or hardware:
 
 ```bash
 "$SIM2REAL_PYTHON" scripts/g1/validate_proteus_deployment.py \
-  --policy-config checkpoints/proteus/wsq61/unitree_g1/policy-pc.yaml \
+  --policy-config checkpoints/proteus/proteus_wamseq_62/unitree_g1/policy-pc.yaml \
   --npz-playback-limit-s 3
 ```
 
@@ -60,7 +61,7 @@ Wait for `Tracker and LowState ready` in the bridge log. Startup emits no DDS mo
 | First A | Release high-level mode and shape over 10 seconds to the arms-down default standing posture, with gantry support. |
 | Second A, after shaping completes | Smoothly transition to the reference pose over 2 seconds, then reset histories and heading and enter Hold. Wait for Hold ready while still supported. |
 | Lower the gantry | Place the feet on the floor while Hold is already active; retain protective support. |
-| Start | Play/pause the reference. The launcher defaults to eight seconds of original-speed forward walking, then holds with policy control active. |
+| Start | Play/pause the reference. The launcher defaults to `walk_straight_short`, about 5.1 seconds of original-speed straight forward walking, then holds with policy control active. |
 | Select | Priority latched software stop. Follow measured joint angles with PD gains retained; active posture support is lost. |
 
 After Select or a fault, restart with A → A → Start. At the configured playback limit, Start cannot extend the segment; a new shaping session resets the reference. `PROTEUS_PLAYBACK_LIMIT_S` changes the limit for a new session, but cannot extend beyond the selected motion's length.

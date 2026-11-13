@@ -19,7 +19,12 @@ case "$mode" in
     policy="checkpoints/proteus/wsq61/primebot_q1/policy-sim.yaml"
     if [[ "$mode" == robot ]]; then
       io_args=(--robot-io inline)
-      policy="checkpoints/proteus/wsq61/primebot_q1/policy.yaml"
+      # The hardware overlay carries the IMU topic and extrinsic that Q1RobotIO requires.
+      policy="checkpoints/proteus/wsq61/primebot_q1/policy-pc.yaml"
+      if [[ ! -f "${PROTEUS_POLICY_CONFIG:-$policy}" ]]; then
+        echo 'Prepare the Q1 hardware overlay with python -m scripts.q1.prepare_deployment (see the Q1 tutorial).' >&2
+        exit 1
+      fi
     fi
     hold="checkpoints/primebot_q1/pico_hold"
     if [[ ! -f "$hold/manifest.json" ]]; then

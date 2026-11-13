@@ -188,7 +188,7 @@ For live PICO, each robot's `start_pico.sh sim` + `start_pico.sh policy-sim` run
 - [ ] Exactly one motor writer: the vendor locomotion or motion-control stack is stopped or has released
       ownership. The G1 and ET1 launchers refuse to start next to a running controller.
 - [ ] Read-only feedback probe passed: G1 and ET1 `PROTEUS_READ_ONLY=1`, PM01 `scripts/pm01/check_robot.py`,
-      X2 `scripts/x2/probe.sh` (onboard) or `scripts/x2/check_feedback.py` (PC), Q1 `scripts/q1/inspect_imu.py`. Check joint order and signs and
+      X2 `scripts/x2/probe.sh`, Q1 `scripts/q1/inspect_imu.py`. Check joint order and signs and
       that the IMU reports gravity along the expected axis.
 - [ ] Robot hangs on the gantry or hoist with the feet clear; the operator knows when to lower it.
 - [ ] Hardware emergency stop tested and in a second person's hand.
